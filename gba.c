@@ -8,12 +8,14 @@
 #include <stdio.h>
 #include <string.h>
 
-#define DEBUG
-bool log_instructions = true;
+//#define DEBUG
+bool log_instructions = false;
 bool log_arm_instructions = true;
 bool log_thumb_instructions = true;
 bool log_registers = false;
+bool single_step = true;
 uint64_t instruction_count = 0;
+uint64_t start_logging_at = 218;
 
 #define DISPLAY_WIDTH 240
 #define DISPLAY_HEIGHT 160
@@ -167,6 +169,7 @@ uint16_t io_win0v;
 uint16_t io_win1v;
 uint16_t io_winin;
 uint16_t io_winout;
+uint16_t io_keyinput;
 uint16_t io_ie;
 uint16_t io_if;
 uint16_t io_ime;
@@ -198,8 +201,11 @@ uint16_t io_read_halfword(uint32_t address) {
 			return io_vcount;
 
 		case IO_KEYINPUT:
-			printf("KEYINPUT\n");
-			return 0x3ff;
+			io_keyinput = 0x3ff;
+			for (int i = 0; i < NUM_KEYS; i++) {
+				if (keys[i]) io_keyinput &= ~(1 << i);
+			}
+			return io_keyinput;
 
 		case IO_IE:
 			return io_ie;
@@ -247,22 +253,22 @@ void io_write_halfword(uint32_t address, uint16_t value) {
 
 		case IO_WIN0H:
 			io_win0h = value;
-			printf("WIN0H = 0x%04x\n", io_win0h);
+			//printf("WIN0H = 0x%04x\n", io_win0h);
 			break;
 
 		case IO_WIN1H:
 			io_win1h = value;
-			printf("WIN1H = 0x%04x\n", io_win1h);
+			//printf("WIN1H = 0x%04x\n", io_win1h);
 			break;
 
 		case IO_WIN0V:
 			io_win0v = value;
-			printf("WIN0V = 0x%04x\n", io_win0v);
+			//printf("WIN0V = 0x%04x\n", io_win0v);
 			break;
 
 		case IO_WIN1V:
 			io_win1v = value;
-			printf("WIN1V = 0x%04x\n", io_win1v);
+			//printf("WIN1V = 0x%04x\n", io_win1v);
 			break;
 
 		case IO_WININ:
@@ -293,6 +299,10 @@ void io_write_halfword(uint32_t address, uint16_t value) {
 
 uint32_t io_read_word(uint32_t address) {
 	switch (address) {
+		case IO_DISPSTAT:
+			io_vcount = (io_vcount + 1) % 228;
+			return io_dispstat | io_vcount << 16;
+
 		case IO_IE:
 			return io_ie | io_if << 16;
 
@@ -314,6 +324,13 @@ void io_write_word(uint32_t address, uint32_t value) {
 			io_bg1cnt = (uint16_t)(value >> 16);
 			printf("BG0CNT = 0x%04x\n", io_bg0cnt);
 			printf("BG1CNT = 0x%04x\n", io_bg1cnt);
+			break;
+
+		case IO_BG0HOFS:
+			io_bg0hofs = (uint16_t) value;
+			io_bg0vofs = (uint16_t)(value >> 16);
+			//printf("BG0HOFS = 0x%04x\n", io_bg0hofs);
+			//printf("BG0VOFS = 0x%04x\n", io_bg0vofs);
 			break;
 
 		case IO_IE:
@@ -653,16 +670,27 @@ uint32_t ror(uint32_t x, uint32_t n) {
 }
 
 void print_psr(uint32_t psr) {
-	printf("%%");
-	putchar(psr & PSR_N ? 'N' : 'n');
-	putchar(psr & PSR_Z ? 'Z' : 'z');
-	putchar(psr & PSR_C ? 'C' : 'c');
-	putchar(psr & PSR_V ? 'V' : 'v');
-	putchar(psr & PSR_I ? 'I' : 'i');
-	putchar(psr & PSR_F ? 'F' : 'f');
-	putchar(psr & PSR_T ? 'T' : 't');
-	printf("_");
-	uint32_t mode = psr & PSR_MODE;
+	putchar(psr & PSR_N ? 'N' : '-');
+	putchar(psr & PSR_Z ? 'Z' : '-');
+	putchar(psr & PSR_C ? 'C' : '-');
+	putchar(psr & PSR_V ? 'V' : '-');
+	putchar(psr & PSR_I ? 'I' : '-');
+	putchar(psr & PSR_F ? 'F' : '-');
+	putchar(psr & PSR_T ? 'T' : '-');
+}
+
+void print_registers(void) {
+	bool T = (cpsr & PSR_T) != 0;
+	printf(" r0: %08X   r1: %08X   r2: %08X   r3: %08X\n", r[0], r[1], r[2], r[3]);
+	printf(" r4: %08X   r5: %08X   r6: %08X   r7: %08X\n", r[4], r[5], r[6], r[7]);
+	printf(" r8: %08X   r9: %08X  r10: %08X  r11: %08X\n", r[8], r[9], r[10], r[11]);
+	printf("r12: %08X  r13: %08X  r14: %08X  r15: %08X\n", r[12], r[13], r[14], r[15] - (T ? 2 : 4));
+	printf("cpsr: %08X [", cpsr);
+	print_psr(cpsr);
+	printf("]\n");
+	printf("Cycle: %lld\n", instruction_count);
+	/*
+	uint32_t mode = cpsr & PSR_MODE;
 	switch (mode) {
 		case PSR_MODE_USR: printf("User32"); break;
 		case PSR_MODE_FIQ: printf("FIQ32"); break;
@@ -673,17 +701,6 @@ void print_psr(uint32_t psr) {
 		case PSR_MODE_SYS: printf("System32"); break;
 		default: printf("Ill_%02x", mode); break;
 	}
-}
-
-void print_registers(void) {
-	bool T = (cpsr & PSR_T) != 0;
-	printf("  r0  = 0x%08x  r1  = 0x%08x  r2  = 0x%08x  r3  = 0x%08x\n", r[0], r[1], r[2], r[3]);
-	printf("  r4  = 0x%08x  r5  = 0x%08x  r6  = 0x%08x  r7  = 0x%08x\n", r[4], r[5], r[6], r[7]);
-	printf("  r8  = 0x%08x  r9  = 0x%08x  r10 = 0x%08x  r11 = 0x%08x\n", r[8], r[9], r[10], r[11]);
-	printf("  r12 = 0x%08x  r13 = 0x%08x  r14 = 0x%08x\n", r[12], r[13], r[14]);
-	printf("  pc  = 0x%08x  psr = ", r[15] - (T ? 4 : 8));
-	print_psr(cpsr);
-	uint32_t mode = cpsr & PSR_MODE;
 	if (mode == PSR_MODE_USR || mode == PSR_MODE_SYS) {
 		printf("\n\n");
 		return;
@@ -691,35 +708,24 @@ void print_registers(void) {
 	printf("  spsr = ");
 	print_psr(read_spsr());
 	printf("\n\n");
+	*/
 }
 
 void arm_print_opcode(void) {
 	bool T = (cpsr & PSR_T) != 0;
-	printf("      0x%08x: 0x%08x  ", r[15] - (T ? 4 : 8), arm_op);
-	for (int i = 0; i < 4; i++) {
-		uint8_t c = (uint8_t)(arm_op >> 8 * i);
-		if (c < 32 || c > 127) c = '.';
-		putchar(c);
-	}
-	printf(" :    ");
+	printf("%08X:  %08X\t", r[15] - (T ? 4 : 8), arm_op);
 }
 
 void thumb_print_opcode(void) {
-	printf("      0x%08x: 0x%04x      ", r[15] - 4, thumb_op);
-	for (int i = 0; i < 2; i++) {
-		uint8_t c = (uint8_t)(thumb_op >> 8 * i);
-		if (c < 32 || c > 127) c = '.';
-		putchar(c);
-	}
-	printf("   :    ");
+	printf("%08X:  %04X    \t", r[15] - 4, thumb_op);
 }
 
 void arm_print_mnemonic(char *s) {
-	printf("%-9s", s);
+	printf("%s ", s);
 }
 
 void thumb_print_mnemonic(char *s) {
-	printf("%-9s", s);
+	printf("%s ", s);
 }
 
 void arm_print_register(uint32_t i) {
@@ -737,7 +743,7 @@ void thumb_print_register(uint32_t i) {
 
 void arm_print_immediate(uint32_t i) {
 	if (i > 9) {
-		printf("#0x%x", i);
+		printf("#0x%X", i);
 	} else {
 		printf("#%d", i);
 	}
@@ -749,18 +755,18 @@ void arm_print_shift(uint32_t i) {
 
 void thumb_print_immediate(uint32_t i) {
 	if (i > 9) {
-		printf("#0x%x", i);
+		printf("#0x%X", i);
 	} else {
 		printf("#%d", i);
 	}
 }
 
 void arm_print_address(uint32_t i) {
-	printf("0x%x", i);
+	printf("0x%08X", i);
 }
 
 void thumb_print_address(uint32_t i) {
-	printf("0x%x", i);
+	printf("0x%08X", i);
 }
 
 void arm_data_processing_register(void) {
@@ -773,6 +779,8 @@ void arm_data_processing_register(void) {
 	uint32_t shop = (arm_op >> 5) & 3;
 	bool shreg = (arm_op & (1 << 4)) != 0;
 	uint32_t Rm = arm_op & 0xf;
+
+	if ((shop == SHIFT_LSR || shop == SHIFT_ASR) && shamt == 0) shamt = 32;
 
 	if (alu == ARM_TST || alu == ARM_TEQ || alu == ARM_CMP || alu == ARM_CMN) {
 		assert(S == 1);
@@ -857,7 +865,7 @@ void arm_data_processing_register(void) {
 				if (shreg) {
 					arm_print_register(Rs);
 				} else {
-					arm_print_shift(shamt == 0 ? 32 : shamt);
+					arm_print_shift(shamt);
 				}
 				break;
 
@@ -866,7 +874,7 @@ void arm_data_processing_register(void) {
 				if (shreg) {
 					arm_print_register(Rs);
 				} else {
-					arm_print_shift(shamt == 0 ? 32 : shamt);
+					arm_print_shift(shamt);
 				}
 				break;
 
@@ -890,18 +898,17 @@ void arm_data_processing_register(void) {
 	}
 #endif
 
-	uint32_t s = (shreg ? r[Rs] & 0x1f : shamt);
-	uint64_t m = r[Rm];
+	uint32_t s = (shreg ? r[Rs] : shamt);
+	uint32_t m = r[Rm];
 	switch (shop) {
-		case SHIFT_LSL: m <<= s; break;
-		case SHIFT_LSR: m >>= (s == 0 ? 32 : s); break;
-		case SHIFT_ASR: m = asr(m, s == 0 ? 32 : s); break;
-		case SHIFT_ROR: assert(false); break;
+		case SHIFT_LSL: if (s >= 32) { m = 0; } else { m <<= s; }; break;
+		case SHIFT_LSR: if (s >= 32) { m = 0; } else { m >>= s; }; break;
+		case SHIFT_ASR: if (s >= 32) { m = (m & (1 << 31)) ? ~0 : 0; } else { m = asr(m, s); } break;
+		case SHIFT_ROR: assert(false); m = ror(m, s & 0x1f); break;
 		default: assert(false); break;
 	}
-	//bool shifter_out = (m & 0xffffffff00000000L) != 0;
 
-	uint32_t result = 0;
+	uint64_t result = 0;
 	switch (alu) {
 		case ARM_AND: result = r[Rn] & m; break;
 		case ARM_EOR: result = r[Rn] ^ m; break;
@@ -921,15 +928,55 @@ void arm_data_processing_register(void) {
 		case ARM_MVN: result = ~m; break;
 		default: assert(false); break;
 	}
-	if (alu != ARM_TST && alu != ARM_TEQ && alu != ARM_CMP && alu != ARM_CMN) {
-		r[Rd] = result;
-	}
 	if (S) {  // flags
 		if ((result & 0x80000000) != 0) { cpsr |= PSR_N; } else { cpsr &= ~PSR_N; }
-		if (result == 0) { cpsr |= PSR_Z; } else { cpsr &= ~PSR_Z; }
-		//if (shifter_out) { cpsr |= PSR_C; }
-		//if (((x) & 0xffffffff00000000L) != 0) { cpsr |= PSR_C; } else { cpsr &= ~PSR_C; }
+		if ((result & 0xffffffff) == 0) { cpsr |= PSR_Z; } else { cpsr &= ~PSR_Z; }
+		if (alu == ARM_SUB || alu == ARM_SBC || alu == ARM_CMP) {
+			if ((result & 0xffffffff00000000LL) != 0) { cpsr &= ~PSR_C; } else { cpsr |= PSR_C; }
+		} else if (alu == ARM_ADD || alu == ARM_ADC || alu == ARM_CMN) {
+			if ((result & 0xffffffff00000000LL) != 0) { cpsr |= PSR_C; } else { cpsr &= ~PSR_C; }
+		}
+		switch (shop) {
+			case SHIFT_LSL:
+				if (s == 0) {
+					// Not altered
+				} else if (s >= 1 && s <= 32) {
+					//printf("r[Rm] = 0x%x\n", r[Rm]);
+					//printf("s = %d\n", s);
+					if ((r[Rm] & (1 << (32 - s))) != 0) { cpsr |= PSR_C; } else { cpsr &= ~PSR_C; }
+				} else {
+					cpsr &= ~PSR_C;
+				}
+				break;
+			case SHIFT_LSR:
+				if (s == 0) {
+					// Not altered
+				} else if (s >= 1 && s <= 32) {
+					if ((r[Rm] & (1 << (s - 1))) != 0) { cpsr |= PSR_C; } else { cpsr &= ~PSR_C; }
+				} else {
+					cpsr &= ~PSR_C;
+				}
+				break;
+			case SHIFT_ASR:
+				if (s == 0) {
+					// Not altered
+				} else if (s >= 1 && s <= 32) {
+					if ((r[Rm] & (1 << (s - 1))) != 0) { cpsr |= PSR_C; } else { cpsr &= ~PSR_C; }
+				} else {
+					if ((r[Rm] & (1 << 31)) != 0) { cpsr |= PSR_C; } else { cpsr &= ~PSR_C; }
+				}
+				break;
+			case SHIFT_ROR: assert(false); break;
+			default: assert(false); break;
+		}
 		//if (false) { cpsr |= PSR_V; } else { cpsr &= ~PSR_V; }  // FIXME
+	}
+	if (alu != ARM_TST && alu != ARM_TEQ && alu != ARM_CMP && alu != ARM_CMN) {
+		r[Rd] = (uint32_t) result;
+		if (Rd == 15) {
+			r[Rd] &= ~1;
+			branch_taken = true;
+		}
 	}
 }
 
@@ -939,7 +986,7 @@ void arm_data_processing_immediate(void) {
 	uint32_t Rn = (arm_op >> 16) & 0xf;
 	uint32_t Rd = (arm_op >> 12) & 0xf;
 	uint32_t rot = (arm_op >> 8) & 0xf;
-	uint32_t imm = ror(arm_op & 0xff, 2 * rot);
+	uint64_t imm = ror(arm_op & 0xff, 2 * rot);
 
 	if (alu == ARM_TST || alu == ARM_TEQ || alu == ARM_CMP || alu == ARM_CMN) {
 		assert(S == 1);
@@ -1014,15 +1061,15 @@ void arm_data_processing_immediate(void) {
 	}
 #endif
 
-	uint32_t result = 0;
+	uint64_t result = 0;
 	switch (alu) {
 		case ARM_AND: result = r[Rn] & imm; break;
 		case ARM_EOR: result = r[Rn] ^ imm; break;
 		case ARM_SUB: result = r[Rn] - imm; break;
 		case ARM_RSB: result = imm - r[Rn]; break;
 		case ARM_ADD: result = r[Rn] + imm; break;
-		case ARM_ADC: assert(false); break;  // FIXME
-		case ARM_SBC: assert(false); break;  // FIXME
+		case ARM_ADC: result = r[Rn] + imm + (cpsr & PSR_C ? 1 : 0); break;
+		case ARM_SBC: result = r[Rn] - imm - (cpsr & PSR_C ? 0 : 1); break;
 		case ARM_RSC: assert(false); break;  // FIXME
 		case ARM_TST: result = r[Rn] & imm; break;
 		case ARM_TEQ: result = r[Rn] ^ imm; break;
@@ -1035,12 +1082,16 @@ void arm_data_processing_immediate(void) {
 		default: assert(false); break;
 	}
 	if (alu != ARM_TST && alu != ARM_TEQ && alu != ARM_CMP && alu != ARM_CMN) {
-		r[Rd] = result;
+		r[Rd] = (uint32_t) result;
 	}
 	if (S) {  // flags
 		if ((result & 0x80000000) != 0) { cpsr |= PSR_N; } else { cpsr &= ~PSR_N; }
-		if (result == 0) { cpsr |= PSR_Z; } else { cpsr &= ~PSR_Z; }
-		//ASSIGN_C(result);
+		if ((result & 0xffffffff) == 0) { cpsr |= PSR_Z; } else { cpsr &= ~PSR_Z; }
+		if (alu == ARM_SUB || alu == ARM_CMP) {
+			if ((result & 0xffffffff00000000LL) != 0) { cpsr &= ~PSR_C; } else { cpsr |= PSR_C; }
+		} else if (alu != ARM_MOV) {
+			if ((result & 0xffffffff00000000LL) != 0) { cpsr |= PSR_C; } else { cpsr &= ~PSR_C; }
+		}
 		//if (false) { cpsr |= PSR_V; } else { cpsr &= ~PSR_V; }  // FIXME
 	}
 }
@@ -1132,7 +1183,13 @@ void arm_single_data_transfer_register(void) {
 	uint32_t n = r[Rn];
 	if (Rn == 15) n &= ~3;
 	uint32_t m = r[Rm];
-	assert(shop == 0 && shamt == 0);
+	switch (shop) {
+		case SHIFT_LSL: if (shamt != 0) assert(false); break;
+		case SHIFT_LSR: assert(false); break;
+		case SHIFT_ASR: assert(false); break;
+		case SHIFT_ROR: assert(false); break;
+		default: assert(false); break;
+	}
 	if (L) {
 		if (B) {
 			r[Rd] = memory_read_byte(n + m);
@@ -1222,8 +1279,11 @@ void arm_block_data_transfer(void) {
 	for (int i = 0; i < 16; i++) {
 		if (rlist & (1 << i)) {
 			if (L) {
-				//assert(i != 15);
 				r[i] = memory_read_word(address);
+				if (i == 15) {
+					assert((r[i] & 1) == 0);
+					branch_taken = true;
+				}
 				//if (log_instructions) printf("Popped r%d = 0x%x\n", i, r[i]);
 			} else {
 				if ((uint32_t) i == Rn && W) assert((uint32_t) i == lowest_set_bit(rlist));
@@ -1259,20 +1319,21 @@ void arm_branch(void) {
 }
 
 void arm_software_interrupt(void) {
-#ifdef DEBUG
-	if (log_instructions && log_arm_instructions) {
+//#ifdef DEBUG
+	if (true) { //log_instructions && log_arm_instructions) {
 		arm_print_opcode();
 		arm_print_mnemonic("swi");
 		arm_print_address(arm_op & 0xffffff);
 		printf("\n");
 	}
-#endif
+//#endif
 
 	r14_svc = r[15] - 4;
 	spsr_svc = cpsr;
 	cpsr = (cpsr & ~PSR_MODE) | PSR_MODE_SVC;
 	cpsr |= PSR_I;
 	r[15] = PC_SWI;
+	branch_taken = true;
 }
 
 void arm_multiply(void) {
@@ -1304,8 +1365,12 @@ void arm_multiply(void) {
 #endif
 
 	assert(!A);
-	assert(!S);
 	r[Rd] = r[Rm] * r[Rs];
+
+	if (S) {
+		if ((r[Rd] & 0x80000000) != 0) { cpsr |= PSR_N; } else { cpsr &= ~PSR_N; }
+		if (r[Rd] == 0) { cpsr |= PSR_Z; } else { cpsr &= ~PSR_Z; }
+	}
 }
 
 void arm_load_store_halfword_register(void) {
@@ -1393,6 +1458,14 @@ void arm_load_store_halfword_immediate(void) {
 		memory_write_halfword(n, (uint16_t) r[Rd]);
 	}
 	if (!P) r[Rn] += imm;  // FIXME?
+}
+
+void arm_load_store_signed_byte_halfword_register(void) {
+	assert(false);
+}
+
+void arm_load_store_signed_byte_halfword_immediate(void) {
+	assert(false);
 }
 
 void arm_special_data_processing_register(void) {
@@ -1701,6 +1774,8 @@ void thumb_data_processing_register(void) {
 	}
 	if (opc == THUMB_NEG) {
 		arm_data_processing_immediate();
+	} else if (opc == THUMB_MUL) {
+		arm_multiply();
 	} else {
 		arm_data_processing_register();
 	}
@@ -1831,7 +1906,7 @@ void thumb_load_store_register_offset(void) {
 
 		case 3:
 		case 7:
-			assert(false);
+			arm_load_store_signed_byte_halfword_register();
 			break;
 	}
 }
@@ -2131,6 +2206,25 @@ void thumb_conditional_branch(void) {
 	}
 }
 
+void thumb_software_interrupt(void) {
+//#ifdef DEBUG
+	if (true) { //log_instructions && log_thumb_instructions) {
+		thumb_print_opcode();
+		thumb_print_mnemonic("swi");
+		thumb_print_address(thumb_op & 0xff);
+		printf("\n");
+	}
+//#endif
+
+	r14_svc = (r[15] - 2) | 1;
+	spsr_svc = cpsr;
+	cpsr = (cpsr & ~PSR_MODE) | PSR_MODE_SVC;
+	cpsr |= PSR_I;
+	cpsr &= ~PSR_T;
+	r[15] = PC_SWI;
+	branch_taken = true;
+}
+
 void thumb_unconditional_branch(void) {
 	uint32_t imm = thumb_op & 0x7ff;
 	if (thumb_op & 0x400) imm |= ~0x7ff;
@@ -2362,7 +2456,7 @@ void thumb_init_lookup(void) {
 	thumb_bind(0xc0, 0x0f, thumb_load_store_multiple);
 	thumb_bind(0xd0, 0x0f, thumb_conditional_branch);
 	thumb_bind(0xde, 0x00, thumb_undefined_instruction);
-	thumb_bind(0xdf, 0x00, NULL);  // thumb_software_interrupt
+	thumb_bind(0xdf, 0x00, thumb_software_interrupt);
 	thumb_bind(0xe0, 0x07, thumb_unconditional_branch);
 	thumb_bind(0xf0, 0x07, thumb_bl_prefix);
 	thumb_bind(0xf8, 0x07, thumb_bl_suffix);
@@ -2391,7 +2485,7 @@ void gba_init(const char *filename) {
 
 	if (skip_bios) {
 		r[13] = 0x03007f00;
-		r[14] = 0x08000000;
+		r13_irq = 0x03007fa0;
 		r[15] = 0x08000000;
 		cpsr = PSR_MODE_SYS;
 	} else {
@@ -2404,21 +2498,26 @@ void gba_init(const char *filename) {
 
 void gba_emulate(void) {
 	for (int i = 0; i < 4096; i++) {
-		/*
-		if (r[15] == 0x08000158) {  // instruction_count > 196608
+#ifdef DEBUG
+		if (single_step && instruction_count >= start_logging_at) {
 			log_instructions = true;
 			log_registers = true;
 		}
-		*/
+#endif
+
 		if (cpsr & PSR_T) {
 			thumb_step();
 		} else {
 			arm_step();
 		}
+
 #ifdef DEBUG
-		char c = fgetc(stdin);
-		if (c == EOF) exit(EXIT_SUCCESS);
+		if (single_step && instruction_count >= start_logging_at) {
+			char c = fgetc(stdin);
+			if (c == EOF) exit(EXIT_SUCCESS);
+		}
 #endif
+
 		instruction_count++;
 	}
 }
