@@ -6,19 +6,18 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>  // FIXME
 #include <string.h>
 
 #define DEBUG
-bool log_instructions = false;
-bool log_arm_instructions = false;
-bool log_thumb_instructions = false;
+bool log_instructions = true;
+bool log_arm_instructions = true;
+bool log_thumb_instructions = true;
 bool log_registers = false;
 uint64_t instruction_count = 0;
 
 #define DISPLAY_WIDTH 240
 #define DISPLAY_HEIGHT 160
-#define SCREEN_SCALE 2
+#define SCREEN_SCALE 3
 #define SCREEN_WIDTH (DISPLAY_WIDTH * SCREEN_SCALE)
 #define SCREEN_HEIGHT (DISPLAY_HEIGHT * SCREEN_SCALE)
 #define NUM_KEYS 10
@@ -109,10 +108,6 @@ bool keys[NUM_KEYS];
 #define THUMB_BIC 0xe
 #define THUMB_MVN 0xf
 
-#define IO_DISPCNT  0x4000000
-#define IO_DISPSTAT 0x4000004
-#define IO_IME      0x4000208
-
 uint8_t system_rom[0x4000];
 uint8_t cpu_ewram[0x40000];
 uint8_t cpu_iwram[0x8000];
@@ -140,11 +135,217 @@ uint16_t thumb_op;
 uint16_t thumb_pipeline[2];
 void (*thumb_lookup[256])(void);
 
+#define IO_DISPCNT  0
+#define IO_DISPSTAT 4
+#define IO_VCOUNT   6
+#define IO_BG0CNT   8
+#define IO_BG1CNT   0xa
+#define IO_BG0HOFS  0x10
+#define IO_BG0VOFS  0x12
+#define IO_WIN0H    0x40
+#define IO_WIN1H    0x42
+#define IO_WIN0V    0x44
+#define IO_WIN1V    0x46
+#define IO_WININ    0x48
+#define IO_WINOUT   0x4a
+#define IO_KEYINPUT 0x130
+#define IO_IE       0x200
+#define IO_IME      0x208
+
+uint16_t io_dispcnt;
+uint16_t io_dispstat;
+uint16_t io_vcount;
+uint16_t io_bg0cnt;
+uint16_t io_bg1cnt;
+uint16_t io_bg2cnt;
+uint16_t io_bg3cnt;
+uint16_t io_bg0hofs;
+uint16_t io_bg0vofs;
+uint16_t io_win0h;
+uint16_t io_win1h;
+uint16_t io_win0v;
+uint16_t io_win1v;
+uint16_t io_winin;
+uint16_t io_winout;
+uint16_t io_ie;
+uint16_t io_if;
+uint16_t io_ime;
+
+uint8_t io_read_byte(uint32_t address) {
+	switch (address) {
+		default:
+			printf("io_read_byte(0x%08x);\n", address);
+			return 0;
+	}
+}
+
+void io_write_byte(uint32_t address, uint8_t value) {
+	switch (address) {
+		default:
+			printf("io_write_byte(0x%08x, 0x%02x);\n", address, value);
+			break;
+	}
+}
+
+uint16_t io_read_halfword(uint32_t address) {
+	switch (address) {
+		case IO_DISPSTAT:
+			io_dispstat = (io_dispstat + 1) % 8;
+			return io_dispstat;
+
+		case IO_VCOUNT:
+			io_vcount = (io_vcount + 1) % 228;
+			return io_vcount;
+
+		case IO_KEYINPUT:
+			printf("KEYINPUT\n");
+			return 0x3ff;
+
+		case IO_IE:
+			return io_ie;
+
+		case IO_IME:
+			return io_ime;
+
+		default:
+			printf("io_read_halfword(0x%08x);\n", address);
+			return 0;
+	}
+}
+
+void io_write_halfword(uint32_t address, uint16_t value) {
+	switch (address) {
+		case IO_DISPCNT:
+			io_dispcnt = value;
+			printf("DISPCNT = 0x%04x\n", io_dispcnt);
+			break;
+
+		case IO_DISPSTAT:
+			io_dispstat = (io_dispstat & 7) | (value & ~7);
+			printf("DISPSTAT = 0x%04x\n", io_dispstat);
+			break;
+
+		case IO_BG0CNT:
+			io_bg0cnt = value;
+			printf("BG0CNT = 0x%04x\n", io_bg0cnt);
+			break;
+
+		case IO_BG1CNT:
+			io_bg1cnt = value;
+			printf("BG1CNT = 0x%04x\n", io_bg1cnt);
+			break;
+
+		case IO_BG0HOFS:
+			io_bg0hofs = value;
+			printf("BG0HOFS = 0x%04x\n", io_bg0hofs);
+			break;
+
+		case IO_BG0VOFS:
+			io_bg0vofs = value;
+			printf("BG0VOFS = 0x%04x\n", io_bg0vofs);
+			break;
+
+		case IO_WIN0H:
+			io_win0h = value;
+			printf("WIN0H = 0x%04x\n", io_win0h);
+			break;
+
+		case IO_WIN1H:
+			io_win1h = value;
+			printf("WIN1H = 0x%04x\n", io_win1h);
+			break;
+
+		case IO_WIN0V:
+			io_win0v = value;
+			printf("WIN0V = 0x%04x\n", io_win0v);
+			break;
+
+		case IO_WIN1V:
+			io_win1v = value;
+			printf("WIN1V = 0x%04x\n", io_win1v);
+			break;
+
+		case IO_WININ:
+			io_winin = value;
+			printf("WININ = 0x%04x\n", io_winin);
+			break;
+
+		case IO_WINOUT:
+			io_winout = value;
+			printf("WINOUT = 0x%04x\n", io_winout);
+			break;
+
+		case IO_IE:
+			io_ie = value;
+			printf("IE = 0x%04x\n", io_ie);
+			break;
+
+		case IO_IME:
+			io_ime = value;
+			printf("IME = 0x%04x\n", io_ime);
+			break;
+
+		default:
+			printf("io_write_halfword(0x%08x, 0x%04x);\n", address, value);
+			break;
+	}
+}
+
+uint32_t io_read_word(uint32_t address) {
+	switch (address) {
+		case IO_IE:
+			return io_ie | io_if << 16;
+
+		default:
+			printf("io_read_word(0x%08x);\n", address);
+			return 0;
+	}
+}
+
+void io_write_word(uint32_t address, uint32_t value) {
+	switch (address) {
+		case IO_DISPCNT:
+			io_dispcnt = (uint16_t) value;
+			printf("DISPCNT = 0x%04x\n", io_dispcnt);
+			break;
+
+		case IO_BG0CNT:
+			io_bg0cnt = (uint16_t) value;
+			io_bg1cnt = (uint16_t)(value >> 16);
+			printf("BG0CNT = 0x%04x\n", io_bg0cnt);
+			printf("BG1CNT = 0x%04x\n", io_bg1cnt);
+			break;
+
+		case IO_IE:
+			io_ie = (uint16_t) value;
+			io_if = (uint16_t)(value >> 16);
+			printf("IE = 0x%04x\n", io_ie);
+			printf("IF = 0x%04x\n", io_if);
+			break;
+
+		case IO_IME:
+			io_ime = (uint16_t) value;
+			printf("IME = 0x%04x\n", io_ime);
+			break;
+
+		default:
+			printf("io_write_word(0x%08x, 0x%08x);\n", address, value);
+			break;
+	}
+}
+
 uint8_t memory_read_byte(uint32_t address) {
 	if (address < 0x4000) {
 		assert(false);
 		return system_rom[address];
-	} else if (address >= 0x08000000 && address < 0x0a000000) {
+	}
+	if (address >= 0x03000000 && address < 0x03008000) {
+		return cpu_iwram[address - 0x03000000];
+	}
+	if (address >= 0x04000000 && address < 0x05000000) {
+		return io_read_byte(address - 0x04000000);
+	}
+	if (address >= 0x08000000 && address < 0x0a000000) {
 		return rom[address - 0x08000000];
 	}
 	printf("memory_read_byte(0x%08x);\n", address);
@@ -157,6 +358,18 @@ void memory_write_byte(uint32_t address, uint8_t value) {
 		cpu_iwram[address - 0x03000000] = value;
 		return;
 	}
+	if (address >= 0x04000000 && address < 0x05000000) {
+		io_write_byte(address - 0x04000000, value);
+		return;
+	}
+	if (address >= 0x05000000 && address < 0x05000400) {
+		*(uint16_t *)&palette_ram[address - 0x05000000] = value | value << 8;
+		return;
+	}
+	if (address >= 0x06000000 && address < 0x06018000) {
+		*(uint16_t *)&video_ram[address - 0x06000000] = value | value << 8;
+		return;
+	}
 	printf("memory_write_byte(0x%08x, 0x%02x);\n", address, value);
 	assert(false);
 }
@@ -167,16 +380,16 @@ uint16_t memory_read_halfword(uint32_t address) {
 		return 0;
 	}
 	if (address < 0x4000) {
-		assert(false);
 		return *(uint16_t *)&system_rom[address];
 	}
 	if (address >= 0x03000000 && address < 0x03008000) {
-		assert(false);
 		return *(uint16_t *)&cpu_iwram[address - 0x03000000];
 	}
 	if (address >= 0x04000000 && address < 0x05000000) {
-		printf("memory_read_halfword(0x%08x);\n", address);
-		return (uint16_t) rand();
+		return io_read_halfword(address - 0x04000000);
+	}
+	if (address >= 0x06000000 && address < 0x06018000) {
+		return *(uint16_t *)&video_ram[address - 0x06000000];
 	}
 	if (address >= 0x08000000 && address < 0x0a000000) {
 		return *(uint16_t *)&rom[address - 0x08000000];
@@ -191,8 +404,12 @@ void memory_write_halfword(uint32_t address, uint16_t value) {
 		assert(false);
 		return;
 	}
+	if (address >= 0x03000000 && address < 0x03008000) {
+		*(uint16_t *)&cpu_iwram[address - 0x03000000] = value;
+		return;
+	}
 	if (address >= 0x04000000 && address < 0x05000000) {
-		printf("memory_write_halfword(0x%08x, 0x%04x);\n", address, value);
+		io_write_halfword(address - 0x04000000, value);
 		return;
 	}
 	if (address >= 0x05000000 && address < 0x05000400) {
@@ -203,21 +420,12 @@ void memory_write_halfword(uint32_t address, uint16_t value) {
 		*(uint16_t *)&video_ram[address - 0x06000000] = value;
 		return;
 	}
-	/*
-	if (address >= 0x06018000 && address < 0x07000000) {
-		return;
-	}
 	if (address >= 0x07000000 && address < 0x07000400) {
 		*(uint16_t *)&object_ram[address - 0x07000000] = value;
 		return;
 	}
-	if (address >= 0x07000400 && address < 0x80000000) {
-		return;
-	}
-	*/
 	printf("memory_write_halfword(0x%08x, 0x%04x);\n", address, value);
-	assert(false);
-	// FIXME
+	assert(false);  // FIXME
 }
 
 uint32_t memory_read_word(uint32_t address) {
@@ -226,17 +434,22 @@ uint32_t memory_read_word(uint32_t address) {
 		return 0;
 	}
 	if (address < 0x4000) {
-		assert(false);
 		return *(uint32_t *)&system_rom[address];
 	}
 	if (address >= 0x03000000 && address < 0x03008000) {
 		return *(uint32_t *)&cpu_iwram[address - 0x03000000];
 	}
+	if (address >= 0x04000000 && address < 0x05000000) {
+		return io_read_word(address - 0x04000000);
+	}
+	if (address >= 0x07000000 && address < 0x07000400) {
+		return *(uint32_t *)&object_ram[address - 0x07000000];
+	}
 	if (address >= 0x08000000 && address < 0x0a000000) {
 		return *(uint32_t *)&rom[address - 0x08000000];
 	}
 	printf("memory_read_word(0x%08x);\n", address);
-	assert(false);
+	//assert(false);
 	return 0;
 }
 
@@ -251,6 +464,22 @@ void memory_write_word(uint32_t address, uint32_t value) {
 	}
 	if (address >= 0x03000000 && address < 0x03008000) {
 		*(uint32_t *)&cpu_iwram[address - 0x03000000] = value;
+		return;
+	}
+	if (address >= 0x04000000 && address < 0x05000000) {
+		io_write_word(address - 0x04000000, value);
+		return;
+	}
+	if (address >= 0x05000000 && address < 0x05000400) {
+		*(uint32_t *)&palette_ram[address - 0x05000000] = value;
+		return;
+	}
+	if (address >= 0x06000000 && address < 0x06018000) {
+		*(uint32_t *)&video_ram[address - 0x06000000] = value;
+		return;
+	}
+	if (address >= 0x07000000 && address < 0x07000400) {
+		*(uint32_t *)&object_ram[address - 0x07000000] = value;
 		return;
 	}
 	printf("memory_write_word(0x%08x, 0x%08x);\n", address, value);
@@ -398,6 +627,21 @@ uint32_t read_spsr() {
 	}
 	assert(false);
 	return 0;
+}
+
+void write_spsr(uint32_t spsr) {
+	uint32_t mode = cpsr & PSR_MODE;
+	switch (mode) {
+		case PSR_MODE_USR: assert(false); break;
+		case PSR_MODE_FIQ: spsr_fiq = spsr; break;
+		case PSR_MODE_IRQ: spsr_irq = spsr; break;
+		case PSR_MODE_SVC: spsr_svc = spsr; break;
+		case PSR_MODE_ABT: spsr_abt = spsr; break;
+		case PSR_MODE_UND: spsr_und = spsr; break;
+		case PSR_MODE_SYS: assert(false); break;
+		default: assert(false); break;
+	}
+	assert(false);
 }
 
 uint32_t asr(uint32_t x, uint32_t n) {
@@ -655,7 +899,7 @@ void arm_data_processing_register(void) {
 		case SHIFT_ROR: assert(false); break;
 		default: assert(false); break;
 	}
-	bool shifter_out = (m & 0xffffffff00000000L) != 0;
+	//bool shifter_out = (m & 0xffffffff00000000L) != 0;
 
 	uint32_t result = 0;
 	switch (alu) {
@@ -681,9 +925,9 @@ void arm_data_processing_register(void) {
 		r[Rd] = result;
 	}
 	if (S) {  // flags
-		if ((result & (1 << 31)) != 0) { cpsr |= PSR_N; } else { cpsr &= ~PSR_N; }
+		if ((result & 0x80000000) != 0) { cpsr |= PSR_N; } else { cpsr &= ~PSR_N; }
 		if (result == 0) { cpsr |= PSR_Z; } else { cpsr &= ~PSR_Z; }
-		if (shifter_out) { cpsr |= PSR_C; }
+		//if (shifter_out) { cpsr |= PSR_C; }
 		//if (((x) & 0xffffffff00000000L) != 0) { cpsr |= PSR_C; } else { cpsr &= ~PSR_C; }
 		//if (false) { cpsr |= PSR_V; } else { cpsr &= ~PSR_V; }  // FIXME
 	}
@@ -794,7 +1038,7 @@ void arm_data_processing_immediate(void) {
 		r[Rd] = result;
 	}
 	if (S) {  // flags
-		if ((result & (1 << 31)) != 0) { cpsr |= PSR_N; } else { cpsr &= ~PSR_N; }
+		if ((result & 0x80000000) != 0) { cpsr |= PSR_N; } else { cpsr &= ~PSR_N; }
 		if (result == 0) { cpsr |= PSR_Z; } else { cpsr &= ~PSR_Z; }
 		//ASSIGN_C(result);
 		//if (false) { cpsr |= PSR_V; } else { cpsr &= ~PSR_V; }  // FIXME
@@ -914,7 +1158,6 @@ void arm_block_data_transfer(void) {
 	uint32_t rlist = arm_op & 0xffff;
 
 	assert(!S);
-	assert(W);
 	assert(rlist != 0);
 
 #ifdef DEBUG
@@ -1013,6 +1256,23 @@ void arm_branch(void) {
 	if (L) r[14] = r[15] - 4;
 	r[15] += imm << 2;
 	branch_taken = true;
+}
+
+void arm_software_interrupt(void) {
+#ifdef DEBUG
+	if (log_instructions && log_arm_instructions) {
+		arm_print_opcode();
+		arm_print_mnemonic("swi");
+		arm_print_address(arm_op & 0xffffff);
+		printf("\n");
+	}
+#endif
+
+	r14_svc = r[15] - 4;
+	spsr_svc = cpsr;
+	cpsr = (cpsr & ~PSR_MODE) | PSR_MODE_SVC;
+	cpsr |= PSR_I;
+	r[15] = PC_SWI;
 }
 
 void arm_multiply(void) {
@@ -1174,20 +1434,22 @@ void arm_special_data_processing_register(void) {
 	}
 #endif
 
-	assert(!R);
 	if (b21) {
 		uint32_t old_mode = cpsr & PSR_MODE;
 		if (mask == 8) {
-			cpsr = r[Rm] & 0xf0000000;
+			if (R) write_spsr(r[Rm] & 0xf0000000);
+			else cpsr = r[Rm] & 0xf0000000;
 		} else if (mask == 9) {
-			cpsr = r[Rm] & 0xf00000ff;
+			if (R) write_spsr(r[Rm] & 0xf00000ff);
+			else cpsr = r[Rm] & 0xf00000ff;
 		} else {
 			assert(false);
 		}
 		uint32_t new_mode = cpsr & PSR_MODE;
 		mode_change(old_mode, new_mode);
 	} else {
-		r[Rd] = cpsr;
+		if (R) r[Rd] = read_spsr();
+		else r[Rd] = cpsr;
 	}
 }
 
@@ -1554,10 +1816,23 @@ void thumb_load_store_register_offset(void) {
 		case 6: arm_op |= 0x7d; break;
 		case 7: arm_op |= 0x19 << 20 | 0xf << 4; break;
 	}
-	if (opc & 1) {
-		assert(false);
-	} else {
-		arm_single_data_transfer_register();
+	switch (opc) {
+		case 0:
+		case 2:
+		case 4:
+		case 6:
+			arm_single_data_transfer_register();
+			break;
+
+		case 1:
+		case 5:
+			arm_load_store_halfword_register();
+			break;
+
+		case 3:
+		case 7:
+			assert(false);
+			break;
 	}
 }
 
@@ -1629,6 +1904,33 @@ void thumb_load_store_halfword_immediate_offset(void) {
 	arm_load_store_halfword_immediate();
 }
 
+void thumb_load_store_to_from_stack(void) {
+	bool L = (thumb_op & (1 << 11)) != 0;
+	uint16_t Rd = (thumb_op >> 8) & 7;
+	int32_t imm = thumb_op & 0xff;
+
+#ifdef DEBUG
+	if (log_instructions && log_thumb_instructions) {
+		thumb_print_opcode();
+		thumb_print_mnemonic(L ? "ldr" : "str");
+		thumb_print_register(Rd);
+		printf(",[");
+		thumb_print_register(REG_SP);
+		printf(",");
+		thumb_print_immediate(imm);
+		printf("]\n");
+	}
+#endif
+
+	arm_op = COND_AL << 28 | REG_SP << 16 | Rd << 12 | imm << 2;
+	if (L) {
+		arm_op |= 0x59 << 20;
+	} else {
+		arm_op |= 0x58 << 20;
+	}
+	arm_single_data_transfer_immediate();
+}
+
 void thumb_add_to_sp_or_pc(void) {
 	bool SP = (thumb_op & (1 << 11)) != 0;
 	uint16_t Rd = (thumb_op >> 8) & 7;
@@ -1648,6 +1950,30 @@ void thumb_add_to_sp_or_pc(void) {
 #endif
 
 	arm_op = COND_AL << 28 | 0x28 << 20 | (SP ? REG_SP : REG_PC) << 16 | Rd << 12 | 0xf << 8 | imm;
+	arm_data_processing_immediate();
+}
+
+void thumb_adjust_stack_pointer(void) {
+	uint16_t opc = (thumb_op >> 7) & 1;
+	uint32_t imm = thumb_op & 0x7f;
+
+#ifdef DEBUG
+	if (log_instructions && log_thumb_instructions) {
+		thumb_print_opcode();
+		thumb_print_mnemonic(opc == 1 ? "sub" : "add");
+		thumb_print_register(REG_SP);
+		printf(",");
+		thumb_print_immediate(imm);
+		printf("\n");
+	}
+#endif
+
+	arm_op = COND_AL << 28 | 0x20 << 20 | REG_SP << 16 | REG_SP << 12 | 0xf << 8 | imm;
+	if (opc == 1) {
+		arm_op |= ARM_SUB << 21;
+	} else {
+		arm_op |= ARM_ADD << 21;
+	}
 	arm_data_processing_immediate();
 }
 
@@ -1997,7 +2323,7 @@ void arm_init_lookup(void) {
 	arm_bind(0xa00, 0x1ff, arm_branch);
 	arm_bind(0xc00, 0x1ff, NULL);  // arm_coprocessor_load_store
 	arm_bind(0xe00, 0x0ff, NULL);  // arm_coprocessor_data_processing
-	arm_bind(0xf00, 0x0ff, NULL);  // arm_software_interrupt
+	arm_bind(0xf00, 0x0ff, arm_software_interrupt);
 	arm_bind(0x009, 0x030, arm_multiply);
 	arm_bind(0x089, 0x070, NULL);  // arm_multiply_long
 	arm_bind(0x00b, 0x1b0, arm_load_store_halfword_register);
@@ -2015,7 +2341,7 @@ void arm_init_lookup(void) {
 void thumb_init_lookup(void) {
 	memset(thumb_lookup, 0, sizeof(void *) * 256);
 
-	thumb_bind(0x00, 0xff, NULL);  // thumb_undefined_instruction);
+	thumb_bind(0x00, 0xff, thumb_undefined_instruction);
 
 	thumb_bind(0x00, 0x0f, thumb_shift_by_immediate);
 	thumb_bind(0x10, 0x07, thumb_shift_by_immediate);
@@ -2029,9 +2355,9 @@ void thumb_init_lookup(void) {
 	thumb_bind(0x50, 0x0f, thumb_load_store_register_offset);
 	thumb_bind(0x60, 0x1f, thumb_load_store_word_byte_immediate_offset);
 	thumb_bind(0x80, 0x0f, thumb_load_store_halfword_immediate_offset);
-	thumb_bind(0x90, 0x0f, NULL);  // thumb_load_store_to_from_stack
+	thumb_bind(0x90, 0x0f, thumb_load_store_to_from_stack);
 	thumb_bind(0xa0, 0x0f, thumb_add_to_sp_or_pc);
-	thumb_bind(0xb0, 0x0b, NULL);  // thumb_adjust_stack_pointer
+	thumb_bind(0xb0, 0x0b, thumb_adjust_stack_pointer);
 	thumb_bind(0xb4, 0x0b, thumb_push_pop_register_list);
 	thumb_bind(0xc0, 0x0f, thumb_load_store_multiple);
 	thumb_bind(0xd0, 0x0f, thumb_conditional_branch);
@@ -2061,28 +2387,120 @@ void gba_init(const char *filename) {
 
 	memset(r, 0, sizeof(uint32_t) * 16);
 
-	//r[15] = PC_RESET;
-	//cpsr = PSR_I | PSR_F | PSR_MODE_SVC;
+	bool skip_bios = true;  // FIXME
 
-	r[13] = 0x03007f00;
-	r[14] = 0x08000000;
-	r[15] = 0x08000000;
-	cpsr = PSR_MODE_SYS;
+	if (skip_bios) {
+		r[13] = 0x03007f00;
+		r[14] = 0x08000000;
+		r[15] = 0x08000000;
+		cpsr = PSR_MODE_SYS;
+	} else {
+		r[15] = PC_RESET;
+		cpsr = PSR_I | PSR_F | PSR_MODE_SVC;
+	}
 
 	branch_taken = true;
 }
 
 void gba_emulate(void) {
 	for (int i = 0; i < 4096; i++) {
-		if (instruction_count > 196608) {
+		/*
+		if (r[15] == 0x08000158) {  // instruction_count > 196608
 			log_instructions = true;
+			log_registers = true;
 		}
+		*/
 		if (cpsr & PSR_T) {
 			thumb_step();
 		} else {
 			arm_step();
 		}
+#ifdef DEBUG
+		char c = fgetc(stdin);
+		if (c == EOF) exit(EXIT_SUCCESS);
+#endif
 		instruction_count++;
+	}
+}
+
+void gba_draw_tiled_bg(SDL_PixelFormat *format, Uint32 *pixels, int pitch, uint32_t character_base, uint32_t screen_base) {
+	for (int y = 0; y < 20; y++) {
+		for (int x = 0; x < 30; x++) {
+			uint16_t tile_index = *(uint16_t *)&video_ram[screen_base + (y * 32 + x) * 2];
+			uint8_t *tile = &video_ram[character_base + tile_index * 0x20];
+			uint32_t tile_counter = 0;
+			for (int j = 0; j < 8; j++) {
+				for (int i = 0; i < 8; i += 2) {
+					uint8_t pixel_indexes = tile[tile_counter++];
+					uint8_t pixel_index_0 = pixel_indexes & 0xf;
+					uint8_t pixel_index_1 = (pixel_indexes >> 4) & 0xf;
+					uint16_t pixel_0 = *(uint16_t *)&palette_ram[pixel_index_0 * 2];
+					uint16_t pixel_1 = *(uint16_t *)&palette_ram[pixel_index_1 * 2];
+					uint32_t r, g, b;
+					r = pixel_0 & 0x1f;
+					g = (pixel_0 >> 5) & 0x1f;
+					b = (pixel_0 >> 10) & 0x1f;
+					r = (r << 3) | (r >> 2);
+					g = (g << 3) | (g >> 2);
+					b = (b << 3) | (b >> 2);
+					pixels[(8*y+j) * (pitch / 4) + (8*x+i)] = SDL_MapRGB(format, r, g, b);
+					r = pixel_1 & 0x1f;
+					g = (pixel_1 >> 5) & 0x1f;
+					b = (pixel_1 >> 10) & 0x1f;
+					r = (r << 3) | (r >> 2);
+					g = (g << 3) | (g >> 2);
+					b = (b << 3) | (b >> 2);
+					pixels[(8*y+j) * (pitch / 4) + (8*x+i+1)] = SDL_MapRGB(format, r, g, b);
+				}
+			}
+		}
+	}
+}
+
+void gba_draw_tiled(SDL_PixelFormat *format, Uint32 *pixels, int pitch) {
+	uint32_t character_base, screen_base;
+
+	if (io_dispcnt & (1 << 11)) {
+		character_base = ((io_bg3cnt >> 2) & 3) * 0x4000;
+		screen_base = ((io_bg3cnt >> 8) & 0x1f) * 0x800;
+		gba_draw_tiled_bg(format, pixels, pitch, character_base, screen_base);
+	}
+	if (io_dispcnt & (1 << 10)) {
+		character_base = ((io_bg2cnt >> 2) & 3) * 0x4000;
+		screen_base = ((io_bg2cnt >> 8) & 0x1f) * 0x800;
+		gba_draw_tiled_bg(format, pixels, pitch, character_base, screen_base);
+	}
+	if (io_dispcnt & (1 << 9)) {
+		character_base = ((io_bg1cnt >> 2) & 3) * 0x4000;
+		screen_base = ((io_bg1cnt >> 8) & 0x1f) * 0x800;
+		gba_draw_tiled_bg(format, pixels, pitch, character_base, screen_base);
+	}
+	if (io_dispcnt & (1 << 8)) {
+		character_base = ((io_bg0cnt >> 2) & 3) * 0x4000;
+		screen_base = ((io_bg0cnt >> 8) & 0x1f) * 0x800;
+		gba_draw_tiled_bg(format, pixels, pitch, character_base, screen_base);
+	}
+}
+
+void gba_draw_bitmap(SDL_PixelFormat *format, Uint32 *pixels, int pitch, uint32_t mode) {
+	for (int y = 0; y < 160; y++) {
+		for (int x = 0; x < 240; x++) {
+			uint16_t pixel;
+			if (mode == 3) {
+				pixel = *(uint16_t *)&video_ram[(y * 240 + x) * 2];
+			} else {
+				uint8_t pixel_index = video_ram[y * 240 + x];
+				pixel = *(uint16_t *)&palette_ram[pixel_index * 2];
+			}
+			uint32_t r, g, b;
+			r = pixel & 0x1f;
+			g = (pixel >> 5) & 0x1f;
+			b = (pixel >> 10) & 0x1f;
+			r = (r << 3) | (r >> 2);
+			g = (g << 3) | (g >> 2);
+			b = (b << 3) | (b >> 2);
+			pixels[y * (pitch / 4) + x] = SDL_MapRGB(format, r, g, b);
+		}
 	}
 }
 
@@ -2127,18 +2545,17 @@ int main(int argc, char **argv) {
 		Uint32 *pixels;
 		int pitch;
 		SDL_LockTexture(texture, NULL, (void**) &pixels, &pitch);
-		for (int y = 0; y < DISPLAY_HEIGHT; y++) {
-			for (int x = 0; x < DISPLAY_WIDTH; x++) {
-				uint8_t index = video_ram[y * DISPLAY_WIDTH + x];
-				uint16_t pixel = *(uint16_t *)&palette_ram[index * 2];
-				uint32_t r = pixel & 0x1f;
-				uint32_t g = (pixel >> 5) & 0x1f;
-				uint32_t b = (pixel >> 10) & 0x1f;
-				r = (r << 3) | (r >> 2);
-				g = (g << 3) | (g >> 2);
-				b = (b << 3) | (b >> 2);
-				pixels[y * (pitch / 4) + x] = SDL_MapRGB(format, r, g, b);
-			}
+		uint32_t mode = io_dispcnt & 7;
+		switch (mode) {
+			case 0:
+			default:
+				gba_draw_tiled(format, pixels, pitch);
+				break;
+
+			case 3:
+			case 4:
+				gba_draw_bitmap(format, pixels, pitch, mode);
+				break;
 		}
 		SDL_UnlockTexture(texture);
 
