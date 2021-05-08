@@ -15,7 +15,7 @@ bool log_thumb_instructions = true;
 bool log_registers = false;
 bool single_step = true;
 uint64_t instruction_count = 0;
-uint64_t start_logging_at = 783;
+uint64_t start_logging_at = 1122;
 
 #define DISPLAY_WIDTH 240
 #define DISPLAY_HEIGHT 160
@@ -116,7 +116,7 @@ uint8_t cpu_iwram[0x8000];
 uint8_t palette_ram[0x400];
 uint8_t video_ram[0x18000];
 uint8_t object_ram[0x400];
-uint8_t rom[0x2000000];
+uint8_t game_rom[0x2000000];
 
 uint32_t r[16];
 uint32_t r8_usr, r9_usr, r10_usr, r11_usr, r12_usr, r13_usr, r14_usr;
@@ -462,7 +462,7 @@ uint8_t memory_read_byte(uint32_t address) {
 		return io_read_byte(address - 0x04000000);
 	}
 	if (address >= 0x08000000 && address < 0x0a000000) {
-		return rom[address - 0x08000000];
+		return game_rom[address - 0x08000000];
 	}
 	printf("memory_read_byte(0x%08x);\n", address);
 	assert(false);
@@ -490,6 +490,9 @@ void memory_write_byte(uint32_t address, uint8_t value) {
 		*(uint16_t *)&video_ram[address - 0x06000000] = value | value << 8;
 		return;
 	}
+	if (address >= 0x07000000 && address < 0x07000400) {
+		return;
+	}
 	printf("memory_write_byte(0x%08x, 0x%02x);\n", address, value);
 	assert(false);
 }
@@ -508,6 +511,9 @@ uint16_t memory_read_halfword(uint32_t address) {
 	if (address >= 0x04000000 && address < 0x05000000) {
 		return io_read_halfword(address - 0x04000000);
 	}
+	if (address >= 0x05000000 && address < 0x05000400) {
+		return *(uint16_t *)&palette_ram[address - 0x05000000];
+	}
 	if (address >= 0x06000000 && address < 0x06018000) {
 		return *(uint16_t *)&video_ram[address - 0x06000000];
 	}
@@ -515,7 +521,7 @@ uint16_t memory_read_halfword(uint32_t address) {
 		return *(uint16_t *)&object_ram[address - 0x07000000];
 	}
 	if (address >= 0x08000000 && address < 0x0a000000) {
-		return *(uint16_t *)&rom[address - 0x08000000];
+		return *(uint16_t *)&game_rom[address - 0x08000000];
 	}
 	printf("memory_read_halfword(0x%08x);\n", address);
 	assert(false);
@@ -523,10 +529,7 @@ uint16_t memory_read_halfword(uint32_t address) {
 }
 
 void memory_write_halfword(uint32_t address, uint16_t value) {
-	if ((address & 1) != 0) {
-		assert(false);
-		return;
-	}
+	address &= ~1;
 	if (address >= 0x02000000 && address < 0x02040000) {
 		*(uint16_t *)&cpu_ewram[address - 0x02000000] = value;
 		return;
@@ -560,23 +563,30 @@ uint32_t memory_read_word(uint32_t address) {
 	if (address < 0x4000) {
 		return *(uint32_t *)&system_rom[address];
 	}
-	if (address >= 0x02000000 && address < 0x02040000) {
-		return *(uint32_t *)&cpu_ewram[address - 0x02000000];
+	if (address >= 0x02000000 && address < 0x03000000) {
+		return *(uint32_t *)&cpu_ewram[(address - 0x02000000) & 0x3ffff];
 	}
-	if (address >= 0x03000000 && address < 0x03008000) {
-		return *(uint32_t *)&cpu_iwram[address - 0x03000000];
+	if (address >= 0x03000000 && address < 0x04000000) {
+		return *(uint32_t *)&cpu_iwram[(address - 0x03000000) & 0x7fff];
 	}
 	if (address >= 0x04000000 && address < 0x05000000) {
 		return io_read_word(address - 0x04000000);
 	}
-	if (address >= 0x07000000 && address < 0x07000400) {
-		return *(uint32_t *)&object_ram[address - 0x07000000];
+	if (address >= 0x05000000 && address < 0x06000000) {
+		return *(uint32_t*)&palette_ram[(address - 0x05000000) & 0x3ff];
 	}
-	if (address >= 0x08000000 && address < 0x0a000000) {
-		return *(uint32_t *)&rom[address - 0x08000000];
+	if (address >= 0x06000000 && address < 0x07000000) {
+		return *(uint32_t*)&video_ram[(address - 0x06000000) & 0x17fff];
 	}
-	printf("memory_read_word(0x%08x);\n", address);
-	//assert(false);
+	if (address >= 0x07000000 && address < 0x08000000) {
+		return *(uint32_t *)&object_ram[(address - 0x07000000) & 0x3ff];
+	}
+	if (address >= 0x08000000 && address < 0x0e000000) {
+		return *(uint32_t *)&game_rom[(address - 0x08000000) & 0x1ffffff];
+	}
+	if (address >= 0x0e000000 && address < 0x0f000000) {
+		printf("memory_read_word(0x%08x);\n", address);
+	}
 	return 0;
 }
 
@@ -1138,10 +1148,12 @@ void arm_data_processing_register(void) {
 		} else if (alu == ARM_ADD || alu == ARM_ADC || alu == ARM_CMN) {
 			if ((result & 0xffffffff00000000LL) != 0) { cpsr |= PSR_C; } else { cpsr &= ~PSR_C; }
 		}
-		if (alu == ARM_SUB || alu == ARM_SBC || alu == ARM_CMP) {
-			if (n >= 0x80000000 && (result > 0 && result < 0x80000000)) { cpsr |= PSR_V; } else { cpsr &= ~PSR_V; }
+		if (alu == ARM_RSB || alu == ARM_RSC) {
+			if ((n >> 31 != m >> 31) && (n >> 31 == (uint32_t) result >> 31)) { cpsr |= PSR_V; } else { cpsr &= ~PSR_V; }
+		} else if (alu == ARM_SUB || alu == ARM_SBC || alu == ARM_CMP) {
+			if ((n >> 31 != m >> 31) && (m >> 31 == (uint32_t) result >> 31)) { cpsr |= PSR_V; } else { cpsr &= ~PSR_V; }
 		} else if (alu == ARM_ADD || alu == ARM_ADC || alu == ARM_CMN) {
-			if ((n >> 31 == m >> 31) && (n >> 31 != result >> 31)) { cpsr |= PSR_V; } else { cpsr &= ~PSR_V; }
+			if ((n >> 31 == m >> 31) && (n >> 31 != (uint32_t) result >> 31)) { cpsr |= PSR_V; } else { cpsr &= ~PSR_V; }
 		}
 	}
 	if (alu != ARM_TST && alu != ARM_TEQ && alu != ARM_CMP && alu != ARM_CMN) {
@@ -1271,10 +1283,12 @@ void arm_data_processing_immediate(void) {
 		} else if (alu == ARM_ADD || alu == ARM_ADC || alu == ARM_CMN) {
 			if ((result & 0xffffffff00000000LL) != 0) { cpsr |= PSR_C; } else { cpsr &= ~PSR_C; }
 		}
-		if (alu == ARM_SUB || alu == ARM_SBC || alu == ARM_CMP) {
-			if (n >= 0x80000000 && (result > 0 && result < 0x80000000)) { cpsr |= PSR_V; } else { cpsr &= ~PSR_V; }
+		if (alu == ARM_RSB || alu == ARM_RSC) {
+			if ((n >> 31 != imm >> 31) && (n >> 31 == (uint32_t) result >> 31)) { cpsr |= PSR_V; } else { cpsr &= ~PSR_V; }
+		} else if (alu == ARM_SUB || alu == ARM_SBC || alu == ARM_CMP) {
+			if ((n >> 31 != imm >> 31) && (imm >> 31 == (uint32_t) result >> 31)) { cpsr |= PSR_V; } else { cpsr &= ~PSR_V; }
 		} else if (alu == ARM_ADD || alu == ARM_ADC || alu == ARM_CMN) {
-			if ((n >> 31 == imm >> 31) && (n >> 31 != result >> 31)) { cpsr |= PSR_V; } else { cpsr &= ~PSR_V; }
+			if ((n >> 31 == imm >> 31) && (n >> 31 != (uint32_t) result >> 31)) { cpsr |= PSR_V; } else { cpsr &= ~PSR_V; }
 		}
 	}
 	if (alu != ARM_TST && alu != ARM_TEQ && alu != ARM_CMP && alu != ARM_CMN) {
@@ -1296,7 +1310,7 @@ void arm_single_data_transfer_register(void) {
 	uint32_t Rn = (arm_op >> 16) & 0xf;
 	uint32_t Rd = (arm_op >> 12) & 0xf;
 	uint32_t shamt = (arm_op >> 7) & 0x1f;
-	uint32_t shop = (arm_op >> 4) & 3;
+	uint32_t shop = (arm_op >> 5) & 3;
 	uint32_t Rm = arm_op & 0xf;
 
 #ifdef DEBUG
@@ -1332,6 +1346,7 @@ void arm_single_data_transfer_register(void) {
 		} else {
 			r[Rd] = align_word(n, memory_read_word(n));
 		}
+		if (Rd == 15) branch_taken = true;
 	} else {
 		if (B) {
 			memory_write_byte(n, (uint8_t) r[Rd]);
@@ -1340,7 +1355,7 @@ void arm_single_data_transfer_register(void) {
 		}
 	}
 	if (!P) n += (U ? m : -m);
-	if ((P && W) || !P) r[Rn] = n;
+	if (((P && W) || !P) && !(L && Rd == Rn)) r[Rn] = n;
 }
 
 void arm_single_data_transfer_immediate(void) {
@@ -1382,6 +1397,7 @@ void arm_single_data_transfer_immediate(void) {
 		} else {
 			r[Rd] = align_word(n, memory_read_word(n));
 		}
+		if (Rd == 15) branch_taken = true;
 	} else {
 		if (B) {
 			memory_write_byte(n, (uint8_t) r[Rd]);
@@ -1394,7 +1410,7 @@ void arm_single_data_transfer_immediate(void) {
 		}
 	}
 	if (!P) n += (U ? imm : -imm);
-	if ((P && W) || !P) r[Rn] = n;
+	if (((P && W) || !P) && !(L && Rd == Rn)) r[Rn] = n;
 }
 
 void arm_block_data_transfer(void) {
@@ -1462,8 +1478,6 @@ void arm_block_data_transfer(void) {
 	}
 #endif
 
-	assert(!S);  // access user registers? restore spsr if r15 in rlist?
-
 	uint32_t count = bit_count(rlist);
 	if (rlist == 0) {
 		rlist |= 1 << 15;
@@ -1474,6 +1488,7 @@ void arm_block_data_transfer(void) {
 	uint32_t address = old_base;
 	if (!U) address -= 4 * count;
 	if (U == P) address += 4;
+	if (S) mode_change(cpsr & PSR_MODE, PSR_MODE_USR);
 	for (uint32_t i = 0; i < 16; i++) {
 		if (rlist & (1 << i)) {
 			if (L) {
@@ -1485,7 +1500,7 @@ void arm_block_data_transfer(void) {
 				}
 			} else {
 				if (i == 15) {
-					memory_write_word(address, r[i] + 2);
+					memory_write_word(address, r[i] + ((cpsr & PSR_T) != 0 ? 2 : 4));
 				} else if (i == Rn) {
 					if (lowest_set_bit(rlist) == Rn) {
 						memory_write_word(address, old_base);
@@ -1499,6 +1514,8 @@ void arm_block_data_transfer(void) {
 			address += 4;
 		}
 	}
+	if (S) mode_change(PSR_MODE_USR, cpsr & PSR_MODE);
+	// FIXME if (S) restore spsr if r15 in rlist?
 	if (W) r[Rn] = new_base;
 }
 
@@ -1575,7 +1592,7 @@ void arm_multiply(void) {
 	r[Rd] = result;
 
 	if (S) {
-		if ((result & 0x80000000) != 0) { cpsr |= PSR_N; } else { cpsr &= ~PSR_N; }
+		if ((result & (1 << 31)) != 0) { cpsr |= PSR_N; } else { cpsr &= ~PSR_N; }
 		if (result == 0) { cpsr |= PSR_Z; } else { cpsr &= ~PSR_Z; }
 	}
 }
@@ -1622,8 +1639,8 @@ void arm_multiply_long(void) {
 	uint64_t m = r[Rm];
 	uint64_t s = r[Rs];
 	if (U) {
-		if ((m & 0x80000000) != 0) m |= ~0xffffffffLL;
-		if ((s & 0x80000000) != 0) s |= ~0xffffffffLL;
+		if ((m & (1 << 31)) != 0) m |= ~0xffffffffLL;
+		if ((s & (1 << 31)) != 0) s |= ~0xffffffffLL;
 	}
 	uint64_t result = m * s;
 	if (A) result += (uint64_t) r[RdLo] | (uint64_t) r[RdHi] << 32;
@@ -1631,7 +1648,7 @@ void arm_multiply_long(void) {
 	r[RdHi] = (result >> 32) & 0xffffffff;
 
 	if (S) {
-		if ((r[RdHi] & 0x80000000) != 0) { cpsr |= PSR_N; } else { cpsr &= ~PSR_N; }
+		if ((r[RdHi] & (1 << 31)) != 0) { cpsr |= PSR_N; } else { cpsr &= ~PSR_N; }
 		if (r[RdHi] == 0 && r[RdLo] == 0) { cpsr |= PSR_Z; } else { cpsr &= ~PSR_Z; }
 	}
 }
@@ -1659,30 +1676,27 @@ void arm_load_store_halfword_register(void) {
 		arm_print_register(Rd);
 		printf(",[");
 		arm_print_register(Rn);
-		if (P) {
-			printf(",");
-			arm_print_register(Rm);
-			printf("]\n");
-		} else {
-			printf("],");
-			arm_print_register(Rm);
-			printf("\n");
-		}
+		printf(P ? "," : "],");
+		if (!U) printf("-");
+		arm_print_register(Rm);
+		if (P) printf("]");
+		if (W) printf("!");
+		printf("\n");
 	}
 #endif
 
-	assert(U);  // FIXME
-	assert(!W);  // FIXME
-
+	uint32_t m = r[Rm];
 	uint32_t n = r[Rn];
 	if (Rn == 15) n &= ~3;
-	if (P) n += r[Rm];
+	if (P) n += (U ? m : -m);
 	if (L) {
 		r[Rd] = align_halfword(n, memory_read_halfword(n & ~1));
+		if (Rd == 15) branch_taken = true;
 	} else {
 		memory_write_halfword(n, (uint16_t) r[Rd]);
 	}
-	if (!P) r[Rn] += r[Rm];  // FIXME?
+	if (!P) n += (U ? m : -m);
+	if (((P && W) || !P) && !(L && Rd == Rn)) r[Rn] = n;
 }
 
 void arm_load_store_halfword_immediate(void) {
@@ -1706,30 +1720,26 @@ void arm_load_store_halfword_immediate(void) {
 		arm_print_register(Rd);
 		printf(",[");
 		arm_print_register(Rn);
-		if (P) {
-			printf(",");
-			arm_print_immediate(imm);
-			printf("]\n");
-		} else {
-			printf("],");
-			arm_print_immediate(imm);
-			printf("\n");
-		}
+		printf(P ? "," : "],");
+		if (!U) printf("-");
+		arm_print_immediate(imm);
+		if (P) printf("]");
+		if (W) printf("!");
+		printf("\n");
 	}
 #endif
 
-	assert(U);  // FIXME
-	assert(!W);  // FIXME
-
 	uint32_t n = r[Rn];
 	if (Rn == 15) n &= ~3;
-	if (P) n += imm;
+	if (P) n += (U ? imm : -imm);
 	if (L) {
 		r[Rd] = align_halfword(n, memory_read_halfword(n & ~1));
+		if (Rd == 15) branch_taken = true;
 	} else {
 		memory_write_halfword(n, (uint16_t) r[Rd]);
 	}
-	if (!P) r[Rn] += imm;  // FIXME?
+	if (!P) n += (U ? imm : -imm);
+	if (((P && W) || !P) && !(L && Rd == Rn)) r[Rn] = n;
 }
 
 void arm_load_store_signed_byte_halfword_register(void) {
@@ -1762,24 +1772,19 @@ void arm_load_store_signed_byte_halfword_register(void) {
 		arm_print_register(Rd);
 		printf(",[");
 		arm_print_register(Rn);
-		if (P) {
-			printf(",");
-			arm_print_register(Rm);
-			printf("]\n");
-		} else {
-			printf("],");
-			arm_print_register(Rm);
-			printf("\n");
-		}
+		printf(P ? "," : "],");
+		if (!U) printf("-");
+		arm_print_register(Rm);
+		if (P) printf("]");
+		if (W) printf("!");
+		printf("\n");
 	}
 #endif
 
-	assert(U);  // FIXME
-	assert(!W);  // FIXME
-
+	uint32_t m = r[Rm];
 	uint32_t n = r[Rn];
 	if (Rn == 15) n &= ~3;
-	if (P) n += r[Rm];
+	if (P) n += (U ? m : -m);
 	if (opc == 0xd) {
 		r[Rd] = memory_read_byte(n);
 		if (r[Rd] & 0x80) r[Rd] |= ~0xff;
@@ -1793,24 +1798,73 @@ void arm_load_store_signed_byte_halfword_register(void) {
 	} else {
 		assert(false);
 	}
-	if (!P) r[Rn] += r[Rm];  // FIXME?
+	if (Rd == 15) branch_taken = true;
+	if (!P) n += (U ? m : -m);
+	if (((P && W) || !P) && !(L && Rd == Rn)) r[Rn] = n;
 }
 
 void arm_load_store_signed_byte_halfword_immediate(void) {
+	bool P = (arm_op & (1 << 24)) != 0;
+	bool U = (arm_op & (1 << 23)) != 0;
+	bool I = (arm_op & (1 << 22)) != 0;
+	bool W = (arm_op & (1 << 21)) != 0;
+	bool L = (arm_op & (1 << 20)) != 0;
+	uint32_t Rn = (arm_op >> 16) & 0xf;
+	uint32_t Rd = (arm_op >> 12) & 0xf;
+	uint32_t imm = (arm_op & 0xf) | ((arm_op >> 4) & 0xf0);
+	uint32_t opc = (arm_op >> 4) & 0xf;
+
+	assert(I);
+	assert(L);
+	assert(opc == 0xd || opc == 0xf);
+
 #ifdef DEBUG
 	if (log_instructions && log_arm_instructions) {
 		arm_print_opcode();
+		if (opc == 0xd) {
+			arm_print_mnemonic("ldrsb");
+		} else if (opc == 0xf) {
+			arm_print_mnemonic("ldrsh");
+		} else {
+			assert(false);
+		}
+		arm_print_register(Rd);
+		printf(",[");
+		arm_print_register(Rn);
+		printf(P ? "," : "],");
+		if (!U) printf("-");
+		arm_print_immediate(imm);
+		if (P) printf("]");
+		if (W) printf("!");
 		printf("\n");
 	}
 #endif
 
-	assert(false);
+	uint32_t n = r[Rn];
+	if (Rn == 15) n &= ~3;
+	if (P) n += (U ? imm : -imm);
+	if (opc == 0xd) {
+		r[Rd] = memory_read_byte(n);
+		if (r[Rd] & 0x80) r[Rd] |= ~0xff;
+	} else if (opc == 0xf) {
+		r[Rd] = align_halfword(n, memory_read_halfword(n & ~1));
+		if ((n & 1) != 0) {
+			if (r[Rd] & 0x80) r[Rd] |= ~0xff;
+		} else {
+			if (r[Rd] & 0x8000) r[Rd] |= ~0xffff;
+		}
+	} else {
+		assert(false);
+	}
+	if (Rd == 15) branch_taken = true;
+	if (!P) n += (U ? imm : -imm);
+	if (((P && W) || !P) && !(L && Rd == Rn)) r[Rn] = n;
 }
 
 void arm_special_data_processing_register(void) {
 	bool R = (arm_op & (1 << 22)) != 0;
 	bool b21 = (arm_op & (1 << 21)) != 0;
-	uint32_t mask = (arm_op >> 16) & 0xf;
+	uint32_t mask_type = (arm_op >> 16) & 0xf;
 	uint32_t Rd = (arm_op >> 12) & 0xf;
 	uint32_t Rm = arm_op & 0xf;
 
@@ -1818,7 +1872,7 @@ void arm_special_data_processing_register(void) {
 		assert(Rd == 0xf);
 		assert((arm_op & 0xff0) == 0);
 	} else {
-		assert(mask == 0xf);
+		assert(mask_type == 0xf);
 		assert((arm_op & 0xfff) == 0);
 	}
 
@@ -1829,7 +1883,7 @@ void arm_special_data_processing_register(void) {
 			arm_print_mnemonic("msr");
 			printf(R ? "spsr" : "cpsr");
 			printf("_");
-			switch (mask) {
+			switch (mask_type) {
 				case 8: printf("f"); break;
 				case 9: printf("cf"); break;
 				default: assert(false); break;
@@ -1847,18 +1901,24 @@ void arm_special_data_processing_register(void) {
 #endif
 
 	if (b21) {
-		if (mask == 8) {
-			if (R) write_spsr(r[Rm] & 0xf0000000);
-			else write_cpsr(r[Rm] & 0xf0000000);
-		} else if (mask == 9) {
-			if (R) write_spsr(r[Rm] & 0xf00000ff);
-			else write_cpsr(r[Rm] & 0xf00000ff);
+		uint32_t mask = 0;
+		switch (mask_type) {
+			case 8: mask = 0xf0000000; break;
+			case 9: mask = 0xf000001f; break;  // Allow bit 4 to be set?
+			default: assert(false); break;
+		}
+		if (R) {
+			write_spsr((read_spsr() & ~mask) | (r[Rm] & mask));
 		} else {
-			assert(false);
+			write_cpsr((cpsr & ~mask) | (r[Rm] & mask));
 		}
 	} else {
-		if (R) r[Rd] = read_spsr();
-		else r[Rd] = cpsr;
+		if (R) {
+			r[Rd] = read_spsr();
+		} else {
+			r[Rd] = cpsr;
+		}
+		assert(Rd != 15);
 	}
 }
 
@@ -1929,12 +1989,13 @@ void arm_swap(void) {
 	if (B) {
 		uint8_t temp = memory_read_byte(r[Rn]);
 		memory_write_byte(r[Rn], r[Rm]);
-		r[Rd] = temp;  // FIXME?
+		r[Rd] = temp;
 	} else {
-		uint32_t temp = memory_read_word(r[Rn]);
+		uint32_t temp = align_word(r[Rn], memory_read_word(r[Rn]));
 		memory_write_word(r[Rn], r[Rm]);
 		r[Rd] = temp;
 	}
+	assert(Rd != 15);
 }
 
 void arm_branch_and_exchange(void) {
@@ -2848,9 +2909,9 @@ void gba_init(const char *filename) {
 	fp = fopen(filename, "rb");
 	assert(fp != NULL);
 	fseek(fp, 0, SEEK_END);
-	uint32_t rom_size = ftell(fp);
+	uint32_t game_rom_size = ftell(fp);
 	fseek(fp, 0, SEEK_SET);
-	fread(rom, sizeof(uint8_t), rom_size, fp);
+	fread(game_rom, sizeof(uint8_t), game_rom_size, fp);
 	fclose(fp);
 
 	memset(r, 0, sizeof(uint32_t) * 16);
