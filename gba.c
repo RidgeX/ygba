@@ -883,7 +883,9 @@ uint32_t handle_shift_op(uint32_t m, uint32_t s, uint32_t shop, uint32_t shamt, 
 
 		case SHIFT_ROR:
 			if (!shreg && shamt == 0) {
-				assert(false);
+				bool C = (cpsr & PSR_C) != 0;
+				if ((m & 1) != 0) { cpsr |= PSR_C; } else { cpsr &= ~PSR_C; }
+				m = m >> 1 | (C ? 1 << 31 : 0);
 			} else {
 				m = ror(m, s & 0x1f);
 			}
@@ -982,7 +984,7 @@ void arm_data_processing_register(void) {
 	}
 #endif
 
-	uint32_t s = (shreg ? r[Rs] : shamt);
+	uint32_t s = (shreg ? r[Rs] & 0xff : shamt);
 	uint32_t m = handle_shift_op(r[Rm], s, shop, shamt, shreg);
 	uint64_t n = r[Rn];
 	uint64_t result = 0;
@@ -1165,7 +1167,7 @@ void arm_data_processing_immediate(void) {
 		case ARM_ADD: result = n + imm; break;
 		case ARM_ADC: result = n + imm + (cpsr & PSR_C ? 1 : 0); break;
 		case ARM_SBC: result = n - imm - (cpsr & PSR_C ? 0 : 1); break;
-		case ARM_RSC: assert(false); break;  // FIXME
+		case ARM_RSC: result = imm - n - (cpsr & PSR_C ? 0 : 1); break;
 		case ARM_TST: result = n & imm; break;
 		case ARM_TEQ: result = n ^ imm; break;
 		case ARM_CMP: result = n - imm; break;
@@ -1378,21 +1380,29 @@ void arm_block_data_transfer(void) {
 		rlist |= 1 << 15;
 		count = 16;
 	}
-	uint32_t address = r[Rn];
+	uint32_t old_base = r[Rn];
+	uint32_t new_base = old_base + (U ? 4 : -4) * count;
+	uint32_t address = old_base;
 	if (!U) address -= 4 * count;
 	if (U == P) address += 4;
-	for (int i = 0; i < 16; i++) {
+	for (uint32_t i = 0; i < 16; i++) {
 		if (rlist & (1 << i)) {
 			if (L) {
+				if (i == Rn) W = false;
 				r[i] = memory_read_word(address);
 				if (i == 15) {
 					r[i] &= ~1;
 					branch_taken = true;
 				}
 			} else {
-				//if ((uint32_t) i == Rn && W) assert((uint32_t) i == lowest_set_bit(rlist));
 				if (i == 15) {
 					memory_write_word(address, r[i] + 2);
+				} else if (i == Rn) {
+					if (lowest_set_bit(rlist) == Rn) {
+						memory_write_word(address, old_base);
+					} else {
+						memory_write_word(address, new_base);
+					}
 				} else {
 					memory_write_word(address, r[i]);
 				}
@@ -1402,7 +1412,7 @@ void arm_block_data_transfer(void) {
 	}
 	if (W) {
 		if (L) assert((rlist & (1 << Rn)) == 0);
-		r[Rn] += (U ? 4 : -4) * count;
+		r[Rn] = new_base;
 	}
 }
 
@@ -1736,11 +1746,12 @@ void arm_special_data_processing_immediate(void) {
 	}
 #endif
 
-	assert(!R);
 	if (mask == 8) {
-		write_cpsr(imm & 0xf0000000);
+		if (R) write_spsr(imm & 0xf0000000);
+		else write_cpsr(imm & 0xf0000000);
 	} else if (mask == 9) {
-		write_cpsr(imm & 0xf00000ff);
+		if (R) write_spsr(imm & 0xf00000ff);
+		else write_cpsr(imm & 0xf00000ff);
 	} else {
 		assert(false);
 	}
