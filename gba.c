@@ -16,6 +16,8 @@ bool log_registers = false;
 bool single_step = false;
 uint64_t instruction_count = 0;
 uint64_t start_logging_at = 47056;
+uint64_t cycles = 0;
+bool halted = false;
 
 #define DISPLAY_WIDTH 240
 #define DISPLAY_HEIGHT 160
@@ -151,13 +153,18 @@ void (*thumb_lookup[256])(void);
 #define IO_WININ     0x48
 #define IO_WINOUT    0x4a
 #define IO_SOUNDBIAS 0x88
+#define IO_DMA0CNT_H 0xba
+#define IO_DMA1CNT_H 0xc6
+#define IO_DMA2CNT_H 0xd2
 #define IO_DMA3SAD   0xd4
 #define IO_DMA3DAD   0xd8
 #define IO_DMA3CNT_L 0xdc
 #define IO_DMA3CNT_H 0xde
 #define IO_KEYINPUT  0x130
+#define IO_RCNT      0x134
 #define IO_IE        0x200
 #define IO_IF        0x202
+#define IO_WAITCNT   0x204
 #define IO_IME       0x208
 #define IO_HALTCNT   0x301
 
@@ -177,14 +184,19 @@ uint16_t io_win1v;
 uint16_t io_winin;
 uint16_t io_winout;
 uint16_t io_soundbias;
+uint16_t io_dma0cnt_h;
+uint16_t io_dma1cnt_h;
+uint16_t io_dma2cnt_h;
 uint32_t io_dma3sad;
 uint32_t io_dma3dad;
 uint16_t io_dma3cnt_l;
 uint16_t io_dma3cnt_h;
 uint16_t io_keyinput;
 uint16_t io_keycnt;
+uint16_t io_rcnt;
 uint16_t io_ie;
 uint16_t io_if;
+uint16_t io_waitcnt;
 uint16_t io_ime;
 uint8_t io_haltcnt;
 
@@ -222,9 +234,13 @@ void io_write_byte(uint32_t address, uint8_t value) {
 			printf("DISPSTAT = 0x%04x\n", io_dispstat);
 			break;
 
+		case IO_IME:
+			io_ime = (io_ime & 0xff00) | value;
+			break;
+
 		case IO_HALTCNT:
 			io_haltcnt = value;
-			printf("HALTCNT = 0x%02x\n", io_haltcnt);
+			halted = true;
 			break;
 
 		default:
@@ -236,15 +252,25 @@ void io_write_byte(uint32_t address, uint8_t value) {
 uint16_t io_read_halfword(uint32_t address) {
 	switch (address) {
 		case IO_DISPSTAT:
-			io_dispstat = (io_dispstat + 1) % 8;
 			return io_dispstat;
 
 		case IO_VCOUNT:
-			io_vcount = (io_vcount + 1) % 228;
 			return io_vcount;
 
 		case IO_SOUNDBIAS:
 			return io_soundbias;
+
+		case IO_DMA0CNT_H:
+			return io_dma0cnt_h;
+
+		case IO_DMA1CNT_H:
+			return io_dma1cnt_h;
+
+		case IO_DMA2CNT_H:
+			return io_dma2cnt_h;
+
+		case IO_DMA3CNT_H:
+			return io_dma3cnt_h;
 
 		case IO_KEYINPUT:
 			io_keyinput = 0x3ff;
@@ -252,6 +278,9 @@ uint16_t io_read_halfword(uint32_t address) {
 				if (keys[i]) io_keyinput &= ~(1 << i);
 			}
 			return io_keyinput;
+
+		case IO_RCNT:
+			return io_rcnt;
 
 		case IO_IE:
 			return io_ie;
@@ -349,7 +378,12 @@ void io_write_halfword(uint32_t address, uint16_t value) {
 
 		case IO_IF:
 			io_if = value;
-			printf("IF = 0x%04x\n", io_if);
+			//printf("IF = 0x%04x\n", io_if);
+			break;
+
+		case IO_WAITCNT:
+			io_waitcnt = value;
+			printf("WAITCNT = 0x%04x\n", io_waitcnt);
 			break;
 
 		case IO_IME:
@@ -366,14 +400,10 @@ void io_write_halfword(uint32_t address, uint16_t value) {
 uint32_t io_read_word(uint32_t address) {
 	switch (address) {
 		case IO_DISPSTAT:
-			if (io_vcount == 0 || io_vcount == 0xa0) {  // FIXME
-				io_dispstat = 0;
-				io_vcount = 0x9f;
-			} else {
-				io_dispstat = 1;
-				io_vcount = 0xa0;
-			}
 			return io_dispstat | io_vcount << 16;
+
+		case IO_DMA3CNT_L:
+			return io_dma3cnt_l | io_dma3cnt_h << 16;
 
 		case IO_KEYINPUT:
 			io_keyinput = 0x3ff;
@@ -432,8 +462,8 @@ void io_write_word(uint32_t address, uint32_t value) {
 		case IO_IE:
 			io_ie = (uint16_t) value;
 			io_if = (uint16_t)(value >> 16);
-			printf("IE = 0x%04x\n", io_ie);
-			printf("IF = 0x%04x\n", io_if);
+			//printf("IE = 0x%04x\n", io_ie);
+			//printf("IF = 0x%04x\n", io_if);
 			break;
 
 		case IO_IME:
@@ -522,9 +552,11 @@ uint16_t memory_read_halfword(uint32_t address) {
 	if (address >= 0x08000000 && address < 0x0a000000) {
 		return *(uint16_t *)&game_rom[address - 0x08000000];
 	}
+	//if (address == 0x03fffff8) return 0;  // FIXME
+	//if (address >= 0x0bfe1fe0 && address <= 0x0bfe1ff2) return 0;  // FIXME
+	//if (address >= 0x0bffffe0 && address <= 0x0bfffff2) return 0;  // FIXME
 	printf("memory_read_halfword(0x%08x);\n", address);
-	if (address >= 0x0bffffe0 && address <= 0x0bfffff2) return 0;  // FIXME
-	assert(false);
+	assert(false);  // FIXME
 	return 0;
 }
 
@@ -1255,7 +1287,7 @@ void arm_data_processing_immediate(void) {
 		default: assert(false); break;
 	}
 	if (S) {  // flags
-		if (rot != 0) {  // FIXME?
+		if (rot != 0) {
 			if ((imm_unrotated & (1 << (2 * rot - 1))) != 0) { cpsr |= PSR_C; } else { cpsr &= ~PSR_C; }
 		}
 		if ((result & 0x80000000) != 0) { cpsr |= PSR_N; } else { cpsr &= ~PSR_N; }
@@ -1480,6 +1512,7 @@ void arm_block_data_transfer(void) {
 				r[i] = memory_read_word(address);
 				if (i == 15) {
 					r[i] &= ~1;
+					if (S) write_cpsr(read_spsr());  // FIXME?
 					branch_taken = true;
 				}
 			} else {
@@ -1499,7 +1532,6 @@ void arm_block_data_transfer(void) {
 		}
 	}
 	if (S) mode_change(PSR_MODE_USR, cpsr & PSR_MODE);
-	// FIXME if (S) restore spsr if r15 in rlist?
 	if (W) r[Rn] = new_base;
 }
 
@@ -2626,12 +2658,16 @@ void thumb_conditional_branch(void) {
 }
 
 void thumb_software_interrupt(void) {
-	thumb_print_opcode();
-	print_mnemonic("swi");
-	print_address(thumb_op & 0xff);
-	printf("\n");
+//#ifdef DEBUG
+	//if (log_instructions && log_thumb_instructions) {
+		thumb_print_opcode();
+		print_mnemonic("swi");
+		print_address(thumb_op & 0xff);
+		printf("\n");
+	//}
+//#endif
 
-	assert(false);  // FIXME
+	assert(false);
 	r14_svc = (r[15] - 2) | 1;
 	spsr_svc = cpsr;
 	write_cpsr((cpsr & ~(PSR_T | PSR_MODE)) | PSR_I | PSR_MODE_SVC);
@@ -2895,24 +2931,178 @@ void gba_init(const char *filename) {
 	}
 
 	branch_taken = true;
+	io_vcount = 227;
 }
 
-void gba_perform_dma(void) {
+SDL_Texture *g_texture;
+SDL_PixelFormat *g_format;
+
+void gba_draw_bitmap(uint32_t mode, int y) {
+	assert(mode == 3 || mode == 4);
+
+	Uint32 *pixels;
+	int pitch;
+	SDL_LockTexture(g_texture, NULL, (void**) &pixels, &pitch);
+	for (int x = 0; x < 240; x++) {
+		uint16_t pixel = 0;
+		if (mode == 3) {
+			pixel = *(uint16_t *)&video_ram[(y * 240 + x) * 2];
+		} else if (mode == 4) {
+			uint8_t pixel_index = video_ram[y * 240 + x];
+			pixel = *(uint16_t *)&palette_ram[pixel_index * 2];
+		}
+		uint32_t r, g, b;
+		r = pixel & 0x1f;
+		g = (pixel >> 5) & 0x1f;
+		b = (pixel >> 10) & 0x1f;
+		r = (r << 3) | (r >> 2);
+		g = (g << 3) | (g >> 2);
+		b = (b << 3) | (b >> 2);
+		pixels[y * (pitch / 4) + x] = SDL_MapRGB(g_format, r, g, b);
+	}
+	SDL_UnlockTexture(g_texture);
+}
+
+void gba_draw_tiled_bg(uint32_t mode, int y, uint32_t character_base, uint32_t screen_base) {
+	assert(mode == 0);
+
+	uint32_t h = io_bg0hofs;
+	uint32_t v = io_bg0vofs;
+
+	Uint32 *pixels;
+	int pitch;
+	SDL_LockTexture(g_texture, NULL, (void**) &pixels, &pitch);
+	for (int x = 0; x < 240; x += 8) {
+		uint16_t tile_index = *(uint16_t *)&video_ram[screen_base + ((y / 8) * 32 + (x / 8)) * 2];
+		uint8_t *tile = &video_ram[character_base + tile_index * 32];
+		for (int i = 0; i < 8; i += 2) {
+			uint8_t pixel_indexes = tile[(y % 8) * 4 + i / 2];
+			uint8_t pixel_index_0 = pixel_indexes & 0xf;
+			uint8_t pixel_index_1 = (pixel_indexes >> 4) & 0xf;
+			uint16_t pixel_0 = *(uint16_t *)&palette_ram[pixel_index_0 * 2];
+			uint16_t pixel_1 = *(uint16_t *)&palette_ram[pixel_index_1 * 2];
+			uint32_t r, g, b;
+			r = pixel_0 & 0x1f;
+			g = (pixel_0 >> 5) & 0x1f;
+			b = (pixel_0 >> 10) & 0x1f;
+			r = (r << 3) | (r >> 2);
+			g = (g << 3) | (g >> 2);
+			b = (b << 3) | (b >> 2);
+			pixels[y * (pitch / 4) + ((x / 8) * 8 + i)] = SDL_MapRGB(g_format, r, g, b);
+			r = pixel_1 & 0x1f;
+			g = (pixel_1 >> 5) & 0x1f;
+			b = (pixel_1 >> 10) & 0x1f;
+			r = (r << 3) | (r >> 2);
+			g = (g << 3) | (g >> 2);
+			b = (b << 3) | (b >> 2);
+			pixels[y * (pitch / 4) + ((x / 8) * 8 + i + 1)] = SDL_MapRGB(g_format, r, g, b);
+		}
+	}
+	SDL_UnlockTexture(g_texture);
+}
+
+void gba_draw_tiled(uint32_t mode, int y) {
+	uint32_t character_base, screen_base;
+
+	if (io_dispcnt & (1 << 11)) {
+		character_base = ((io_bg3cnt >> 2) & 3) * 0x4000;
+		screen_base = ((io_bg3cnt >> 8) & 0x1f) * 0x800;
+		gba_draw_tiled_bg(mode, y, character_base, screen_base);
+	}
+	if (io_dispcnt & (1 << 10)) {
+		character_base = ((io_bg2cnt >> 2) & 3) * 0x4000;
+		screen_base = ((io_bg2cnt >> 8) & 0x1f) * 0x800;
+		gba_draw_tiled_bg(mode, y, character_base, screen_base);
+	}
+	if (io_dispcnt & (1 << 9)) {
+		character_base = ((io_bg1cnt >> 2) & 3) * 0x4000;
+		screen_base = ((io_bg1cnt >> 8) & 0x1f) * 0x800;
+		gba_draw_tiled_bg(mode, y, character_base, screen_base);
+	}
+	if (io_dispcnt & (1 << 8)) {
+		character_base = ((io_bg0cnt >> 2) & 3) * 0x4000;
+		screen_base = ((io_bg0cnt >> 8) & 0x1f) * 0x800;
+		gba_draw_tiled_bg(mode, y, character_base, screen_base);
+	}
+}
+
+void hardware_interrupt(void) {
+	bool T = (cpsr & PSR_T) != 0;
+	r14_irq = (r[15] - (T ? 2 : 4)) | (T ? 1 : 0);
+	spsr_irq = cpsr;
+	write_cpsr((cpsr & ~(PSR_T | PSR_MODE)) | PSR_I | PSR_MODE_IRQ);
+	r[15] = PC_IRQ;
+	branch_taken = true;
+	halted = false;
+}
+
+void gba_ppu_update(void) {
+	if (cycles % 1232 == 0) {
+		if (io_vcount < 160) {
+			uint32_t mode = io_dispcnt & 7;
+			switch (mode) {
+				case 0:
+				case 1:
+				case 2:
+					gba_draw_tiled(mode, io_vcount);
+					break;
+
+				case 3:
+				case 4:
+				case 5:
+					gba_draw_bitmap(mode, io_vcount);
+					break;
+
+				case 6:
+				case 7:
+				default:
+					assert(false);
+					break;
+			}
+		}
+		io_vcount = (io_vcount + 1) % 228;
+		if (io_vcount == 0) {
+			io_dispstat &= ~1;
+		} else if (io_vcount == 160) {
+			io_dispstat |= 1;
+			if (io_ime == 1) {  // FIXME
+				hardware_interrupt();
+			}
+		}
+	}
+	cycles = (cycles + 1) % 280896;
+}
+
+void gba_dma_update(void) {
 	if ((io_dma3cnt_h & (1 << 15)) != 0) {
-		io_dma3cnt_h &= ~(1 << 15);
-		assert(io_dma3cnt_h == 0);
+		if ((io_dma3cnt_h & (1 << 9)) == 0) {
+			io_dma3cnt_h &= ~(1 << 15);
+		}
+		uint32_t dest_ctrl = (io_dma3cnt_h >> 5) & 3;
+		uint32_t src_ctrl = (io_dma3cnt_h >> 7) & 3;
+		assert(dest_ctrl == 0);
+		assert(src_ctrl == 0 || src_ctrl == 2);
 		uint32_t length = io_dma3cnt_l;
 		if (length == 0) length = 0x10000;
-		for (uint16_t i = 0; i < length; i++) {
-			uint16_t value = memory_read_halfword(io_dma3sad + 2 * i);
-			memory_write_halfword(io_dma3dad + 2 * i, value);
+		if ((io_dma3cnt_h & (1 << 10)) != 0) {
+			for (uint32_t i = 0; i < length; i++) {
+				uint32_t value = memory_read_word(io_dma3sad + (src_ctrl == 2 ? 0 : 4 * i));
+				memory_write_word(io_dma3dad + 4 * i, value);
+			}
+		} else {
+			for (uint32_t i = 0; i < length; i++) {
+				uint16_t value = memory_read_halfword(io_dma3sad + (src_ctrl == 2 ? 0 : 2 * i));
+				memory_write_halfword(io_dma3dad + 2 * i, value);
+			}
 		}
 	}
 }
 
 void gba_emulate(void) {
-	for (int n = 0; n < 4096; n++) {
-		//gba_perform_dma();
+	while (true) {
+		gba_dma_update();
+		gba_ppu_update();
+		if (cycles == 0) break;
 
 #ifdef DEBUG
 		if (single_step && instruction_count >= start_logging_at) {
@@ -2921,10 +3111,13 @@ void gba_emulate(void) {
 		}
 #endif
 
-		if (cpsr & PSR_T) {
-			thumb_step();
-		} else {
-			arm_step();
+		if (!halted) {
+			if (cpsr & PSR_T) {
+				thumb_step();
+			} else {
+				arm_step();
+			}
+			instruction_count++;
 		}
 
 #ifdef DEBUG
@@ -2933,89 +3126,6 @@ void gba_emulate(void) {
 			if (c == EOF) exit(EXIT_SUCCESS);
 		}
 #endif
-
-		instruction_count++;
-	}
-}
-
-void gba_draw_tiled_bg(SDL_PixelFormat *format, Uint32 *pixels, int pitch, uint32_t character_base, uint32_t screen_base) {
-	for (int y = 0; y < 20; y++) {
-		for (int x = 0; x < 30; x++) {
-			uint16_t tile_index = *(uint16_t *)&video_ram[screen_base + (y * 32 + x) * 2];
-			uint8_t *tile = &video_ram[character_base + tile_index * 0x20];
-			uint32_t tile_counter = 0;
-			for (int j = 0; j < 8; j++) {
-				for (int i = 0; i < 8; i += 2) {
-					uint8_t pixel_indexes = tile[tile_counter++];
-					uint8_t pixel_index_0 = pixel_indexes & 0xf;
-					uint8_t pixel_index_1 = (pixel_indexes >> 4) & 0xf;
-					uint16_t pixel_0 = *(uint16_t *)&palette_ram[pixel_index_0 * 2];
-					uint16_t pixel_1 = *(uint16_t *)&palette_ram[pixel_index_1 * 2];
-					uint32_t r, g, b;
-					r = pixel_0 & 0x1f;
-					g = (pixel_0 >> 5) & 0x1f;
-					b = (pixel_0 >> 10) & 0x1f;
-					r = (r << 3) | (r >> 2);
-					g = (g << 3) | (g >> 2);
-					b = (b << 3) | (b >> 2);
-					pixels[(8*y+j) * (pitch / 4) + (8*x+i)] = SDL_MapRGB(format, r, g, b);
-					r = pixel_1 & 0x1f;
-					g = (pixel_1 >> 5) & 0x1f;
-					b = (pixel_1 >> 10) & 0x1f;
-					r = (r << 3) | (r >> 2);
-					g = (g << 3) | (g >> 2);
-					b = (b << 3) | (b >> 2);
-					pixels[(8*y+j) * (pitch / 4) + (8*x+i+1)] = SDL_MapRGB(format, r, g, b);
-				}
-			}
-		}
-	}
-}
-
-void gba_draw_tiled(SDL_PixelFormat *format, Uint32 *pixels, int pitch) {
-	uint32_t character_base, screen_base;
-
-	if (io_dispcnt & (1 << 11)) {
-		character_base = ((io_bg3cnt >> 2) & 3) * 0x4000;
-		screen_base = ((io_bg3cnt >> 8) & 0x1f) * 0x800;
-		gba_draw_tiled_bg(format, pixels, pitch, character_base, screen_base);
-	}
-	if (io_dispcnt & (1 << 10)) {
-		character_base = ((io_bg2cnt >> 2) & 3) * 0x4000;
-		screen_base = ((io_bg2cnt >> 8) & 0x1f) * 0x800;
-		gba_draw_tiled_bg(format, pixels, pitch, character_base, screen_base);
-	}
-	if (io_dispcnt & (1 << 9)) {
-		character_base = ((io_bg1cnt >> 2) & 3) * 0x4000;
-		screen_base = ((io_bg1cnt >> 8) & 0x1f) * 0x800;
-		gba_draw_tiled_bg(format, pixels, pitch, character_base, screen_base);
-	}
-	if (io_dispcnt & (1 << 8)) {
-		character_base = ((io_bg0cnt >> 2) & 3) * 0x4000;
-		screen_base = ((io_bg0cnt >> 8) & 0x1f) * 0x800;
-		gba_draw_tiled_bg(format, pixels, pitch, character_base, screen_base);
-	}
-}
-
-void gba_draw_bitmap(SDL_PixelFormat *format, Uint32 *pixels, int pitch, uint32_t mode) {
-	for (int y = 0; y < 160; y++) {
-		for (int x = 0; x < 240; x++) {
-			uint16_t pixel;
-			if (mode == 3) {
-				pixel = *(uint16_t *)&video_ram[(y * 240 + x) * 2];
-			} else {
-				uint8_t pixel_index = video_ram[y * 240 + x];
-				pixel = *(uint16_t *)&palette_ram[pixel_index * 2];
-			}
-			uint32_t r, g, b;
-			r = pixel & 0x1f;
-			g = (pixel >> 5) & 0x1f;
-			b = (pixel >> 10) & 0x1f;
-			r = (r << 3) | (r >> 2);
-			g = (g << 3) | (g >> 2);
-			b = (b << 3) | (b >> 2);
-			pixels[y * (pitch / 4) + x] = SDL_MapRGB(format, r, g, b);
-		}
 	}
 }
 
@@ -3031,8 +3141,8 @@ int main(int argc, char **argv) {
 	SDL_Window *window = SDL_CreateWindow("GBA", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
 	SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
 	Uint32 pixel_format = SDL_GetWindowPixelFormat(window);
-	SDL_Texture *texture = SDL_CreateTexture(renderer, pixel_format, SDL_TEXTUREACCESS_STREAMING, DISPLAY_WIDTH, DISPLAY_HEIGHT);
-	SDL_PixelFormat *format = SDL_AllocFormat(pixel_format);
+	g_texture = SDL_CreateTexture(renderer, pixel_format, SDL_TEXTUREACCESS_STREAMING, DISPLAY_WIDTH, DISPLAY_HEIGHT);
+	g_format = SDL_AllocFormat(pixel_format);
 
 	bool quit = false;
 	while (!quit) {
@@ -3057,33 +3167,16 @@ int main(int argc, char **argv) {
 
 		gba_emulate();
 
-		Uint32 *pixels;
-		int pitch;
-		SDL_LockTexture(texture, NULL, (void**) &pixels, &pitch);
-		uint32_t mode = io_dispcnt & 7;
-		switch (mode) {
-			case 0:
-			default:
-				gba_draw_tiled(format, pixels, pitch);
-				break;
-
-			case 3:
-			case 4:
-				gba_draw_bitmap(format, pixels, pitch, mode);
-				break;
-		}
-		SDL_UnlockTexture(texture);
-
 		SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
 		SDL_RenderClear(renderer);
 		SDL_Rect displayRect = {0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT};
 		SDL_Rect screenRect = {0, 0, SCREEN_WIDTH, SCREEN_HEIGHT};
-		SDL_RenderCopy(renderer, texture, &displayRect, &screenRect);
+		SDL_RenderCopy(renderer, g_texture, &displayRect, &screenRect);
 		SDL_RenderPresent(renderer);
 	}
 
-	SDL_FreeFormat(format);
-	SDL_DestroyTexture(texture);
+	SDL_FreeFormat(g_format);
+	SDL_DestroyTexture(g_texture);
 	SDL_DestroyRenderer(renderer);
 	SDL_DestroyWindow(window);
 	SDL_Quit();
