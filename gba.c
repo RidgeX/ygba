@@ -216,13 +216,16 @@ void (*thumb_lookup[256])(void);
     #define DMA_AT_REFRESH 3
     #define DMA_IRQ        (1 << 30)
     #define DMA_ENABLE     (1 << 31)
+#define REG_SIODATA32  (MEM_IO + 0x120)
+#define REG_SIOCNT     (MEM_IO + 0x128)
 #define REG_KEYINPUT   (MEM_IO + 0x130)
 #define REG_KEYCNT     (MEM_IO + 0x132)
-#define IO_RCNT        (MEM_IO+0x0134)
-#define IO_IE          (MEM_IO+0x0200)
-#define IO_IF          (MEM_IO+0x0202)
-#define IO_WAITCNT     (MEM_IO+0x0204)
+#define REG_RCNT       (MEM_IO + 0x134)
+#define REG_IE         (MEM_IO + 0x200)
+#define REG_IF         (MEM_IO + 0x202)
+#define REG_WAITCNT    (MEM_IO + 0x204)
 #define REG_IME        (MEM_IO + 0x208)
+#define REG_POSTFLG    (MEM_IO + 0x300)
 #define REG_HALTCNT    (MEM_IO + 0x301)
 
 uint16_t io_dispcnt;
@@ -248,10 +251,10 @@ uint32_t io_dma2sad, io_dma2dad, io_dma2cnt;
 uint32_t io_dma3sad, io_dma3dad, io_dma3cnt;
 uint16_t io_keyinput;
 uint16_t io_keycnt;
-uint16_t io_rcnt;
+//uint16_t io_rcnt;
 uint16_t io_ie;
 uint16_t io_if;
-uint16_t io_waitcnt;
+//uint16_t io_waitcnt;
 uint16_t io_ime;
 uint8_t io_haltcnt;
 
@@ -289,6 +292,10 @@ void io_write_byte(uint32_t address, uint8_t value) {
         //    printf("DISPSTAT = 0x%04x\n", io_dispstat);
         //    break;
 
+        case REG_IF:
+            io_if = (io_if & 0xff00) | value;  // FIXME? xor value
+            break;
+
         case REG_IME:
             io_ime = (io_ime & 0xff00) | value;
             break;
@@ -312,6 +319,9 @@ uint16_t io_read_halfword(uint32_t address) {
         case REG_BG0CNT: return io_bg0cnt;
         case REG_BG1CNT: return io_bg1cnt;
         case REG_BG2CNT: return io_bg2cnt;
+        case REG_BG3CNT: return io_bg3cnt;
+        case REG_BG0HOFS: return io_bg0hofs;
+        case REG_BG0VOFS: return io_bg0vofs;
 
         case IO_SOUNDBIAS:
             return io_soundbias;
@@ -328,6 +338,9 @@ uint16_t io_read_halfword(uint32_t address) {
         //case IO_DMA3CNT_H:
         //    return io_dma3cnt_h;
 
+        case REG_SIODATA32: return 0;  // FIXME
+        case REG_SIOCNT: return 0;  // FIXME
+
         case REG_KEYINPUT:
             io_keyinput = 0x3ff;
             for (int i = 0; i < NUM_KEYS; i++) {
@@ -335,14 +348,12 @@ uint16_t io_read_halfword(uint32_t address) {
             }
             return io_keyinput;
 
-        case IO_RCNT:
-            return io_rcnt;
+        //case IO_RCNT:
+        //    return io_rcnt;
 
-        case IO_IE:
-            return io_ie;
-
-        case REG_IME:
-            return io_ime;
+        case REG_IE: return io_ie;
+        case REG_IF: return io_if;
+        case REG_IME: return io_ime;
 
         default:
             printf("io_read_halfword(0x%08x);\n", address);
@@ -363,6 +374,7 @@ void io_write_halfword(uint32_t address, uint16_t value) {
         case REG_BG0CNT: io_bg0cnt = value; break;
         case REG_BG1CNT: io_bg1cnt = value; break;
         case REG_BG2CNT: io_bg2cnt = value; break;
+        case REG_BG3CNT: io_bg3cnt = value; break;
         case REG_BG0HOFS: io_bg0hofs = value; break;
         case REG_BG0VOFS: io_bg0vofs = value; break;
         case REG_BG1HOFS: io_bg1hofs = value; break;
@@ -405,6 +417,14 @@ void io_write_halfword(uint32_t address, uint16_t value) {
             //printf("SOUNDBIAS = 0x%04x\n", io_soundbias);
             break;
 
+        case REG_DMA1CNT_H:
+            io_dma1cnt = (io_dma1cnt & 0xffff) | value << 16;
+            break;
+
+        case REG_DMA2CNT_H:
+            io_dma2cnt = (io_dma2cnt & 0xffff) | value << 16;
+            break;
+
         case REG_DMA3CNT_L:
             io_dma3cnt = (io_dma3cnt & 0xffff0000) | value;
             break;
@@ -413,24 +433,15 @@ void io_write_halfword(uint32_t address, uint16_t value) {
             io_dma3cnt = (io_dma3cnt & 0xffff) | value << 16;
             break;
 
-        case IO_IE:
-            io_ie = value;
-            printf("IE = 0x%04x\n", io_ie);
-            break;
+        case REG_IE: io_ie = value; break;
+        case REG_IF: io_if = value; break;  // FIXME? xor value
 
-        case IO_IF:
-            io_if = value;
-            //printf("IF = 0x%04x\n", io_if);
-            break;
+        //case IO_WAITCNT:
+        //    io_waitcnt = value;
+        //    printf("WAITCNT = 0x%04x\n", io_waitcnt);
+        //    break;
 
-        case IO_WAITCNT:
-            io_waitcnt = value;
-            printf("WAITCNT = 0x%04x\n", io_waitcnt);
-            break;
-
-        case REG_IME:
-            io_ime = value;
-            break;
+        case REG_IME: io_ime = value; break;
 
         default:
             printf("io_write_halfword(0x%08x, 0x%04x);\n", address, value);
@@ -449,7 +460,11 @@ uint32_t io_read_word(uint32_t address) {
         case REG_DMA0SAD: return io_dma0sad;
         case REG_DMA0DAD: return io_dma0dad;
         case REG_DMA0CNT_L: return io_dma0cnt;
+        case REG_DMA1SAD: return io_dma1sad;
+        case REG_DMA1DAD: return io_dma1dad;
         case REG_DMA1CNT_L: return io_dma1cnt;
+        case REG_DMA2SAD: return io_dma2sad;
+        case REG_DMA2DAD: return io_dma2dad;
         case REG_DMA2CNT_L: return io_dma2cnt;
         case REG_DMA3SAD: return io_dma3sad;
         case REG_DMA3DAD: return io_dma3dad;
@@ -462,8 +477,11 @@ uint32_t io_read_word(uint32_t address) {
         //    }
         //    return io_keyinput | io_keycnt << 16;
 
-        case IO_IE:
+        case REG_IE:
             return io_ie | io_if << 16;
+
+        case REG_IME:
+            return io_ime;
 
         default:
             printf("io_read_word(0x%08x);\n", address);
@@ -487,35 +505,22 @@ void io_write_word(uint32_t address, uint32_t value) {
             io_bg0vofs = (uint16_t)(value >> 16);
             break;
 
-        case REG_DMA0SAD:
-            io_dma0sad = value;
-            break;
+        case REG_DMA0SAD: io_dma0sad = value; break;
+        case REG_DMA0DAD: io_dma0dad = value; break;
+        case REG_DMA0CNT_L: io_dma0cnt = value; break;
+        case REG_DMA1SAD: io_dma1sad = value; break;
+        case REG_DMA1DAD: io_dma1dad = value; break;
+        case REG_DMA1CNT_L: io_dma1cnt = value; break;
+        case REG_DMA2SAD: io_dma2sad = value; break;
+        case REG_DMA2DAD: io_dma2dad = value; break;
+        case REG_DMA2CNT_L: io_dma2cnt = value; break;
+        case REG_DMA3SAD: io_dma3sad = value; break;
+        case REG_DMA3DAD: io_dma3dad = value; break;
+        case REG_DMA3CNT_L: io_dma3cnt = value; break;
 
-        case REG_DMA0DAD:
-            io_dma0dad = value;
-            break;
-
-        case REG_DMA0CNT_L:
-            io_dma0cnt = value;
-            break;
-
-        case REG_DMA3SAD:
-            io_dma3sad = value;
-            break;
-
-        case REG_DMA3DAD:
-            io_dma3dad = value;
-            break;
-
-        case REG_DMA3CNT_L:
-            io_dma3cnt = value;
-            break;
-
-        case IO_IE:
+        case REG_IE:
             io_ie = (uint16_t) value;
             io_if = (uint16_t)(value >> 16);
-            //printf("IE = 0x%04x\n", io_ie);
-            //printf("IF = 0x%04x\n", io_if);
             break;
 
         case REG_IME:
@@ -672,6 +677,9 @@ uint32_t memory_read_word(uint32_t address) {
         if (r[15] < 0x4000) last_bios_access = address;
         return *(uint32_t *)&system_rom[last_bios_access];
     }
+    if (address < 0x02000000) {
+        //return 0;  // Unmapped
+    }
     if (address >= 0x02000000 && address < 0x03000000) {
         return *(uint32_t *)&cpu_ewram[address & 0x3ffff];
     }
@@ -706,6 +714,9 @@ void memory_write_word(uint32_t address, uint32_t value) {
     address &= ~3;
     if (address < 0x4000) {
         //return;  // Read only
+    }
+    if (address < 0x02000000) {
+        //return;  // Unmapped
     }
     if (address >= 0x02000000 && address < 0x03000000) {
         *(uint32_t *)&cpu_ewram[address & 0x3ffff] = value;
@@ -3053,17 +3064,19 @@ void gba_draw_bitmap(uint32_t mode, int y) {
     SDL_UnlockTexture(g_texture);
 }
 
-void gba_draw_tiled_bg(uint32_t mode, int y, uint32_t tile_base, uint32_t map_base) {
+void gba_draw_tiled_bg(uint32_t mode, int bg, int y, uint32_t tile_base, uint32_t map_base) {
     assert(mode == 0);
-
-    //uint32_t h = io_bg0hofs;  // FIXME
-    //uint32_t v = io_bg0vofs;
+    assert(bg >= 0 && bg <= 3);
+    //uint32_t h = io_read_halfword(REG_BG0HOFS + 4 * bg);
+    //uint32_t v = io_read_halfword(REG_BG0VOFS + 4 * bg);
 
     Uint32 *pixels;
     int pitch;
     SDL_LockTexture(g_texture, NULL, (void**) &pixels, &pitch);
     for (uint32_t x = 0; x < SCREEN_WIDTH; x += 8) {
-        uint32_t map_address = map_base + ((y / 8) * 32 + (x / 8)) * 2;
+        uint32_t map_x = x / 8;
+        uint32_t map_y = y / 8;
+        uint32_t map_address = map_base + (map_y * 32 + map_x) * 2;
         uint16_t info = *(uint16_t *)&video_ram[map_address];
         uint16_t tile_no = info & 0x3ff;
         //bool hflip = (info & (1 << 10)) != 0;  // FIXME
@@ -3091,7 +3104,7 @@ void gba_draw_tiled_bg(uint32_t mode, int y, uint32_t tile_base, uint32_t map_ba
 }
 
 void gba_draw_tiled(uint32_t mode, int y) {
-    for (int pri = 0; pri < 4; pri++) {  // FIXME? reverse order
+    for (int pri = 3; pri >= 0; pri--) {  // FIXME? reverse order
         for (int bg = 0; bg < 4; bg++) {
             bool visible = (io_dispcnt & (1 << (8 + bg))) != 0;
             if (!visible) continue;
@@ -3100,7 +3113,7 @@ void gba_draw_tiled(uint32_t mode, int y) {
             if (priority == pri) {
                 uint32_t tile_base = ((bgcnt >> 2) & 3) * 16384;
                 uint32_t map_base = ((bgcnt >> 8) & 0x1f) * 2048;
-                gba_draw_tiled_bg(mode, y, tile_base, map_base);
+                gba_draw_tiled_bg(mode, bg, y, tile_base, map_base);
             }
         }
     }
@@ -3150,14 +3163,15 @@ void gba_ppu_update(void) {
         } else if (io_vcount == 160) {
             io_dispstat |= DSTAT_IN_VBL;
             if (interrupts_enabled && (io_dispstat & DSTAT_VBL_IRQ) != 0 && (io_ie & (1 << 0)) != 0) {
-                //io_if |= 1 << 0;  // FIXME?
-                //arm_hardware_interrupt();  // FIXME?
+                io_if |= 1 << 0;
+                arm_hardware_interrupt();
             }
         }
         if (io_vcount == (uint8_t)(io_dispstat >> 8)) {
             io_dispstat |= DSTAT_IN_VCT;
             if (interrupts_enabled && (io_dispstat & DSTAT_VCT_IRQ) != 0 && (io_ie & (1 << 2)) != 0) {
-                //arm_hardware_interrupt();  // FIXME?
+                //io_if |= 1 << 2;
+                //arm_hardware_interrupt();
             }
         } else {
             io_dispstat &= ~DSTAT_IN_VCT;
@@ -3166,7 +3180,8 @@ void gba_ppu_update(void) {
     if (cycles % 1232 == 960) {
         io_dispstat |= DSTAT_IN_HBL;
         if (interrupts_enabled && (io_dispstat & DSTAT_HBL_IRQ) != 0 && (io_ie & (1 << 1)) != 0) {
-            //arm_hardware_interrupt();  // FIXME?
+            //io_if |= 1 << 1;
+            //arm_hardware_interrupt();
         }
     }
     cycles = (cycles + 1) % 280896;
