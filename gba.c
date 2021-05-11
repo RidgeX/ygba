@@ -15,9 +15,9 @@ bool log_thumb_instructions = true;
 bool log_registers = false;
 bool single_step = false;
 uint64_t instruction_count = 0;
-uint64_t start_logging_at = 0;
+uint64_t start_logging_at = 300000;
 uint64_t cycles = 0;
-bool halted = false;
+//bool halted = false;
 
 #define SCREEN_WIDTH  240
 #define SCREEN_HEIGHT 160
@@ -175,8 +175,8 @@ void (*thumb_lookup[256])(void);
     #define DSTAT_VCT     0xff
 
 #define REG_VCOUNT    (MEM_IO + 6)
-#define IO_BG0CNT     (MEM_IO+0x0008)
-#define IO_BG1CNT     (MEM_IO+0x000a)
+#define IO_BG0CNT     (MEM_IO + 8)
+#define IO_BG1CNT     (MEM_IO + 0xa)
 #define IO_BG0HOFS    (MEM_IO+0x0010)
 #define IO_BG0VOFS    (MEM_IO+0x0012)
 #define IO_WIN0H      (MEM_IO+0x0040)
@@ -193,7 +193,8 @@ void (*thumb_lookup[256])(void);
 #define IO_DMA3DAD    (MEM_IO+0x00d8)
 #define IO_DMA3CNT_L  (MEM_IO+0x00dc)
 #define IO_DMA3CNT_H  (MEM_IO+0x00de)
-#define IO_KEYINPUT   (MEM_IO+0x0130)
+#define REG_KEYINPUT  (MEM_IO + 0x130)
+#define REG_KEYCNT    (MEM_IO + 0x132)
 #define IO_RCNT       (MEM_IO+0x0134)
 #define IO_IE         (MEM_IO+0x0200)
 #define IO_IF         (MEM_IO+0x0202)
@@ -271,10 +272,10 @@ void io_write_byte(uint32_t address, uint8_t value) {
             io_ime = (io_ime & 0xff00) | value;
             break;
 
-        case IO_HALTCNT:
-            io_haltcnt = value;
-            halted = true;
-            break;
+        //case IO_HALTCNT:
+        //   io_haltcnt = value;
+        //    halted = true;
+        //    break;
 
         default:
             printf("io_write_byte(0x%08x, 0x%02x);\n", address, value);
@@ -305,7 +306,7 @@ uint16_t io_read_halfword(uint32_t address) {
         case IO_DMA3CNT_H:
             return io_dma3cnt_h;
 
-        case IO_KEYINPUT:
+        case REG_KEYINPUT:
             io_keyinput = 0x3ff;
             for (int i = 0; i < NUM_KEYS; i++) {
                 if (keys[i]) io_keyinput &= ~(1 << i);
@@ -350,12 +351,12 @@ void io_write_halfword(uint32_t address, uint16_t value) {
 
         case IO_BG0HOFS:
             io_bg0hofs = value;
-            printf("BG0HOFS = 0x%04x\n", io_bg0hofs);
+            //printf("BG0HOFS = 0x%04x\n", io_bg0hofs);
             break;
 
         case IO_BG0VOFS:
             io_bg0vofs = value;
-            printf("BG0VOFS = 0x%04x\n", io_bg0vofs);
+            //printf("BG0VOFS = 0x%04x\n", io_bg0vofs);
             break;
 
         case IO_WIN0H:
@@ -440,12 +441,12 @@ uint32_t io_read_word(uint32_t address) {
         case IO_DMA3CNT_L:
             return io_dma3cnt_l | io_dma3cnt_h << 16;
 
-        case IO_KEYINPUT:
-            io_keyinput = 0x3ff;
-            for (int i = 0; i < NUM_KEYS; i++) {
-                if (keys[i]) io_keyinput &= ~(1 << i);
-            }
-            return io_keyinput | io_keycnt << 16;
+        //case IO_KEYINPUT:
+        //    io_keyinput = 0x3ff;
+        //    for (int i = 0; i < NUM_KEYS; i++) {
+        //        if (keys[i]) io_keyinput &= ~(1 << i);
+        //    }
+        //    return io_keyinput | io_keycnt << 16;
 
         case IO_IE:
             return io_ie | io_if << 16;
@@ -554,6 +555,7 @@ void memory_write_byte(uint32_t address, uint8_t value) {
         return;
     }
     if (address >= 0x07000000 && address < 0x07000400) {
+        *(uint16_t *)&object_ram[address - 0x07000000] = value | value << 8;
         return;
     }
     printf("memory_write_byte(0x%08x, 0x%02x);\n", address, value);
@@ -621,7 +623,7 @@ void memory_write_halfword(uint32_t address, uint16_t value) {
         return;
     }
     printf("memory_write_halfword(0x%08x, 0x%04x);\n", address, value);
-    assert(false);  // FIXME
+    //assert(false);  // FIXME
 }
 
 uint32_t memory_read_word(uint32_t address) {
@@ -2693,17 +2695,16 @@ void thumb_conditional_branch(void) {
 }
 
 void thumb_software_interrupt(void) {
-//#ifdef DEBUG
-    //if (log_instructions && log_thumb_instructions) {
+#ifdef DEBUG
+    if (log_instructions && log_thumb_instructions) {
         thumb_print_opcode();
         print_mnemonic("swi");
         print_address(thumb_op & 0xff);
         printf("\n");
-    //}
-//#endif
+    }
+#endif
 
-    //assert(false);  // FIXME
-    r14_svc = (r[15] - 2) | 1;
+    r14_svc = r[15] - 2;  // | 1; FIXME?
     spsr_svc = cpsr;
     write_cpsr((cpsr & ~(PSR_T | PSR_MODE)) | PSR_I | PSR_MODE_SVC);
     r[15] = PC_SWI;
@@ -2984,15 +2985,19 @@ Uint32 rgb555(uint32_t pixel) {
 }
 
 void gba_draw_bitmap(uint32_t mode, int y) {
-    assert(mode != DCNT_MODE5);
+    uint32_t width = (mode == DCNT_MODE5 ? 160 : SCREEN_WIDTH);
 
     Uint32 *pixels;
     int pitch;
     SDL_LockTexture(g_texture, NULL, (void**) &pixels, &pitch);
-    for (int x = 0; x < SCREEN_WIDTH; x++) {
+    for (uint32_t x = 0; x < SCREEN_WIDTH; x++) {
         uint16_t pixel = 0;
-        if (mode == DCNT_MODE3) {
-            pixel = *(uint16_t *)&video_ram[(y * SCREEN_WIDTH + x) * 2];
+        if (mode == DCNT_MODE3 || mode == DCNT_MODE5) {
+            if (x < width && (mode == DCNT_MODE3 || y < 128)) {
+                pixel = *(uint16_t *)&video_ram[(y * width + x) * 2];
+            } else {
+                pixel = *(uint16_t *)&palette_ram[0];
+            }
         } else if (mode == DCNT_MODE4) {
             bool pageflip = (io_dispcnt & DCNT_PAGE) != 0;
             uint8_t pixel_index = video_ram[(pageflip ? 0xa000 : 0) + y * SCREEN_WIDTH + x];
@@ -3006,17 +3011,21 @@ void gba_draw_bitmap(uint32_t mode, int y) {
 void gba_draw_tiled_bg(uint32_t mode, int y, uint32_t character_base, uint32_t screen_base) {
     assert(mode == DCNT_MODE0);
 
-    uint32_t h = io_bg0hofs;
-    uint32_t v = io_bg0vofs;
+    //uint32_t h = io_bg0hofs;
+    //uint32_t v = io_bg0vofs;
 
     Uint32 *pixels;
     int pitch;
     SDL_LockTexture(g_texture, NULL, (void**) &pixels, &pitch);
-    for (int x = 0; x < SCREEN_WIDTH; x += 8) {
+    for (uint32_t x = 0; x < SCREEN_WIDTH; x += 8) {
         uint16_t tile_index = *(uint16_t *)&video_ram[screen_base + ((y / 8) * 32 + (x / 8)) * 2];
-        uint8_t *tile = &video_ram[character_base + tile_index * 32];
+        uint32_t vram_offset = character_base + tile_index * 32;
+        if (vram_offset < sizeof(video_ram)) goto error;  // FIXME
+        uint8_t *tile = &video_ram[vram_offset];
         for (int i = 0; i < 8; i += 2) {
-            uint8_t pixel_indexes = tile[(y % 8) * 4 + i / 2];
+            uint32_t tile_offset = (y % 8) * 4 + i / 2;
+            if (vram_offset + tile_offset < sizeof(video_ram)) goto error;  // FIXME
+            uint8_t pixel_indexes = tile[tile_offset];
             uint8_t pixel_index_0 = pixel_indexes & 0xf;
             uint8_t pixel_index_1 = (pixel_indexes >> 4) & 0xf;
             uint16_t pixel_0 = *(uint16_t *)&palette_ram[pixel_index_0 * 2];
@@ -3025,6 +3034,7 @@ void gba_draw_tiled_bg(uint32_t mode, int y, uint32_t character_base, uint32_t s
             pixels[y * (pitch / 4) + ((x / 8) * 8 + i + 1)] = rgb555(pixel_1);
         }
     }
+error:
     SDL_UnlockTexture(g_texture);
 }
 
@@ -3081,7 +3091,7 @@ void arm_hardware_interrupt(void) {
     write_cpsr((cpsr & ~(PSR_T | PSR_MODE)) | PSR_I | PSR_MODE_IRQ);
     r[15] = PC_IRQ;
     branch_taken = true;
-    halted = false;
+    //halted = false;
 }
 
 void gba_ppu_update(void) {
@@ -3155,17 +3165,17 @@ void gba_emulate(void) {
         }
 #endif
 
-        if (!halted) {
+        //if (!halted) {
             if (cpsr & PSR_T) {
                 thumb_step();
             } else {
                 arm_step();
             }
             instruction_count++;
-        }
+        //}
 
 #ifdef DEBUG
-        if (single_step && instruction_count >= start_logging_at) {
+        if (single_step && instruction_count > start_logging_at) {
             char c = fgetc(stdin);
             if (c == EOF) exit(EXIT_SUCCESS);
         }
@@ -3208,6 +3218,14 @@ int main(int argc, char **argv) {
         keys[7] = state[SDL_SCANCODE_DOWN];       // Down
         keys[8] = state[SDL_SCANCODE_S];          // Button R
         keys[9] = state[SDL_SCANCODE_A];          // Button L
+        if (keys[4] && keys[5]) {  // Disallow opposing directions
+            keys[4] = false;
+            keys[5] = false;
+        }
+        if (keys[6] && keys[7]) {
+            keys[6] = false;
+            keys[7] = false;
+        }
 
         gba_emulate();
 
