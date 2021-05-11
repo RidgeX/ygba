@@ -2,4 +2,5 @@ games/
 roms/
 tests/
 tonc/
+*.exe
 system_rom.bin
