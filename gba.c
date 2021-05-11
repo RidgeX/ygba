@@ -8,16 +8,18 @@
 #include <stdio.h>
 #include <string.h>
 
-#define DEBUG
+//#define DEBUG
 bool log_instructions = false;
 bool log_arm_instructions = true;
 bool log_thumb_instructions = true;
 bool log_registers = false;
 bool single_step = false;
 uint64_t instruction_count = 0;
-uint64_t start_logging_at = 300000;
+uint64_t start_logging_at = 0;
 uint64_t cycles = 0;
 bool halted = false;
+bool skip_bios = true;
+uint32_t last_bios_access = 0xe4;
 
 #define SCREEN_WIDTH  240
 #define SCREEN_HEIGHT 160
@@ -142,65 +144,86 @@ void (*thumb_lookup[256])(void);
 #define MEM_IO        0x4000000
 #define MEM_VRAM      0x6000000
 
-#define REG_DISPCNT   (MEM_IO + 0)
-  #define DCNT_MODE     7
-    #define DCNT_MODE0    0
-    #define DCNT_MODE1    1
-    #define DCNT_MODE2    2
-    #define DCNT_MODE3    3
-    #define DCNT_MODE4    4
-    #define DCNT_MODE5    5
-  #define DCNT_GB       (1 << 3)
-  #define DCNT_PAGE     (1 << 4)
-  #define DCNT_OAM_HBL  (1 << 5)
-  #define DCNT_OBJ_1D   (1 << 6)
-  #define DCNT_BLANK    (1 << 7)
-  #define DCNT_LAYER    0x1f
-    #define DCNT_BG0      (1 << 8)
-    #define DCNT_BG1      (1 << 9)
-    #define DCNT_BG2      (1 << 10)
-    #define DCNT_BG3      (1 << 11)
-    #define DCNT_OBJ      (1 << 12)
-  #define DCNT_WIN0     (1 << 13)
-  #define DCNT_WIN1     (1 << 14)
-  #define DCNT_WINOBJ   (1 << 15)
-
-#define REG_DISPSTAT  (MEM_IO + 4)
-    #define DSTAT_IN_VBL  (1 << 0)
-    #define DSTAT_IN_HBL  (1 << 1)
-    #define DSTAT_IN_VCT  (1 << 2)
-    #define DSTAT_VBL_IRQ (1 << 3)
-    #define DSTAT_HBL_IRQ (1 << 4)
-    #define DSTAT_VCT_IRQ (1 << 5)
-    #define DSTAT_VCT     0xff
-
-#define REG_VCOUNT    (MEM_IO + 6)
-#define IO_BG0CNT     (MEM_IO + 8)
-#define IO_BG1CNT     (MEM_IO + 0xa)
-#define IO_BG0HOFS    (MEM_IO+0x0010)
-#define IO_BG0VOFS    (MEM_IO+0x0012)
-#define IO_WIN0H      (MEM_IO+0x0040)
-#define IO_WIN1H      (MEM_IO+0x0042)
-#define IO_WIN0V      (MEM_IO+0x0044)
-#define IO_WIN1V      (MEM_IO+0x0046)
-#define IO_WININ      (MEM_IO+0x0048)
-#define IO_WINOUT     (MEM_IO+0x004a)
-#define IO_SOUNDBIAS  (MEM_IO+0x0088)
-#define IO_DMA0CNT_H  (MEM_IO+0x00ba)
-#define IO_DMA1CNT_H  (MEM_IO+0x00c6)
-#define IO_DMA2CNT_H  (MEM_IO+0x00d2)
-#define IO_DMA3SAD    (MEM_IO+0x00d4)
-#define IO_DMA3DAD    (MEM_IO+0x00d8)
-#define IO_DMA3CNT_L  (MEM_IO+0x00dc)
-#define IO_DMA3CNT_H  (MEM_IO+0x00de)
-#define REG_KEYINPUT  (MEM_IO + 0x130)
-#define REG_KEYCNT    (MEM_IO + 0x132)
-#define IO_RCNT       (MEM_IO+0x0134)
-#define IO_IE         (MEM_IO+0x0200)
-#define IO_IF         (MEM_IO+0x0202)
-#define IO_WAITCNT    (MEM_IO+0x0204)
-#define REG_IME       (MEM_IO + 0x208)
-#define REG_HALTCNT   (MEM_IO + 0x301)
+#define REG_DISPCNT    (MEM_IO + 0)
+    #define DCNT_GB        (1 << 3)
+    #define DCNT_PAGE      (1 << 4)
+    #define DCNT_OAM_HBL   (1 << 5)
+    #define DCNT_OBJ_1D    (1 << 6)
+    #define DCNT_BLANK     (1 << 7)
+    #define DCNT_BG0       (1 << 8)
+    #define DCNT_BG1       (1 << 9)
+    #define DCNT_BG2       (1 << 10)
+    #define DCNT_BG3       (1 << 11)
+    #define DCNT_OBJ       (1 << 12)
+    #define DCNT_WIN0      (1 << 13)
+    #define DCNT_WIN1      (1 << 14)
+    #define DCNT_WINOBJ    (1 << 15)
+#define REG_DISPSTAT   (MEM_IO + 4)
+    #define DSTAT_IN_VBL   (1 << 0)
+    #define DSTAT_IN_HBL   (1 << 1)
+    #define DSTAT_IN_VCT   (1 << 2)
+    #define DSTAT_VBL_IRQ  (1 << 3)
+    #define DSTAT_HBL_IRQ  (1 << 4)
+    #define DSTAT_VCT_IRQ  (1 << 5)
+#define REG_VCOUNT     (MEM_IO + 6)
+#define REG_BG0CNT     (MEM_IO + 8)
+#define REG_BG1CNT     (MEM_IO + 0xa)
+#define REG_BG2CNT     (MEM_IO + 0xc)
+#define REG_BG3CNT     (MEM_IO + 0xe)
+#define REG_BG0HOFS    (MEM_IO + 0x10)
+#define REG_BG0VOFS    (MEM_IO + 0x12)
+#define REG_BG1HOFS    (MEM_IO + 0x14)
+#define REG_BG1VOFS    (MEM_IO + 0x16)
+#define REG_BG2HOFS    (MEM_IO + 0x18)
+#define REG_BG2VOFS    (MEM_IO + 0x1a)
+#define REG_BG3HOFS    (MEM_IO + 0x1c)
+#define REG_BG3VOFS    (MEM_IO + 0x1e)
+#define IO_WIN0H       (MEM_IO+0x0040)
+#define IO_WIN1H       (MEM_IO+0x0042)
+#define IO_WIN0V       (MEM_IO+0x0044)
+#define IO_WIN1V       (MEM_IO+0x0046)
+#define IO_WININ       (MEM_IO+0x0048)
+#define IO_WINOUT      (MEM_IO+0x004a)
+#define IO_BLDCNT      (MEM_IO+0x0050)
+#define IO_BLDALPHA    (MEM_IO+0x0052)
+#define IO_BLDY        (MEM_IO+0x0054)
+#define IO_SOUNDBIAS   (MEM_IO+0x0088)
+#define REG_DMA0SAD    (MEM_IO + 0xb0)
+#define REG_DMA0DAD    (MEM_IO + 0xb4)
+#define REG_DMA0CNT_L  (MEM_IO + 0xb8)
+#define REG_DMA0CNT_H  (MEM_IO + 0xba)
+#define REG_DMA1SAD    (MEM_IO + 0xbc)
+#define REG_DMA1DAD    (MEM_IO + 0xc0)
+#define REG_DMA1CNT_L  (MEM_IO + 0xc4)
+#define REG_DMA1CNT_H  (MEM_IO + 0xc6)
+#define REG_DMA2SAD    (MEM_IO + 0xc8)
+#define REG_DMA2DAD    (MEM_IO + 0xcc)
+#define REG_DMA2CNT_L  (MEM_IO + 0xd0)
+#define REG_DMA2CNT_H  (MEM_IO + 0xd2)
+#define REG_DMA3SAD    (MEM_IO + 0xd4)
+#define REG_DMA3DAD    (MEM_IO + 0xd8)
+#define REG_DMA3CNT_L  (MEM_IO + 0xdc)
+#define REG_DMA3CNT_H  (MEM_IO + 0xde)
+    #define DMA_INC        0
+    #define DMA_DEC        1
+    #define DMA_FIXED      2
+    #define DMA_RELOAD     3
+    #define DMA_REPEAT     (1 << 25)
+    #define DMA_32         (1 << 26)
+    #define DMA_NOW        0
+    #define DMA_AT_VBLANK  1
+    #define DMA_AT_HBLANK  2
+    #define DMA_AT_REFRESH 3
+    #define DMA_IRQ        (1 << 30)
+    #define DMA_ENABLE     (1 << 31)
+#define REG_KEYINPUT   (MEM_IO + 0x130)
+#define REG_KEYCNT     (MEM_IO + 0x132)
+#define IO_RCNT        (MEM_IO+0x0134)
+#define IO_IE          (MEM_IO+0x0200)
+#define IO_IF          (MEM_IO+0x0202)
+#define IO_WAITCNT     (MEM_IO+0x0204)
+#define REG_IME        (MEM_IO + 0x208)
+#define REG_HALTCNT    (MEM_IO + 0x301)
 
 uint16_t io_dispcnt;
 uint16_t io_dispstat;
@@ -209,8 +232,9 @@ uint16_t io_bg0cnt;
 uint16_t io_bg1cnt;
 uint16_t io_bg2cnt;
 uint16_t io_bg3cnt;
-uint16_t io_bg0hofs;
-uint16_t io_bg0vofs;
+uint16_t io_bg0hofs, io_bg0vofs;
+uint16_t io_bg1hofs, io_bg1vofs;
+uint16_t io_bg2hofs, io_bg2vofs;
 uint16_t io_win0h;
 uint16_t io_win1h;
 uint16_t io_win0v;
@@ -218,13 +242,10 @@ uint16_t io_win1v;
 uint16_t io_winin;
 uint16_t io_winout;
 uint16_t io_soundbias;
-uint16_t io_dma0cnt_h;
-uint16_t io_dma1cnt_h;
-uint16_t io_dma2cnt_h;
-uint32_t io_dma3sad;
-uint32_t io_dma3dad;
-uint16_t io_dma3cnt_l;
-uint16_t io_dma3cnt_h;
+uint32_t io_dma0sad, io_dma0dad, io_dma0cnt;
+uint32_t io_dma1sad, io_dma1dad, io_dma1cnt;
+uint32_t io_dma2sad, io_dma2dad, io_dma2cnt;
+uint32_t io_dma3sad, io_dma3dad, io_dma3cnt;
 uint16_t io_keyinput;
 uint16_t io_keycnt;
 uint16_t io_rcnt;
@@ -285,26 +306,27 @@ void io_write_byte(uint32_t address, uint8_t value) {
 
 uint16_t io_read_halfword(uint32_t address) {
     switch (address) {
-        case REG_DISPSTAT:
-            return io_dispstat;
-
-        case REG_VCOUNT:
-            return io_vcount;
+        case REG_DISPCNT: return io_dispcnt;
+        case REG_DISPSTAT: return io_dispstat;
+        case REG_VCOUNT: return io_vcount;
+        case REG_BG0CNT: return io_bg0cnt;
+        case REG_BG1CNT: return io_bg1cnt;
+        case REG_BG2CNT: return io_bg2cnt;
 
         case IO_SOUNDBIAS:
             return io_soundbias;
 
-        case IO_DMA0CNT_H:
-            return io_dma0cnt_h;
+        //case IO_DMA0CNT_H:
+        //    return io_dma0cnt_h;
 
-        case IO_DMA1CNT_H:
-            return io_dma1cnt_h;
+        //case IO_DMA1CNT_H:
+        //    return io_dma1cnt_h;
 
-        case IO_DMA2CNT_H:
-            return io_dma2cnt_h;
+        //case IO_DMA2CNT_H:
+        //    return io_dma2cnt_h;
 
-        case IO_DMA3CNT_H:
-            return io_dma3cnt_h;
+        //case IO_DMA3CNT_H:
+        //    return io_dma3cnt_h;
 
         case REG_KEYINPUT:
             io_keyinput = 0x3ff;
@@ -338,25 +360,15 @@ void io_write_halfword(uint32_t address, uint16_t value) {
             io_dispstat = (io_dispstat & 7) | (value & ~7);
             break;
 
-        case IO_BG0CNT:
-            io_bg0cnt = value;
-            //printf("BG0CNT = 0x%04x\n", io_bg0cnt);
-            break;
-
-        case IO_BG1CNT:
-            io_bg1cnt = value;
-            printf("BG1CNT = 0x%04x\n", io_bg1cnt);
-            break;
-
-        case IO_BG0HOFS:
-            io_bg0hofs = value;
-            //printf("BG0HOFS = 0x%04x\n", io_bg0hofs);
-            break;
-
-        case IO_BG0VOFS:
-            io_bg0vofs = value;
-            //printf("BG0VOFS = 0x%04x\n", io_bg0vofs);
-            break;
+        case REG_BG0CNT: io_bg0cnt = value; break;
+        case REG_BG1CNT: io_bg1cnt = value; break;
+        case REG_BG2CNT: io_bg2cnt = value; break;
+        case REG_BG0HOFS: io_bg0hofs = value; break;
+        case REG_BG0VOFS: io_bg0vofs = value; break;
+        case REG_BG1HOFS: io_bg1hofs = value; break;
+        case REG_BG1VOFS: io_bg1vofs = value; break;
+        case REG_BG2HOFS: io_bg2hofs = value; break;
+        case REG_BG2VOFS: io_bg2vofs = value; break;
 
         case IO_WIN0H:
             io_win0h = value;
@@ -393,14 +405,12 @@ void io_write_halfword(uint32_t address, uint16_t value) {
             //printf("SOUNDBIAS = 0x%04x\n", io_soundbias);
             break;
 
-        case IO_DMA3CNT_L:
-            io_dma3cnt_l = value;
-            printf("DMA3CNT_L = 0x%04x\n", io_dma3cnt_l);
+        case REG_DMA3CNT_L:
+            io_dma3cnt = (io_dma3cnt & 0xffff0000) | value;
             break;
 
-        case IO_DMA3CNT_H:
-            io_dma3cnt_h = value;
-            printf("DMA3CNT_H = 0x%04x\n", io_dma3cnt_h);
+        case REG_DMA3CNT_H:
+            io_dma3cnt = (io_dma3cnt & 0xffff) | value << 16;
             break;
 
         case IO_IE:
@@ -436,8 +446,14 @@ uint32_t io_read_word(uint32_t address) {
         case REG_DISPSTAT:
             return io_dispstat | io_vcount << 16;
 
-        case IO_DMA3CNT_L:
-            return io_dma3cnt_l | io_dma3cnt_h << 16;
+        case REG_DMA0SAD: return io_dma0sad;
+        case REG_DMA0DAD: return io_dma0dad;
+        case REG_DMA0CNT_L: return io_dma0cnt;
+        case REG_DMA1CNT_L: return io_dma1cnt;
+        case REG_DMA2CNT_L: return io_dma2cnt;
+        case REG_DMA3SAD: return io_dma3sad;
+        case REG_DMA3DAD: return io_dma3dad;
+        case REG_DMA3CNT_L: return io_dma3cnt;
 
         //case IO_KEYINPUT:
         //    io_keyinput = 0x3ff;
@@ -461,35 +477,38 @@ void io_write_word(uint32_t address, uint32_t value) {
             io_dispcnt = (io_dispcnt & DCNT_GB) | ((uint16_t) value & ~DCNT_GB);  // FIXME green swap
             break;
 
-        case IO_BG0CNT:
+        case REG_BG0CNT:
             io_bg0cnt = (uint16_t) value;
             io_bg1cnt = (uint16_t)(value >> 16);
-            printf("BG0CNT = 0x%04x\n", io_bg0cnt);
-            printf("BG1CNT = 0x%04x\n", io_bg1cnt);
             break;
 
-        case IO_BG0HOFS:
+        case REG_BG0HOFS:
             io_bg0hofs = (uint16_t) value;
             io_bg0vofs = (uint16_t)(value >> 16);
-            //printf("BG0HOFS = 0x%04x\n", io_bg0hofs);
-            //printf("BG0VOFS = 0x%04x\n", io_bg0vofs);
             break;
 
-        case IO_DMA3DAD:
-            io_dma3dad = value;
-            printf("DMA3DAD = 0x%08x\n", io_dma3dad);
+        case REG_DMA0SAD:
+            io_dma0sad = value;
             break;
 
-        case IO_DMA3SAD:
+        case REG_DMA0DAD:
+            io_dma0dad = value;
+            break;
+
+        case REG_DMA0CNT_L:
+            io_dma0cnt = value;
+            break;
+
+        case REG_DMA3SAD:
             io_dma3sad = value;
-            printf("DMA3SAD = 0x%08x\n", io_dma3sad);
             break;
 
-        case IO_DMA3CNT_L:
-            io_dma3cnt_l = (uint16_t) value;
-            io_dma3cnt_h = (uint16_t)(value >> 16);
-            printf("DMA3CNT_L = 0x%04x\n", io_dma3cnt_l);
-            printf("DMA3CNT_H = 0x%04x\n", io_dma3cnt_h);
+        case REG_DMA3DAD:
+            io_dma3dad = value;
+            break;
+
+        case REG_DMA3CNT_L:
+            io_dma3cnt = value;
             break;
 
         case IO_IE:
@@ -511,182 +530,213 @@ void io_write_word(uint32_t address, uint32_t value) {
 
 uint8_t memory_read_byte(uint32_t address) {
     if (address < 0x4000) {
-        return system_rom[address];
+        if (r[15] < 0x4000) last_bios_access = address;
+        return system_rom[last_bios_access];
     }
-    if (address >= 0x02000000 && address < 0x02040000) {
-        return cpu_ewram[address - 0x02000000];
+    if (address >= 0x02000000 && address < 0x03000000) {
+        return cpu_ewram[address & 0x3ffff];
     }
-    if (address >= 0x03000000 && address < 0x03008000) {
-        return cpu_iwram[address - 0x03000000];
+    if (address >= 0x03000000 && address < 0x04000000) {
+        return cpu_iwram[address & 0x7fff];
     }
-    if (address >= MEM_IO && address < 0x05000000) {
+    if (address >= 0x04000000 && address < 0x05000000) {
         return io_read_byte(address);
     }
-    if (address >= 0x08000000 && address < 0x0a000000) {
-        return game_rom[address - 0x08000000];
+    if (address >= 0x05000000 && address < 0x06000000) {
+        return palette_ram[address & 0x3ff];
+    }
+    if (address >= 0x06000000 && address < 0x07000000) {
+        address &= 0x1ffff;
+        if (address >= 0x18000) address -= 0x18000;        
+        return video_ram[address];
+    }
+    if (address >= 0x07000000 && address < 0x08000000) {
+        return object_ram[address & 0x3ff];
+    }    
+    if (address >= 0x08000000 && address < 0x0e000000) {
+        return game_rom[address & 0x1ffffff];
     }
     printf("memory_read_byte(0x%08x);\n", address);
-    assert(false);
     return 0;
 }
 
 void memory_write_byte(uint32_t address, uint8_t value) {
-    if (address >= 0x02000000 && address < 0x02040000) {
-        cpu_ewram[address - 0x02000000] = value;
+    if (address < 0x4000) {
+        //return;  // Read only
+    }
+    if (address >= 0x02000000 && address < 0x03000000) {
+        cpu_ewram[address & 0x3ffff] = value;
         return;
     }
-    if (address >= 0x03000000 && address < 0x03008000) {
-        cpu_iwram[address - 0x03000000] = value;
+    if (address >= 0x03000000 && address < 0x04000000) {
+        cpu_iwram[address & 0x7fff] = value;
         return;
     }
-    if (address >= MEM_IO && address < 0x05000000) {
+    if (address >= 0x04000000 && address < 0x05000000) {
         io_write_byte(address, value);
         return;
     }
-    if (address >= 0x05000000 && address < 0x05000400) {
-        *(uint16_t *)&palette_ram[address - 0x05000000] = value | value << 8;
+    if (address >= 0x05000000 && address < 0x06000000) {
+        *(uint16_t *)&palette_ram[address & 0x3ff] = value | value << 8;
         return;
     }
-    if (address >= MEM_VRAM && address < 0x06018000) {
-        *(uint16_t *)&video_ram[address - MEM_VRAM] = value | value << 8;
+    if (address >= 0x06000000 && address < 0x07000000) {
+        address &= 0x1ffff;
+        if (address >= 0x18000) address -= 0x18000;        
+        *(uint16_t *)&video_ram[address] = value | value << 8;  // FIXME ignored sometimes?
         return;
     }
-    if (address >= 0x07000000 && address < 0x07000400) {
-        *(uint16_t *)&object_ram[address - 0x07000000] = value | value << 8;
+    if (address >= 0x07000000 && address < 0x08000000) {
+        *(uint16_t *)&object_ram[address & 0x3ff] = value | value << 8;  // FIXME ignored?
         return;
+    }
+    if (address >= 0x08000000 && address < 0x0e000000) {
+        //return;  // Read only
     }
     printf("memory_write_byte(0x%08x, 0x%02x);\n", address, value);
-    assert(false);
 }
 
 uint16_t memory_read_halfword(uint32_t address) {
     assert((address & 1) == 0);
     if (address < 0x4000) {
-        return *(uint16_t *)&system_rom[address];
+        if (r[15] < 0x4000) last_bios_access = address;
+        return *(uint16_t *)&system_rom[last_bios_access];
     }
-    if (address >= 0x02000000 && address < 0x02040000) {
-        return *(uint16_t *)&cpu_ewram[address - 0x02000000];
+    if (address >= 0x02000000 && address < 0x03000000) {
+        return *(uint16_t *)&cpu_ewram[address & 0x3ffff];
     }
-    if (address >= 0x03000000 && address < 0x03008000) {
-        return *(uint16_t *)&cpu_iwram[address - 0x03000000];
+    if (address >= 0x03000000 && address < 0x04000000) {
+        return *(uint16_t *)&cpu_iwram[address & 0x7fff];
     }
-    if (address >= MEM_IO && address < 0x05000000) {
+    if (address >= 0x04000000 && address < 0x05000000) {
         return io_read_halfword(address);
     }
-    if (address >= 0x05000000 && address < 0x05000400) {
-        return *(uint16_t *)&palette_ram[address - 0x05000000];
+    if (address >= 0x05000000 && address < 0x06000000) {
+        return *(uint16_t *)&palette_ram[address & 0x3ff];
     }
-    if (address >= MEM_VRAM && address < 0x06018000) {
-        return *(uint16_t *)&video_ram[address - MEM_VRAM];
+    if (address >= 0x06000000 && address < 0x07000000) {
+        address &= 0x1ffff;
+        if (address >= 0x18000) address -= 0x18000;
+        return *(uint16_t *)&video_ram[address];
     }
-    if (address >= 0x07000000 && address < 0x07000400) {
-        return *(uint16_t *)&object_ram[address - 0x07000000];
+    if (address >= 0x07000000 && address < 0x08000000) {
+        return *(uint16_t *)&object_ram[address & 0x3ff];
     }
-    if (address >= 0x08000000 && address < 0x0a000000) {
-        return *(uint16_t *)&game_rom[address - 0x08000000];
+    if (address >= 0x08000000 && address < 0x0e000000) {
+        return *(uint16_t *)&game_rom[address & 0x1ffffff];
     }
-    //if (address == 0x03fffff8) return 0;  // FIXME
-    //if (address >= 0x0bfe1fe0 && address <= 0x0bfe1ff2) return 0;  // FIXME
-    //if (address >= 0x0bffffe0 && address <= 0x0bfffff2) return 0;  // FIXME
     printf("memory_read_halfword(0x%08x);\n", address);
-    //assert(false);  // FIXME
     return 0;
 }
 
 void memory_write_halfword(uint32_t address, uint16_t value) {
     address &= ~1;
-    if (address >= 0x02000000 && address < 0x02040000) {
-        *(uint16_t *)&cpu_ewram[address - 0x02000000] = value;
+    if (address < 0x4000) {
+        //return;  // Read only
+    }
+    if (address >= 0x02000000 && address < 0x03000000) {
+        *(uint16_t *)&cpu_ewram[address & 0x3ffff] = value;
         return;
     }
-    if (address >= 0x03000000 && address < 0x03008000) {
-        *(uint16_t *)&cpu_iwram[address - 0x03000000] = value;
+    if (address >= 0x03000000 && address < 0x04000000) {
+        *(uint16_t *)&cpu_iwram[address & 0x7fff] = value;
         return;
     }
-    if (address >= MEM_IO && address < 0x05000000) {
+    if (address >= 0x04000000 && address < 0x05000000) {
         io_write_halfword(address, value);
         return;
     }
-    if (address >= 0x05000000 && address < 0x05000400) {
-        *(uint16_t *)&palette_ram[address - 0x05000000] = value;
+    if (address >= 0x05000000 && address < 0x06000000) {
+        *(uint16_t *)&palette_ram[address & 0x3ff] = value;
         return;
     }
-    if (address >= MEM_VRAM && address < 0x06018000) {
-        *(uint16_t *)&video_ram[address - MEM_VRAM] = value;
+    if (address >= 0x06000000 && address < 0x07000000) {
+        address &= 0x1ffff;
+        if (address >= 0x18000) address -= 0x18000;
+        *(uint16_t *)&video_ram[address] = value;
         return;
     }
-    if (address >= 0x07000000 && address < 0x07000400) {
-        *(uint16_t *)&object_ram[address - 0x07000000] = value;
+    if (address >= 0x07000000 && address < 0x08000000) {
+        *(uint16_t *)&object_ram[address & 0x3ff] = value;
         return;
+    }
+    if (address >= 0x08000000 && address < 0x0e000000) {
+        //return;  // Read only
     }
     printf("memory_write_halfword(0x%08x, 0x%04x);\n", address, value);
-    //assert(false);  // FIXME
 }
 
 uint32_t memory_read_word(uint32_t address) {
     address &= ~3;
     if (address < 0x4000) {
-        return *(uint32_t *)&system_rom[address];
+        if (r[15] < 0x4000) last_bios_access = address;
+        return *(uint32_t *)&system_rom[last_bios_access];
     }
-    if (address >= 0x02000000 && address < 0x02040000) {
-        return *(uint32_t *)&cpu_ewram[address - 0x02000000];
+    if (address >= 0x02000000 && address < 0x03000000) {
+        return *(uint32_t *)&cpu_ewram[address & 0x3ffff];
     }
-    if (address >= 0x03000000 && address < 0x03008000) {
-        return *(uint32_t *)&cpu_iwram[address - 0x03000000];
+    if (address >= 0x03000000 && address < 0x04000000) {
+        return *(uint32_t *)&cpu_iwram[address & 0x7fff];
     }
-    if (address >= MEM_IO && address < 0x05000000) {
+    if (address >= 0x04000000 && address < 0x05000000) {
         return io_read_word(address);
     }
-    if (address >= 0x05000000 && address < 0x05000400) {
-        return *(uint32_t*)&palette_ram[address - 0x05000000];
+    if (address >= 0x05000000 && address < 0x06000000) {
+        return *(uint32_t*)&palette_ram[address & 0x3ff];
     }
-    if (address >= MEM_VRAM && address < 0x07000400) {
-        return *(uint32_t*)&video_ram[address - MEM_VRAM];
+    if (address >= 0x06000000 && address < 0x07000000) {
+        address &= 0x1ffff;
+        if (address >= 0x18000) address -= 0x18000;
+        return *(uint32_t*)&video_ram[address];
     }
-    if (address >= 0x07000000 && address < 0x07000400) {
-        return *(uint32_t *)&object_ram[address - 0x07000000];
+    if (address >= 0x07000000 && address < 0x08000000) {
+        return *(uint32_t *)&object_ram[address & 0x3ff];
     }
     if (address >= 0x08000000 && address < 0x0e000000) {
-        return *(uint32_t *)&game_rom[(address - 0x08000000) & 0x1ffffff];
+        return *(uint32_t *)&game_rom[address & 0x1ffffff];
     }
-    //if (address >= 0x0e000000 && address < 0x0f000000)
-    if (address == 0x80000000) return 0;
+    if (address >= 0x0e000000 && address < 0x0e010000) {
+        // TODO
+    }
     printf("memory_read_word(0x%08x);\n", address);
-    //assert(false);
     return 0;
 }
 
 void memory_write_word(uint32_t address, uint32_t value) {
     address &= ~3;
-    if (address >= 0x02000000 && address < 0x02040000) {
-        *(uint32_t *)&cpu_ewram[address - 0x02000000] = value;
+    if (address < 0x4000) {
+        //return;  // Read only
+    }
+    if (address >= 0x02000000 && address < 0x03000000) {
+        *(uint32_t *)&cpu_ewram[address & 0x3ffff] = value;
         return;
     }
-    if (address >= 0x03000000 && address < 0x03008000) {
-        *(uint32_t *)&cpu_iwram[address - 0x03000000] = value;
+    if (address >= 0x03000000 && address < 0x04000000) {
+        *(uint32_t *)&cpu_iwram[address & 0x7fff] = value;
         return;
     }
-    if (address >= MEM_IO && address < 0x05000000) {
+    if (address >= 0x04000000 && address < 0x05000000) {
         io_write_word(address, value);
         return;
     }
-    if (address >= 0x05000000 && address < 0x05000400) {
-        *(uint32_t *)&palette_ram[address - 0x05000000] = value;
+    if (address >= 0x05000000 && address < 0x06000000) {
+        *(uint32_t *)&palette_ram[address & 0x3ff] = value;
         return;
     }
-    if (address >= MEM_VRAM && address < 0x06018000) {
-        *(uint32_t *)&video_ram[address - MEM_VRAM] = value;
+    if (address >= MEM_VRAM && address < 0x07000000) {
+        address &= 0x1ffff;
+        if (address >= 0x18000) address -= 0x18000;
+        *(uint32_t *)&video_ram[address] = value;
         return;
     }
-    if (address >= 0x07000000 && address < 0x07000400) {
-        *(uint32_t *)&object_ram[address - 0x07000000] = value;
+    if (address >= 0x07000000 && address < 0x08000000) {
+        *(uint32_t *)&object_ram[address & 0x3ff] = value;
         return;
     }
-    if (address >= 0x08000000 && address < 0x0a000000) {
-        return;
+    if (address >= 0x08000000 && address < 0x0e000000) {
+        //return;  // Read only
     }
     printf("memory_write_word(0x%08x, 0x%08x);\n", address, value);
-    //assert(false);
 }
 
 uint32_t bit_count(uint32_t x) {
@@ -1598,9 +1648,10 @@ void arm_software_interrupt(void) {
     }
 #endif
 
-    r14_svc = r[15] - 4;
+    bool T = (cpsr & PSR_T) != 0;
+    r14_svc = r[15] - (T ? 2 : 4);
     spsr_svc = cpsr;
-    write_cpsr((cpsr & ~PSR_MODE) | PSR_I | PSR_MODE_SVC);
+    write_cpsr((cpsr & ~(PSR_T | PSR_MODE)) | PSR_I | PSR_MODE_SVC);
     r[15] = PC_SWI;
     branch_taken = true;
 }
@@ -2692,20 +2743,19 @@ void thumb_conditional_branch(void) {
 }
 
 void thumb_software_interrupt(void) {
+    uint32_t imm = thumb_op & 0xff;
+
 #ifdef DEBUG
     if (log_instructions && log_thumb_instructions) {
         thumb_print_opcode();
         print_mnemonic("swi");
-        print_address(thumb_op & 0xff);
+        print_address(imm);
         printf("\n");
     }
 #endif
 
-    r14_svc = r[15] - 2;  // | 1; FIXME?
-    spsr_svc = cpsr;
-    write_cpsr((cpsr & ~(PSR_T | PSR_MODE)) | PSR_I | PSR_MODE_SVC);
-    r[15] = PC_SWI;
-    branch_taken = true;
+    arm_op = COND_AL << 28 | 0xf << 24 | imm;
+    arm_software_interrupt();
 }
 
 void thumb_unconditional_branch(void) {
@@ -2887,15 +2937,15 @@ void arm_init_lookup(void) {
     arm_bind(0xc00, 0x1ff, NULL);  // arm_coprocessor_load_store
     arm_bind(0xe00, 0x0ff, NULL);  // arm_coprocessor_data_processing
     arm_bind(0xf00, 0x0ff, arm_software_interrupt);
+    arm_bind(0x100, 0x04f, arm_special_data_processing_register);
+    arm_bind(0x120, 0x04e, arm_special_data_processing_register);
     arm_bind(0x009, 0x030, arm_multiply);
     arm_bind(0x089, 0x070, arm_multiply_long);
     arm_bind(0x00b, 0x1b0, arm_load_store_halfword_register);
     arm_bind(0x04b, 0x1b0, arm_load_store_halfword_immediate);
     arm_bind(0x00d, 0x1b2, arm_load_signed_byte_or_signed_halfword_register);
     arm_bind(0x04d, 0x1b2, arm_load_signed_byte_or_signed_halfword_immediate);
-    arm_bind(0x100, 0x04f, arm_special_data_processing_register);
     arm_bind(0x109, 0x040, arm_swap);
-    arm_bind(0x120, 0x04e, arm_special_data_processing_register);
     arm_bind(0x121, 0x000, arm_branch_and_exchange);
     //arm_bind(0x121, 0x04e, NULL);  // branch_and_exchange or undefined_instruction?
     arm_bind(0x320, 0x00f, arm_special_data_processing_immediate);
@@ -2950,8 +3000,6 @@ void gba_init(const char *filename) {
 
     memset(r, 0, sizeof(uint32_t) * 16);
 
-    bool skip_bios = true;  // FIXME
-
     if (skip_bios) {
         r[13] = 0x03007f00;
         r13_irq = 0x03007fa0;
@@ -2982,20 +3030,20 @@ Uint32 rgb555(uint32_t pixel) {
 }
 
 void gba_draw_bitmap(uint32_t mode, int y) {
-    uint32_t width = (mode == DCNT_MODE5 ? 160 : SCREEN_WIDTH);
+    uint32_t width = (mode == 5 ? 160 : SCREEN_WIDTH);
 
     Uint32 *pixels;
     int pitch;
     SDL_LockTexture(g_texture, NULL, (void**) &pixels, &pitch);
     for (uint32_t x = 0; x < SCREEN_WIDTH; x++) {
         uint16_t pixel = 0;
-        if (mode == DCNT_MODE3 || mode == DCNT_MODE5) {
-            if (x < width && (mode == DCNT_MODE3 || y < 128)) {
+        if (mode == 3 || mode == 5) {
+            if (x < width && (mode == 3 || y < 128)) {
                 pixel = *(uint16_t *)&video_ram[(y * width + x) * 2];
             } else {
                 pixel = *(uint16_t *)&palette_ram[0];
             }
-        } else if (mode == DCNT_MODE4) {
+        } else if (mode == 4) {
             bool pflip = (io_dispcnt & DCNT_PAGE) != 0;
             uint8_t pixel_index = video_ram[(pflip ? 0xa000 : 0) + y * SCREEN_WIDTH + x];
             pixel = *(uint16_t *)&palette_ram[pixel_index * 2];
@@ -3006,7 +3054,7 @@ void gba_draw_bitmap(uint32_t mode, int y) {
 }
 
 void gba_draw_tiled_bg(uint32_t mode, int y, uint32_t tile_base, uint32_t map_base) {
-    assert(mode == DCNT_MODE0);
+    assert(mode == 0);
 
     //uint32_t h = io_bg0hofs;  // FIXME
     //uint32_t v = io_bg0vofs;
@@ -3029,11 +3077,11 @@ void gba_draw_tiled_bg(uint32_t mode, int y, uint32_t tile_base, uint32_t map_ba
             uint8_t pixel_indexes = tile[offset];
             uint8_t pixel_index_0 = pixel_indexes & 0xf;
             uint8_t pixel_index_1 = (pixel_indexes >> 4) & 0xf;
-            if (pixel_index_0 != 0) {
+            if (true) { //pixel_index_0 != 0) {
                 uint16_t pixel_0 = *(uint16_t *)&palette_ram[palette_no * 32 + pixel_index_0 * 2];
                 pixels[y * (pitch / 4) + ((x / 8) * 8 + i)] = rgb555(pixel_0);
             }
-            if (pixel_index_1 != 0) {
+            if (true) { //pixel_index_1 != 0) {
                 uint16_t pixel_1 = *(uint16_t *)&palette_ram[palette_no * 32 + pixel_index_1 * 2];
                 pixels[y * (pitch / 4) + ((x / 8) * 8 + i + 1)] = rgb555(pixel_1);
             }
@@ -3043,42 +3091,33 @@ void gba_draw_tiled_bg(uint32_t mode, int y, uint32_t tile_base, uint32_t map_ba
 }
 
 void gba_draw_tiled(uint32_t mode, int y) {
-    uint32_t tile_base, map_base;
-
-    if ((io_dispcnt & DCNT_BG3) != 0) {
-        tile_base = ((io_bg3cnt >> 2) & 3) * 16384;
-        map_base = ((io_bg3cnt >> 8) & 0x1f) * 2048;
-        gba_draw_tiled_bg(mode, y, tile_base, map_base);
-    }
-    if ((io_dispcnt & DCNT_BG2) != 0) {
-        tile_base = ((io_bg2cnt >> 2) & 3) * 16384;
-        map_base = ((io_bg2cnt >> 8) & 0x1f) * 2048;
-        gba_draw_tiled_bg(mode, y, tile_base, map_base);
-    }
-    if ((io_dispcnt & DCNT_BG1) != 0) {
-        tile_base = ((io_bg1cnt >> 2) & 3) * 16384;
-        map_base = ((io_bg1cnt >> 8) & 0x1f) * 2048;
-        gba_draw_tiled_bg(mode, y, tile_base, map_base);
-    }
-    if ((io_dispcnt & DCNT_BG0) != 0) {
-        tile_base = ((io_bg0cnt >> 2) & 3) * 16384;
-        map_base = ((io_bg0cnt >> 8) & 0x1f) * 2048;
-        gba_draw_tiled_bg(mode, y, tile_base, map_base);
+    for (int pri = 0; pri < 4; pri++) {  // FIXME? reverse order
+        for (int bg = 0; bg < 4; bg++) {
+            bool visible = (io_dispcnt & (1 << (8 + bg))) != 0;
+            if (!visible) continue;
+            uint16_t bgcnt = io_read_halfword(REG_BG0CNT + 2 * bg);
+            uint16_t priority = bgcnt & 3;
+            if (priority == pri) {
+                uint32_t tile_base = ((bgcnt >> 2) & 3) * 16384;
+                uint32_t map_base = ((bgcnt >> 8) & 0x1f) * 2048;
+                gba_draw_tiled_bg(mode, y, tile_base, map_base);
+            }
+        }
     }
 }
 
 void gba_draw_scanline(void) {
     uint32_t mode = io_dispcnt & 7;
     switch (mode) {
-        case DCNT_MODE0:
-        case DCNT_MODE1:
-        case DCNT_MODE2:
+        case 0:
+        case 1:
+        case 2:
             gba_draw_tiled(mode, io_vcount);
             break;
 
-        case DCNT_MODE3:
-        case DCNT_MODE4:
-        case DCNT_MODE5:
+        case 3:
+        case 4:
+        case 5:
             gba_draw_bitmap(mode, io_vcount);
             break;
 
@@ -3111,13 +3150,14 @@ void gba_ppu_update(void) {
         } else if (io_vcount == 160) {
             io_dispstat |= DSTAT_IN_VBL;
             if (interrupts_enabled && (io_dispstat & DSTAT_VBL_IRQ) != 0 && (io_ie & (1 << 0)) != 0) {
-                arm_hardware_interrupt();  // FIXME?
+                //io_if |= 1 << 0;  // FIXME?
+                //arm_hardware_interrupt();  // FIXME?
             }
         }
         if (io_vcount == (uint8_t)(io_dispstat >> 8)) {
             io_dispstat |= DSTAT_IN_VCT;
             if (interrupts_enabled && (io_dispstat & DSTAT_VCT_IRQ) != 0 && (io_ie & (1 << 2)) != 0) {
-                arm_hardware_interrupt();  // FIXME?
+                //arm_hardware_interrupt();  // FIXME?
             }
         } else {
             io_dispstat &= ~DSTAT_IN_VCT;
@@ -3126,32 +3166,62 @@ void gba_ppu_update(void) {
     if (cycles % 1232 == 960) {
         io_dispstat |= DSTAT_IN_HBL;
         if (interrupts_enabled && (io_dispstat & DSTAT_HBL_IRQ) != 0 && (io_ie & (1 << 1)) != 0) {
-            arm_hardware_interrupt();  // FIXME?
+            //arm_hardware_interrupt();  // FIXME?
         }
     }
     cycles = (cycles + 1) % 280896;
 }
 
+void gba_dma_transfer_halfwords(uint32_t dst_ctrl, uint32_t src_ctrl, uint32_t dst_addr, uint32_t src_addr, uint32_t len) {
+    uint32_t dst_off = 0;
+    uint32_t src_off = 0;
+    for (uint32_t i = 0; i < len; i++) {
+        uint16_t value = memory_read_halfword(src_addr + src_off);
+        memory_write_halfword(dst_addr + dst_off, value);
+        if (dst_ctrl == DMA_INC) dst_off += 2;
+        if (dst_ctrl == DMA_DEC) dst_off -= 2;
+        if (src_ctrl == DMA_INC) src_off += 2;
+        if (src_ctrl == DMA_DEC) src_off -= 2;
+    }
+}
+
+void gba_dma_transfer_words(uint32_t dst_ctrl, uint32_t src_ctrl, uint32_t dst_addr, uint32_t src_addr, uint32_t len) {
+    uint32_t dst_off = 0;
+    uint32_t src_off = 0;
+    for (uint32_t i = 0; i < len; i++) {
+        uint32_t value = memory_read_word(src_addr + src_off);
+        memory_write_word(dst_addr + dst_off, value);
+        if (dst_ctrl == DMA_INC) dst_off += 4;
+        if (dst_ctrl == DMA_DEC) dst_off -= 4;
+        if (src_ctrl == DMA_INC) src_off += 4;
+        if (src_ctrl == DMA_DEC) src_off -= 4;
+    }
+}
+
 void gba_dma_update(void) {
-    if ((io_dma3cnt_h & (1 << 15)) != 0) {
-        if ((io_dma3cnt_h & (1 << 9)) == 0) {
-            io_dma3cnt_h &= ~(1 << 15);
-        }
-        uint32_t dest_ctrl = (io_dma3cnt_h >> 5) & 3;
-        uint32_t src_ctrl = (io_dma3cnt_h >> 7) & 3;
-        assert(dest_ctrl == 0);
-        assert(src_ctrl == 0 || src_ctrl == 2);
-        uint32_t length = io_dma3cnt_l;
-        if (length == 0) length = 0x10000;
-        if ((io_dma3cnt_h & (1 << 10)) != 0) {
-            for (uint32_t i = 0; i < length; i++) {
-                uint32_t value = memory_read_word(io_dma3sad + (src_ctrl == 2 ? 0 : 4 * i));
-                memory_write_word(io_dma3dad + 4 * i, value);
+    for (int ch = 0; ch < 4; ch++) {
+        uint32_t dmacnt = io_read_word(REG_DMA0CNT_L + 12 * ch);
+
+        if ((dmacnt & DMA_ENABLE) != 0) {
+            uint32_t dst_ctrl = (dmacnt >> 21) & 3;
+            uint32_t src_ctrl = (dmacnt >> 23) & 3;
+            uint32_t dst_addr = io_read_word(REG_DMA0DAD + 12 * ch);
+            uint32_t src_addr = io_read_word(REG_DMA0SAD + 12 * ch);
+            uint32_t len = (ch == 3 ? dmacnt & 0xffff : dmacnt & 0x3fff);
+            if (len == 0) len = (ch == 3 ? 0x10000 : 0x4000);
+
+            assert(dst_ctrl != DMA_REPEAT);
+            assert(src_ctrl != DMA_REPEAT);
+
+            if ((dmacnt & DMA_32) != 0) {
+                gba_dma_transfer_words(dst_ctrl, src_ctrl, dst_addr, src_addr, len);
+            } else {
+                gba_dma_transfer_halfwords(dst_ctrl, src_ctrl, dst_addr, src_addr, len);
             }
-        } else {
-            for (uint32_t i = 0; i < length; i++) {
-                uint16_t value = memory_read_halfword(io_dma3sad + (src_ctrl == 2 ? 0 : 2 * i));
-                memory_write_halfword(io_dma3dad + 2 * i, value);
+
+            if ((dmacnt & DMA_REPEAT) == 0) {
+                dmacnt &= ~DMA_ENABLE;
+                io_write_word(REG_DMA0CNT_L + 12 * ch, dmacnt);
             }
         }
     }
@@ -3164,6 +3234,8 @@ void gba_emulate(void) {
         if (cycles == 0) break;
 
         if (!halted) {
+            //if (r[15] == 0x00000300) single_step = true;
+
 #ifdef DEBUG
             if (single_step && instruction_count >= start_logging_at) {
                 log_instructions = true;
@@ -3188,6 +3260,9 @@ void gba_emulate(void) {
     }
 }
 
+uint32_t fps_ticks_last = 0;
+double fps_diff = 0;
+
 int main(int argc, char **argv) {
     if (argc != 2) {
         fprintf(stderr, "Usage: %s filename.gba\n", argv[0]);
@@ -3197,7 +3272,7 @@ int main(int argc, char **argv) {
     gba_init(argv[1]);
 
     SDL_Init(SDL_INIT_VIDEO);
-    SDL_Window *window = SDL_CreateWindow("GBA", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, RENDER_WIDTH, RENDER_HEIGHT, SDL_WINDOW_SHOWN);
+    SDL_Window *window = SDL_CreateWindow("ygba", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, RENDER_WIDTH, RENDER_HEIGHT, SDL_WINDOW_SHOWN);
     SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
     Uint32 pixel_format = SDL_GetWindowPixelFormat(window);
     g_texture = SDL_CreateTexture(renderer, pixel_format, SDL_TEXTUREACCESS_STREAMING, SCREEN_WIDTH, SCREEN_HEIGHT);
@@ -3243,6 +3318,15 @@ int main(int argc, char **argv) {
         SDL_Rect screenRect = {0, 0, RENDER_WIDTH, RENDER_HEIGHT};
         SDL_RenderCopy(renderer, g_texture, &displayRect, &screenRect);
         SDL_RenderPresent(renderer);
+
+        static char title[256];
+        uint32_t t0 = fps_ticks_last;
+        uint32_t t1 = SDL_GetTicks();
+        fps_diff = fps_diff * 0.975 + (t1 - t0) * 0.025;
+        double fps = 1 / (fps_diff / 1000.0);
+        sprintf(title, "ygba - %s (%.1f fps)", argv[1], fps);
+        SDL_SetWindowTitle(window, title);
+        fps_ticks_last = t1;
     }
 
     SDL_FreeFormat(g_format);

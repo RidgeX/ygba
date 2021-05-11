@@ -1,6 +1,7 @@
 games/
+passed/
 roms/
-tests/
 tonc/
 *.exe
+*.gba
 system_rom.bin
