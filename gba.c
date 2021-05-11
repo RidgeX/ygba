@@ -3042,13 +3042,25 @@ Uint32 rgb555(uint32_t pixel) {
     return SDL_MapRGB(g_format, r, g, b);
 }
 
-void gba_draw_bitmap(uint32_t mode, int y) {
-    uint32_t width = (mode == 5 ? 160 : SCREEN_WIDTH);
+void gba_draw_blank(int y) {
+    Uint32 clear_color = rgb555(0x7fff);
 
     Uint32 *pixels;
     int pitch;
     SDL_LockTexture(g_texture, NULL, (void**) &pixels, &pitch);
-    for (uint32_t x = 0; x < SCREEN_WIDTH; x++) {
+    for (int x = 0; x < SCREEN_WIDTH; x++) {
+        pixels[y * (pitch / 4) + x] = clear_color;
+    }
+    SDL_UnlockTexture(g_texture);
+}
+
+void gba_draw_bitmap(uint32_t mode, int y) {
+    int width = (mode == 5 ? 160 : SCREEN_WIDTH);
+
+    Uint32 *pixels;
+    int pitch;
+    SDL_LockTexture(g_texture, NULL, (void**) &pixels, &pitch);
+    for (int x = 0; x < SCREEN_WIDTH; x++) {
         uint16_t pixel = 0;
         if (mode == 3 || mode == 5) {
             if (x < width && (mode == 3 || y < 128)) {
@@ -3132,6 +3144,8 @@ void gba_draw_tiled(uint32_t mode, int y) {
 }
 
 void gba_draw_scanline(void) {
+    gba_draw_blank(io_vcount);  // FIXME forced blank
+
     uint32_t mode = io_dispcnt & 7;
     switch (mode) {
         case 0:
