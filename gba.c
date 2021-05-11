@@ -322,6 +322,8 @@ uint16_t io_read_halfword(uint32_t address) {
         case REG_BG3CNT: return io_bg3cnt;
         case REG_BG0HOFS: return io_bg0hofs;
         case REG_BG0VOFS: return io_bg0vofs;
+        case REG_BG1HOFS: return io_bg1hofs;
+        case REG_BG1VOFS: return io_bg1vofs;
 
         case IO_SOUNDBIAS:
             return io_soundbias;
@@ -3064,39 +3066,49 @@ void gba_draw_bitmap(uint32_t mode, int y) {
     SDL_UnlockTexture(g_texture);
 }
 
+void gba_draw_tiled_final(Uint32 *pixels, int pitch, int x, int y, int h, int v, uint32_t pixel) {
+    //x -= h;
+    //y -= v;
+    //if (x < 0 || x >= SCREEN_WIDTH) return;
+    //if (y < 0 || y >= SCREEN_HEIGHT) return;
+    pixels[y * (pitch / 4) + x] = rgb555(pixel);
+}
+
 void gba_draw_tiled_bg(uint32_t mode, int bg, int y, uint32_t tile_base, uint32_t map_base) {
     assert(mode == 0);
-    assert(bg >= 0 && bg <= 3);
-    //uint32_t h = io_read_halfword(REG_BG0HOFS + 4 * bg);
-    //uint32_t v = io_read_halfword(REG_BG0VOFS + 4 * bg);
+
+    int h = io_read_halfword(REG_BG0HOFS + 4 * bg);
+    int v = io_read_halfword(REG_BG0VOFS + 4 * bg);
+    if (h & 0x8000) h |= ~0xffff;
+    if (v & 0x8000) v |= ~0xffff;
 
     Uint32 *pixels;
     int pitch;
     SDL_LockTexture(g_texture, NULL, (void**) &pixels, &pitch);
-    for (uint32_t x = 0; x < SCREEN_WIDTH; x += 8) {
+    for (int x = 0; x < SCREEN_WIDTH; x += 8) {
         uint32_t map_x = x / 8;
         uint32_t map_y = y / 8;
         uint32_t map_address = map_base + (map_y * 32 + map_x) * 2;
         uint16_t info = *(uint16_t *)&video_ram[map_address];
         uint16_t tile_no = info & 0x3ff;
-        //bool hflip = (info & (1 << 10)) != 0;  // FIXME
-        //bool vflip = (info & (1 << 11)) != 0;
+        bool hflip = (info & (1 << 10)) != 0;  // FIXME
+        bool vflip = (info & (1 << 11)) != 0;
         uint16_t palette_no = (info >> 12) & 0xf;
 
         uint32_t tile_address = tile_base + tile_no * 32;
         uint8_t *tile = &video_ram[tile_address];
         for (int i = 0; i < 8; i += 2) {
-            uint32_t offset = (y % 8) * 4 + (i / 2);
+            uint32_t offset = (vflip ? 7 - (y % 8) : (y % 8)) * 4 + ((hflip ? 7 - i : i) / 2);
             uint8_t pixel_indexes = tile[offset];
-            uint8_t pixel_index_0 = pixel_indexes & 0xf;
-            uint8_t pixel_index_1 = (pixel_indexes >> 4) & 0xf;
+            uint8_t pixel_index_0 = (pixel_indexes >> (hflip ? 4 : 0)) & 0xf;
+            uint8_t pixel_index_1 = (pixel_indexes >> (hflip ? 0 : 4)) & 0xf;
             if (true) { //pixel_index_0 != 0) {
                 uint16_t pixel_0 = *(uint16_t *)&palette_ram[palette_no * 32 + pixel_index_0 * 2];
-                pixels[y * (pitch / 4) + ((x / 8) * 8 + i)] = rgb555(pixel_0);
+                gba_draw_tiled_final(pixels, pitch, (x / 8) * 8 + i, y, h, v, pixel_0);
             }
             if (true) { //pixel_index_1 != 0) {
                 uint16_t pixel_1 = *(uint16_t *)&palette_ram[palette_no * 32 + pixel_index_1 * 2];
-                pixels[y * (pitch / 4) + ((x / 8) * 8 + i + 1)] = rgb555(pixel_1);
+                gba_draw_tiled_final(pixels, pitch, (x / 8) * 8 + i + 1, y, h, v, pixel_1);
             }
         }
     }
