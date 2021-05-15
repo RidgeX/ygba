@@ -856,34 +856,13 @@ void mode_change(uint32_t old_mode, uint32_t new_mode) {
     }
 }
 
-bool check_condition(uint32_t cond) {
-    bool N = (cpsr & PSR_N) != 0;
-    bool Z = (cpsr & PSR_Z) != 0;
-    bool C = (cpsr & PSR_C) != 0;
-    bool V = (cpsr & PSR_V) != 0;
+uint16_t cond_lookup[16] = {
+    0x56aa, 0x6a6a, 0x55a6, 0x6966, 0x66a9, 0x6a69, 0x66a5, 0x6a65,
+    0x6a9a, 0x565a, 0x6996, 0x5556, 0x6a99, 0x6659, 0x6a95, 0x6655
+};
 
-    switch (cond) {
-        case COND_EQ: return Z;
-        case COND_NE: return !Z;
-        case COND_CS: return C;
-        case COND_CC: return !C;
-        case COND_MI: return N;
-        case COND_PL: return !N;
-        case COND_VS: return V;
-        case COND_VC: return !V;
-        case COND_HI: return C && !Z;
-        case COND_LS: return !C || Z;
-        case COND_GE: return N == V;
-        case COND_LT: return N != V;
-        case COND_GT: return (N == V) && !Z;
-        case COND_LE: return (N != V) || Z;
-        case COND_AL: return true;
-        case COND_NV: break;
-        default: break;
-    }
-
-    assert(false);
-    return false;
+inline bool check_condition(uint32_t cond) {
+    return (cond_lookup[cpsr >> 28] & (1 << cond)) != 0;
 }
 
 void write_cpsr(uint32_t psr) {
@@ -2701,9 +2680,10 @@ void thumb_conditional_branch(void) {
     }
 #endif
 
-    if (!check_condition(cond)) return;
-    r[15] += imm << 1;
-    branch_taken = true;
+    if (check_condition(cond)) {
+        r[15] += imm << 1;
+        branch_taken = true;
+    }
 }
 
 void thumb_software_interrupt(void) {
@@ -2808,7 +2788,7 @@ void arm_step(void) {
 #endif
 
     uint32_t cond = (arm_op >> 28) & 0xf;
-    if (cond == COND_AL || check_condition(cond)) {
+    if (check_condition(cond)) {
         uint32_t index = ((arm_op >> 4) & 0xf) | ((arm_op >> 16) & 0xff0);
         void (*handler)(void) = arm_lookup[index];
         if (handler != NULL) {
