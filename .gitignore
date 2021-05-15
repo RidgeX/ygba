@@ -4,4 +4,5 @@ roms/
 tonc/
 *.exe
 *.gba
+*.o
 system_rom.bin
