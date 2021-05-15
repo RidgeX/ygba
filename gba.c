@@ -8,10 +8,10 @@
 #include <stdio.h>
 #include <string.h>
 
-//#define DEBUG
+#define DEBUG
 bool log_instructions = false;
-bool log_arm_instructions = true;
-bool log_thumb_instructions = true;
+bool log_arm_instructions = false;
+bool log_thumb_instructions = false;
 bool log_registers = false;
 bool single_step = false;
 uint64_t instruction_count = 0;
@@ -90,6 +90,7 @@ bool keys[NUM_KEYS];
 #define PSR_MODE_SYS 0x1f
 
 #define REG_SP 0xd
+#define REG_LR 0xe
 #define REG_PC 0xf
 
 #define SHIFT_LSL 0
@@ -855,7 +856,7 @@ void mode_change(uint32_t old_mode, uint32_t new_mode) {
     }
 }
 
-bool cpsr_check_condition(uint32_t cond) {
+bool check_condition(uint32_t cond) {
     bool N = (cpsr & PSR_N) != 0;
     bool Z = (cpsr & PSR_Z) != 0;
     bool C = (cpsr & PSR_C) != 0;
@@ -999,6 +1000,35 @@ void print_address(uint32_t i) {
 
 void print_shift_amount(uint32_t i) {
     printf("#%d", i);
+}
+
+bool thumb_print_rlist(uint32_t rlist) {
+    bool first = true;
+    int i = 0;
+    while (i < 8) {
+        if (rlist & (1 << i)) {
+            int j = i + 1;
+            while (rlist & (1 << j)) j++;
+            if (j == i + 1) {
+                if (!first) printf(",");
+                print_register(i);
+            } else if (j == i + 2) {
+                if (!first) printf(",");
+                print_register(i);
+                printf(",");
+                print_register(j - 1);
+            } else {
+                if (!first) printf(",");
+                print_register(i);
+                printf("-");
+                print_register(j - 1);
+            }
+            i = j;
+            first = false;
+        }
+        i++;
+    }
+    return first;
 }
 
 void print_shift_op(uint32_t shop, uint32_t shamt, uint32_t shreg, uint32_t Rs) {
@@ -1412,7 +1442,7 @@ void arm_data_processing_immediate(void) {
     }
 }
 
-void arm_single_data_transfer_register(void) {
+void arm_load_store_word_or_byte_register(void) {
     bool P = (arm_op & (1 << 24)) != 0;
     bool U = (arm_op & (1 << 23)) != 0;
     bool B = (arm_op & (1 << 22)) != 0;
@@ -1471,7 +1501,7 @@ void arm_single_data_transfer_register(void) {
     if (((P && W) || !P) && !(L && Rd == Rn)) r[Rn] = n;
 }
 
-void arm_single_data_transfer_immediate(void) {
+void arm_load_store_word_or_byte_immediate(void) {
     bool P = (arm_op & (1 << 24)) != 0;
     bool U = (arm_op & (1 << 23)) != 0;
     bool B = (arm_op & (1 << 22)) != 0;
@@ -1526,7 +1556,7 @@ void arm_single_data_transfer_immediate(void) {
     if (((P && W) || !P) && !(L && Rd == Rn)) r[Rn] = n;
 }
 
-void arm_block_data_transfer(void) {
+void arm_load_store_multiple(void) {
     bool P = (arm_op & (1 << 24)) != 0;
     bool U = (arm_op & (1 << 23)) != 0;
     bool S = (arm_op & (1 << 22)) != 0;
@@ -1856,7 +1886,7 @@ void arm_load_store_halfword_immediate(void) {
     if (((P && W) || !P) && !(L && Rd == Rn)) r[Rn] = n;
 }
 
-void arm_load_signed_byte_or_signed_halfword_register(void) {
+void arm_load_signed_halfword_or_signed_byte_register(void) {
     bool P = (arm_op & (1 << 24)) != 0;
     bool U = (arm_op & (1 << 23)) != 0;
     bool I = (arm_op & (1 << 22)) != 0;
@@ -1917,7 +1947,7 @@ void arm_load_signed_byte_or_signed_halfword_register(void) {
     if (((P && W) || !P) && !(L && Rd == Rn)) r[Rn] = n;
 }
 
-void arm_load_signed_byte_or_signed_halfword_immediate(void) {
+void arm_load_signed_halfword_or_signed_byte_immediate(void) {
     bool P = (arm_op & (1 << 24)) != 0;
     bool U = (arm_op & (1 << 23)) != 0;
     bool I = (arm_op & (1 << 22)) != 0;
@@ -2137,19 +2167,18 @@ void arm_branch_and_exchange(void) {
 }
 
 void thumb_shift_by_immediate(void) {
-    uint16_t opc = (thumb_op >> 11) & 3;
-    uint16_t imm = (thumb_op >> 6) & 0x1f;
-    uint16_t Rm = (thumb_op >> 3) & 7;
-    uint16_t Rd = thumb_op & 7;
+    uint32_t opc = (thumb_op >> 11) & 3;
+    uint32_t imm = (thumb_op >> 6) & 0x1f;
+    uint32_t Rm = (thumb_op >> 3) & 7;
+    uint32_t Rd = (thumb_op >> 0) & 7;
 
 #ifdef DEBUG
     if (log_instructions && log_thumb_instructions) {
         thumb_print_opcode();
         switch (opc) {
-            case 0: print_mnemonic("lsl"); break;
-            case 1: print_mnemonic("lsr"); break;
-            case 2: print_mnemonic("asr"); break;
-            case 3: assert(false); break;
+            case SHIFT_LSL: print_mnemonic("lsl"); break;
+            case SHIFT_LSR: print_mnemonic("lsr"); break;
+            case SHIFT_ASR: print_mnemonic("asr"); break;
         }
         print_register(Rd);
         printf(",");
@@ -2160,23 +2189,20 @@ void thumb_shift_by_immediate(void) {
     }
 #endif
 
-    assert(opc != 3);
-
     arm_op = COND_AL << 28 | 0x1b << 20 | Rd << 12 | imm << 7 | Rm;
     switch (opc) {
-        case 0: arm_op |= SHIFT_LSL << 5; break;
-        case 1: arm_op |= SHIFT_LSR << 5; break;
-        case 2: arm_op |= SHIFT_ASR << 5; break;
-        case 3: assert(false); break;
+        case SHIFT_LSL: arm_op |= SHIFT_LSL << 5; break;
+        case SHIFT_LSR: arm_op |= SHIFT_LSR << 5; break;
+        case SHIFT_ASR: arm_op |= SHIFT_ASR << 5; break;
     }
     arm_data_processing_register();
 }
 
-void thumb_add_subtract_register(void) {
-    uint16_t opc = (thumb_op >> 9) & 1;
-    uint16_t Rm = (thumb_op >> 6) & 7;
-    uint16_t Rn = (thumb_op >> 3) & 7;
-    uint16_t Rd = thumb_op & 7;
+void thumb_add_or_subtract_register(void) {
+    uint32_t opc = (thumb_op >> 9) & 1;
+    uint32_t Rm = (thumb_op >> 6) & 7;
+    uint32_t Rn = (thumb_op >> 3) & 7;
+    uint32_t Rd = (thumb_op >> 0) & 7;
 
 #ifdef DEBUG
     if (log_instructions && log_thumb_instructions) {
@@ -2202,11 +2228,11 @@ void thumb_add_subtract_register(void) {
     arm_data_processing_register();
 }
 
-void thumb_add_subtract_immediate(void) {
-    uint16_t opc = (thumb_op >> 9) & 1;
-    uint16_t imm = (thumb_op >> 6) & 7;
-    uint16_t Rn = (thumb_op >> 3) & 7;
-    uint16_t Rd = thumb_op & 7;
+void thumb_add_or_subtract_immediate(void) {
+    uint32_t opc = (thumb_op >> 9) & 1;
+    uint32_t imm = (thumb_op >> 6) & 7;
+    uint32_t Rn = (thumb_op >> 3) & 7;
+    uint32_t Rd = (thumb_op >> 0) & 7;
 
 #ifdef DEBUG
     if (log_instructions && log_thumb_instructions) {
@@ -2232,10 +2258,10 @@ void thumb_add_subtract_immediate(void) {
     arm_data_processing_immediate();
 }
 
-void thumb_add_subtract_compare_move_immediate(void) {
-    uint16_t opc = (thumb_op >> 11) & 3;
-    uint16_t Rdn = (thumb_op >> 8) & 7;
-    uint16_t imm = thumb_op & 0xff;
+void thumb_add_subtract_compare_or_move_immediate(void) {
+    uint32_t opc = (thumb_op >> 11) & 3;
+    uint32_t Rdn = (thumb_op >> 8) & 7;
+    uint32_t imm = (thumb_op >> 0) & 0xff;
 
 #ifdef DEBUG
     if (log_instructions && log_thumb_instructions) {
@@ -2264,9 +2290,9 @@ void thumb_add_subtract_compare_move_immediate(void) {
 }
 
 void thumb_data_processing_register(void) {
-    uint16_t opc = (thumb_op >> 6) & 0xf;
-    uint16_t Rm = (thumb_op >> 3) & 7;
-    uint16_t Rn = thumb_op & 7;
+    uint32_t opc = (thumb_op >> 6) & 0xf;
+    uint32_t Rms = (thumb_op >> 3) & 7;
+    uint32_t Rdn = (thumb_op >> 0) & 7;
 
 #ifdef DEBUG
     if (log_instructions && log_thumb_instructions) {
@@ -2289,45 +2315,45 @@ void thumb_data_processing_register(void) {
             case THUMB_BIC: print_mnemonic("bic"); break;
             case THUMB_MVN: print_mnemonic("mvn"); break;
         }
-        print_register(Rn);
+        print_register(Rdn);
         printf(",");
-        print_register(Rm);
+        print_register(Rms);
         printf("\n");
     }
 #endif
 
-    arm_op = COND_AL << 28;
+    arm_op = COND_AL << 28 | 0x01 << 20;
     switch (opc) {
-        case THUMB_AND: arm_op |= ARM_AND << 21 | 0x01 << 20 | Rn << 16 | Rn << 12 | Rm; break;
-        case THUMB_EOR: arm_op |= ARM_EOR << 21 | 0x01 << 20 | Rn << 16 | Rn << 12 | Rm; break;
-        case THUMB_LSL: arm_op |= ARM_MOV << 21 | 0x01 << 20 | Rn << 12 | Rm << 8 | SHIFT_LSL << 5 | 1 << 4 | Rn; break;
-        case THUMB_LSR: arm_op |= ARM_MOV << 21 | 0x01 << 20 | Rn << 12 | Rm << 8 | SHIFT_LSR << 5 | 1 << 4 | Rn; break;
-        case THUMB_ASR: arm_op |= ARM_MOV << 21 | 0x01 << 20 | Rn << 12 | Rm << 8 | SHIFT_ASR << 5 | 1 << 4 | Rn; break;
-        case THUMB_ADC: arm_op |= ARM_ADC << 21 | 0x01 << 20 | Rn << 16 | Rn << 12 | Rm; break;
-        case THUMB_SBC: arm_op |= ARM_SBC << 21 | 0x01 << 20 | Rn << 16 | Rn << 12 | Rm; break;
-        case THUMB_ROR: arm_op |= ARM_MOV << 21 | 0x01 << 20 | Rn << 12 | Rm << 8 | SHIFT_ROR << 5 | 1 << 4 | Rn; break;
-        case THUMB_TST: arm_op |= ARM_TST << 21 | 0x01 << 20 | Rn << 16 | Rm; break;
-        case THUMB_NEG: arm_op |= ARM_RSB << 21 | 0x21 << 20 | Rm << 16 | Rn << 12; break;
-        case THUMB_CMP: arm_op |= ARM_CMP << 21 | 0x01 << 20 | Rn << 16 | Rm; break;
-        case THUMB_CMN: arm_op |= ARM_CMN << 21 | 0x01 << 20 | Rn << 16 | Rm; break;
-        case THUMB_ORR: arm_op |= ARM_ORR << 21 | 0x01 << 20 | Rn << 16 | Rn << 12 | Rm; break;
-        case THUMB_MUL: arm_op |= ARM_AND << 21 | 0x01 << 20 | Rn << 16 | Rn << 8 | 0x9 << 4 | Rm; break;
-        case THUMB_BIC: arm_op |= ARM_BIC << 21 | 0x01 << 20 | Rn << 16 | Rn << 12 | Rm; break;
-        case THUMB_MVN: arm_op |= ARM_MVN << 21 | 0x01 << 20 | Rn << 12 | Rm; break;
+        case THUMB_AND: arm_op |= ARM_AND << 21 | Rdn << 16 | Rdn << 12 | Rms; break;
+        case THUMB_EOR: arm_op |= ARM_EOR << 21 | Rdn << 16 | Rdn << 12 | Rms; break;
+        case THUMB_LSL: arm_op |= ARM_MOV << 21 | Rdn << 12 | Rms << 8 | SHIFT_LSL << 5 | 0x1 << 4 | Rdn; break;
+        case THUMB_LSR: arm_op |= ARM_MOV << 21 | Rdn << 12 | Rms << 8 | SHIFT_LSR << 5 | 0x1 << 4 | Rdn; break;
+        case THUMB_ASR: arm_op |= ARM_MOV << 21 | Rdn << 12 | Rms << 8 | SHIFT_ASR << 5 | 0x1 << 4 | Rdn; break;
+        case THUMB_ADC: arm_op |= ARM_ADC << 21 | Rdn << 16 | Rdn << 12 | Rms; break;
+        case THUMB_SBC: arm_op |= ARM_SBC << 21 | Rdn << 16 | Rdn << 12 | Rms; break;
+        case THUMB_ROR: arm_op |= ARM_MOV << 21 | Rdn << 12 | Rms << 8 | SHIFT_ROR << 5 | 0x1 << 4 | Rdn; break;
+        case THUMB_TST: arm_op |= ARM_TST << 21 | Rdn << 16 | Rms; break;
+        case THUMB_NEG: arm_op |= ARM_RSB << 21 | 0x20 << 20 | Rms << 16 | Rdn << 12; break;
+        case THUMB_CMP: arm_op |= ARM_CMP << 21 | Rdn << 16 | Rms; break;
+        case THUMB_CMN: arm_op |= ARM_CMN << 21 | Rdn << 16 | Rms; break;
+        case THUMB_ORR: arm_op |= ARM_ORR << 21 | Rdn << 16 | Rdn << 12 | Rms; break;
+        case THUMB_MUL: arm_op |= Rdn << 16 | Rdn << 8 | 0x9 << 4 | Rms; break;
+        case THUMB_BIC: arm_op |= ARM_BIC << 21 | Rdn << 16 | Rdn << 12 | Rms; break;
+        case THUMB_MVN: arm_op |= ARM_MVN << 21 | Rdn << 12 | Rms; break;
     }
-    if (opc == THUMB_NEG) {
-        arm_data_processing_immediate();
-    } else if (opc == THUMB_MUL) {
+    if (opc == THUMB_MUL) {
         arm_multiply();
+    } else if (opc == THUMB_NEG) {
+        arm_data_processing_immediate();
     } else {
         arm_data_processing_register();
     }
 }
 
 void thumb_special_data_processing(void) {
-    uint16_t opc = (thumb_op >> 8) & 3;
-    uint16_t Rm = (thumb_op >> 3) & 0xf;
-    uint16_t Rd = (thumb_op & 7) | ((thumb_op >> 4) & 8);
+    uint32_t opc = (thumb_op >> 8) & 3;
+    uint32_t Rm = (thumb_op >> 3) & 0xf;
+    uint32_t Rdn = ((thumb_op >> 7) & 1) << 3 | ((thumb_op >> 0) & 7);
 
 #ifdef DEBUG
     if (log_instructions && log_thumb_instructions) {
@@ -2337,48 +2363,48 @@ void thumb_special_data_processing(void) {
             case 1: print_mnemonic("cmp"); break;
             case 2: print_mnemonic("mov"); break;
         }
-        print_register(Rd);
+        print_register(Rdn);
         printf(",");
         print_register(Rm);
         printf("\n");
     }
 #endif
 
-    assert(opc != 3);
+    assert(Rm >= 8 || Rdn >= 8);  // unpredictable
 
     arm_op = COND_AL << 28 | Rm;
     switch (opc) {
-        case 0: arm_op |= 0x08 << 20 | Rd << 16 | Rd << 12; break;
-        case 1: arm_op |= 0x15 << 20 | Rd << 16; break;
-        case 2: arm_op |= 0x1a << 20 | Rd << 12; break;
+        case 0: arm_op |= ARM_ADD << 21 | Rdn << 16 | Rdn << 12; break;
+        case 1: arm_op |= ARM_CMP << 21 | 0x01 << 20 | Rdn << 16; break;
+        case 2: arm_op |= ARM_MOV << 21 | Rdn << 12; break;
     }
     arm_data_processing_register();
 }
 
-void thumb_branch_exchange_instruction_set(void) {
-    bool L = (thumb_op & (1 << 7)) != 0;
-    uint16_t Rm = (thumb_op >> 3) & 0xf;
-    uint16_t sbz = thumb_op & 7;
+void thumb_branch_and_exchange(void) {
+    bool L = (thumb_op >> 7) & 1;
+    uint32_t Rm = (thumb_op >> 3) & 0xf;
+    uint32_t sbz = thumb_op & 7;
 
 #ifdef DEBUG
     if (log_instructions && log_thumb_instructions) {
         thumb_print_opcode();
-        print_mnemonic("bx");
+        print_mnemonic(L ? "blx" : "bx");
         print_register(Rm);
         printf("\n");
     }
 #endif
 
-    assert(!L);
-    assert(sbz == 0);
+    assert(!L);  // unpredictable
+    assert(sbz == 0);  // should be zero
 
     arm_op = COND_AL << 28 | 0x12 << 20 | 0xfff << 8 | 0x1 << 4 | Rm;
     arm_branch_and_exchange();
 }
 
 void thumb_load_from_literal_pool(void) {
-    uint16_t Rd = (thumb_op >> 8) & 7;
-    uint16_t imm = thumb_op & 0xff;
+    uint32_t Rd = (thumb_op >> 8) & 7;
+    uint32_t imm = (thumb_op >> 0) & 0xff;
 
 #ifdef DEBUG
     if (log_instructions && log_thumb_instructions) {
@@ -2392,14 +2418,14 @@ void thumb_load_from_literal_pool(void) {
 #endif
 
     arm_op = COND_AL << 28 | 0x59 << 20 | REG_PC << 16 | Rd << 12 | imm << 2;
-    arm_single_data_transfer_immediate();
+    arm_load_store_word_or_byte_immediate();
 }
 
-void thumb_load_store_register_offset(void) {
-    uint16_t opc = (thumb_op >> 9) & 0x7;
-    uint16_t Rm = (thumb_op >> 6) & 0x7;
-    uint16_t Rn = (thumb_op >> 3) & 0x7;
-    uint16_t Rd = thumb_op & 0x7;
+void thumb_load_store_register(void) {
+    uint32_t opc = (thumb_op >> 9) & 7;
+    uint32_t Rm = (thumb_op >> 6) & 7;
+    uint32_t Rn = (thumb_op >> 3) & 7;
+    uint32_t Rd = (thumb_op >> 0) & 7;
 
 #ifdef DEBUG
     if (log_instructions && log_thumb_instructions) {
@@ -2413,7 +2439,6 @@ void thumb_load_store_register_offset(void) {
             case 5: print_mnemonic("ldrh"); break;
             case 6: print_mnemonic("ldrb"); break;
             case 7: print_mnemonic("ldrsh"); break;
-            default: assert(false); break;
         }
         print_register(Rd);
         printf(",[");
@@ -2434,38 +2459,22 @@ void thumb_load_store_register_offset(void) {
         case 5: arm_op |= 0x19 << 20 | 0xb << 4; break;
         case 6: arm_op |= 0x7d << 20; break;
         case 7: arm_op |= 0x19 << 20 | 0xf << 4; break;
-        default: assert(false); break;
     }
-    switch (opc) {
-        case 0:
-        case 2:
-        case 4:
-        case 6:
-            arm_single_data_transfer_register();
-            break;
-
-        case 1:
-        case 5:
-            arm_load_store_halfword_register();
-            break;
-
-        case 3:
-        case 7:
-            arm_load_signed_byte_or_signed_halfword_register();
-            break;
-
-        default:
-            assert(false);
-            break;
+    if (opc == 1 || opc == 5) {
+        arm_load_store_halfword_register();
+    } else if (opc == 3 || opc == 7) {
+        arm_load_signed_halfword_or_signed_byte_register();
+    } else {
+        arm_load_store_word_or_byte_register();
     }
 }
 
-void thumb_load_store_word_byte_immediate_offset(void) {
-    bool B = (thumb_op & (1 << 12)) != 0;
-    bool L = (thumb_op & (1 << 11)) != 0;
-    uint16_t imm = (thumb_op >> 6) & 0x1f;
-    uint16_t Rn = (thumb_op >> 3) & 7;
-    uint16_t Rd = thumb_op & 7;
+void thumb_load_store_word_or_byte_immediate(void) {
+    bool B = (thumb_op >> 12) & 1;
+    bool L = (thumb_op >> 11) & 1;
+    uint32_t imm = (thumb_op >> 6) & 0x1f;
+    uint32_t Rn = (thumb_op >> 3) & 7;
+    uint32_t Rd = (thumb_op >> 0) & 7;
 
 #ifdef DEBUG
     if (log_instructions && log_thumb_instructions) {
@@ -2486,30 +2495,26 @@ void thumb_load_store_word_byte_immediate_offset(void) {
 
     arm_op = COND_AL << 28 | 0x58 << 20 | Rn << 16 | Rd << 12;
     if (B) {
-        arm_op |= 1 << 22 | imm;
+        arm_op |= 0x04 << 20 | imm;
     } else {
         arm_op |= imm << 2;
     }
     if (L) {
-        arm_op |= 1 << 20;
+        arm_op |= 0x01 << 20;
     }
-    arm_single_data_transfer_immediate();
+    arm_load_store_word_or_byte_immediate();
 }
 
-void thumb_load_store_halfword_immediate_offset(void) {
-    bool L = (thumb_op & (1 << 11)) != 0;
-    uint16_t imm = (thumb_op >> 6) & 0x1f;
-    uint16_t Rn = (thumb_op >> 3) & 7;
-    uint16_t Rd = thumb_op & 7;
+void thumb_load_store_halfword_immediate(void) {
+    bool L = (thumb_op >> 11) & 1;
+    uint32_t imm = (thumb_op >> 6) & 0x1f;
+    uint32_t Rn = (thumb_op >> 3) & 7;
+    uint32_t Rd = (thumb_op >> 0) & 7;
 
 #ifdef DEBUG
     if (log_instructions && log_thumb_instructions) {
         thumb_print_opcode();
-        if (L) {
-            print_mnemonic("ldrh");
-        } else {
-            print_mnemonic("strh");
-        }
+        print_mnemonic(L ? "ldrh" : "strh");
         print_register(Rd);
         printf(",[");
         print_register(Rn);
@@ -2528,10 +2533,10 @@ void thumb_load_store_halfword_immediate_offset(void) {
     arm_load_store_halfword_immediate();
 }
 
-void thumb_load_store_to_from_stack(void) {
-    bool L = (thumb_op & (1 << 11)) != 0;
-    uint16_t Rd = (thumb_op >> 8) & 7;
-    int32_t imm = thumb_op & 0xff;
+void thumb_load_store_to_or_from_stack(void) {
+    bool L = (thumb_op >> 11) & 1;
+    uint32_t Rd = (thumb_op >> 8) & 7;
+    uint32_t imm = (thumb_op >> 0) & 0xff;
 
 #ifdef DEBUG
     if (log_instructions && log_thumb_instructions) {
@@ -2552,13 +2557,13 @@ void thumb_load_store_to_from_stack(void) {
     } else {
         arm_op |= 0x58 << 20;
     }
-    arm_single_data_transfer_immediate();
+    arm_load_store_word_or_byte_immediate();
 }
 
 void thumb_add_to_sp_or_pc(void) {
-    bool SP = (thumb_op & (1 << 11)) != 0;
-    uint16_t Rd = (thumb_op >> 8) & 7;
-    int32_t imm = thumb_op & 0xff;
+    bool SP = (thumb_op >> 11) & 1;
+    uint32_t Rd = (thumb_op >> 8) & 7;
+    uint32_t imm = (thumb_op >> 0) & 0xff;
 
 #ifdef DEBUG
     if (log_instructions && log_thumb_instructions) {
@@ -2573,13 +2578,19 @@ void thumb_add_to_sp_or_pc(void) {
     }
 #endif
 
-    arm_op = COND_AL << 28 | 0x28 << 20 | (SP ? REG_SP : REG_PC) << 16 | Rd << 12 | 0xf << 8 | imm;
+    arm_op = COND_AL << 28 | ARM_ADD << 21 | 0x20 << 20 | Rd << 12 | 0xf << 8 | imm;
+    if (SP) {
+        arm_op |= REG_SP << 16;
+    } else {
+        arm_op |= REG_PC << 16;
+    }
     arm_data_processing_immediate();
 }
 
 void thumb_adjust_stack_pointer(void) {
-    uint16_t opc = (thumb_op >> 7) & 1;
-    uint32_t imm = thumb_op & 0x7f;
+    uint32_t opc = (thumb_op >> 7) & 1;
+    uint32_t imm = (thumb_op >> 0) & 0x7f;
+    uint32_t sbz = thumb_op & 0xb00;
 
 #ifdef DEBUG
     if (log_instructions && log_thumb_instructions) {
@@ -2592,6 +2603,8 @@ void thumb_adjust_stack_pointer(void) {
     }
 #endif
 
+    assert(sbz == 0);  // should be zero
+
     arm_op = COND_AL << 28 | 0x20 << 20 | REG_SP << 16 | REG_SP << 12 | 0xf << 8 | imm;
     if (opc == 1) {
         arm_op |= ARM_SUB << 21;
@@ -2601,127 +2614,68 @@ void thumb_adjust_stack_pointer(void) {
     arm_data_processing_immediate();
 }
 
-void thumb_push_pop_register_list(void) {
-    bool L = (thumb_op & (1 << 11)) != 0;
-    bool R = (thumb_op & (1 << 8)) != 0;
-    uint32_t rlist = thumb_op & 0xff;
+void thumb_push_or_pop_register_list(void) {
+    bool L = (thumb_op >> 11) & 1;
+    bool R = (thumb_op >> 8) & 1;
+    uint32_t rlist = (thumb_op >> 0) & 0xff;
+    uint32_t sbz = thumb_op & 0x200;
 
 #ifdef DEBUG
     if (log_instructions && log_thumb_instructions) {
         thumb_print_opcode();
         print_mnemonic(L ? "pop" : "push");
         printf("{");
-        bool first = true;
-        int i = 0;
-        while (i < 8) {
-            if (rlist & (1 << i)) {
-                int j = i + 1;
-                while (rlist & (1 << j)) j++;
-                if (j == i + 1) {
-                    if (!first) printf(",");
-                    print_register(i);
-                } else if (j == i + 2) {
-                    if (!first) printf(",");
-                    print_register(i);
-                    printf(",");
-                    print_register(j - 1);
-                } else {
-                    if (!first) printf(",");
-                    print_register(i);
-                    printf("-");
-                    print_register(j - 1);
-                }
-                i = j;
-                first = false;
-            }
-            i++;
-        }
-        if (L) {
-            if (R) {
-                if (!first) printf(",");
-                print_register(15);
-            }
-        } else {
-            if (R) {
-                if (!first) printf(",");
-                print_register(14);
-            }
+        bool first = thumb_print_rlist(rlist);
+        if (R) {
+            if (!first) printf(",");
+            print_register(L ? REG_PC : REG_LR);
         }
         printf("}\n");
     }
 #endif
 
+    assert(sbz == 0);  // should be zero
+
     arm_op = COND_AL << 28 | REG_SP << 16 | rlist;
     if (L) {
         arm_op |= 0x8b << 20;
-        if (R) arm_op |= 1 << 15;
+        if (R) arm_op |= 1 << REG_PC;
     } else {
         arm_op |= 0x92 << 20;
-        if (R) arm_op |= 1 << 14;
+        if (R) arm_op |= 1 << REG_LR;
     }
-    arm_block_data_transfer();
+    arm_load_store_multiple();
 }
 
 void thumb_load_store_multiple(void) {
-    bool L = (thumb_op & (1 << 11)) != 0;
+    bool L = (thumb_op >> 11) & 1;
     uint32_t Rn = (thumb_op >> 8) & 7;
-    uint32_t rlist = thumb_op & 0xff;
-
-    bool W = true;
-    if (L && (rlist & (1 << Rn)) != 0) {
-        W = false;
-    }
+    uint32_t rlist = (thumb_op >> 0) & 0xff;
 
 #ifdef DEBUG
     if (log_instructions && log_thumb_instructions) {
         thumb_print_opcode();
         print_mnemonic(L ? "ldmia" : "stmia");
         print_register(Rn);
-        if (W) printf("!");
-        printf(",{");
-        bool first = true;
-        int i = 0;
-        while (i < 8) {
-            if (rlist & (1 << i)) {
-                int j = i + 1;
-                while (rlist & (1 << j)) j++;
-                if (j == i + 1) {
-                    if (!first) printf(",");
-                    print_register(i);
-                } else if (j == i + 2) {
-                    if (!first) printf(",");
-                    print_register(i);
-                    printf(",");
-                    print_register(j - 1);
-                } else {
-                    if (!first) printf(",");
-                    print_register(i);
-                    printf("-");
-                    print_register(j - 1);
-                }
-                i = j;
-                first = false;
-            }
-            i++;
-        }
+        printf("!,{");
+        thumb_print_rlist(rlist);
         printf("}\n");
     }
 #endif
 
     arm_op = COND_AL << 28 | Rn << 16 | rlist;
     if (L) {
-        arm_op |= 0x89 << 20 | (W ? 1 : 0) << 21;
+        arm_op |= 0x8b << 20;
     } else {
         arm_op |= 0x8a << 20;
     }
-    arm_block_data_transfer();
+    arm_load_store_multiple();
 }
 
 void thumb_conditional_branch(void) {
-    uint16_t cond = (thumb_op >> 8) & 0xf;
-    uint32_t imm = thumb_op & 0xff;
-    if (thumb_op & 0x80) imm |= ~0xff;
-    assert(cond != 0xe && cond != 0xf);
+    uint32_t cond = (thumb_op >> 8) & 0xf;
+    uint32_t imm = (thumb_op >> 0) & 0xff;
+    if (imm & 0x80) imm |= ~0xff;
 
 #ifdef DEBUG
     if (log_instructions && log_thumb_instructions) {
@@ -2741,22 +2695,19 @@ void thumb_conditional_branch(void) {
             case COND_LT: print_mnemonic("blt"); break;
             case COND_GT: print_mnemonic("bgt"); break;
             case COND_LE: print_mnemonic("ble"); break;
-            case COND_AL: assert(false); break;
-            case COND_NV: assert(false); break;
         }
         print_address(r[15] + (imm << 1));
         printf("\n");
     }
 #endif
 
-    if (cpsr_check_condition(cond)) {
-        r[15] += imm << 1;
-        branch_taken = true;
-    }
+    if (!check_condition(cond)) return;
+    r[15] += imm << 1;
+    branch_taken = true;
 }
 
 void thumb_software_interrupt(void) {
-    uint32_t imm = thumb_op & 0xff;
+    uint32_t imm = (thumb_op >> 0) & 0xff;
 
 #ifdef DEBUG
     if (log_instructions && log_thumb_instructions) {
@@ -2767,13 +2718,13 @@ void thumb_software_interrupt(void) {
     }
 #endif
 
-    arm_op = COND_AL << 28 | 0xf << 24 | imm;
+    arm_op = COND_AL << 28 | 0xf0 << 20 | imm;
     arm_software_interrupt();
 }
 
 void thumb_unconditional_branch(void) {
-    uint32_t imm = thumb_op & 0x7ff;
-    if (thumb_op & 0x400) imm |= ~0x7ff;
+    uint32_t imm = (thumb_op >> 0) & 0x7ff;
+    if (imm & 0x400) imm |= ~0x7ff;
 
 #ifdef DEBUG
     if (log_instructions && log_thumb_instructions) {
@@ -2788,8 +2739,8 @@ void thumb_unconditional_branch(void) {
     branch_taken = true;
 }
 
-void thumb_bl_prefix(void) {
-    uint32_t imm = thumb_op & 0x7ff;
+void thumb_branch_with_link_prefix(void) {
+    uint32_t imm = (thumb_op >> 0) & 0x7ff;
     if (imm & 0x400) imm |= ~0x7ff;
 
 #ifdef DEBUG
@@ -2803,23 +2754,21 @@ void thumb_bl_prefix(void) {
     r[14] = r[15] + (imm << 12);
 }
 
-void thumb_bl_suffix(void) {
-    uint16_t imm = thumb_op & 0x7ff;
-
-    uint32_t return_address = (r[15] - 2) | 1;
-    uint32_t target_address = r[14] + (imm << 1);
+void thumb_branch_with_link_suffix(void) {
+    uint32_t imm = (thumb_op >> 0) & 0x7ff;
+    uint32_t next_pc = r[14] + (imm << 1);
 
 #ifdef DEBUG
     if (log_instructions && log_thumb_instructions) {
         thumb_print_opcode();
         print_mnemonic("bl.2");
-        print_address(target_address);
+        print_address(next_pc);
         printf("\n");
     }
 #endif
 
-    r[14] = return_address;
-    r[15] = target_address;
+    r[14] = (r[15] - 2) | 1;
+    r[15] = next_pc;
     branch_taken = true;
 }
 
@@ -2859,7 +2808,7 @@ void arm_step(void) {
 #endif
 
     uint32_t cond = (arm_op >> 28) & 0xf;
-    if (cond == COND_AL || cpsr_check_condition(cond)) {
+    if (cond == COND_AL || check_condition(cond)) {
         uint32_t index = ((arm_op >> 4) & 0xf) | ((arm_op >> 16) & 0xff0);
         void (*handler)(void) = arm_lookup[index];
         if (handler != NULL) {
@@ -2953,9 +2902,9 @@ void arm_init_lookup(void) {
 
     arm_bind("000xxxxxxxxx", arm_data_processing_register);
     arm_bind("001xxxxxxxxx", arm_data_processing_immediate);
-    arm_bind("010xxxxxxxxx", arm_single_data_transfer_immediate);
-    arm_bind("011xxxxxxxx0", arm_single_data_transfer_register);
-    arm_bind("100xxxxxxxxx", arm_block_data_transfer);
+    arm_bind("010xxxxxxxxx", arm_load_store_word_or_byte_immediate);
+    arm_bind("011xxxxxxxx0", arm_load_store_word_or_byte_register);
+    arm_bind("100xxxxxxxxx", arm_load_store_multiple);
     arm_bind("101xxxxxxxxx", arm_branch);
     arm_bind("110xxxxxxxxx", NULL);  // arm_coprocessor_load_store
     arm_bind("1110xxxxxxxx", NULL);  // arm_coprocessor_data_processing
@@ -2966,11 +2915,11 @@ void arm_init_lookup(void) {
     arm_bind("00001xxx1001", arm_multiply_long);
     arm_bind("000xx0xx1011", arm_load_store_halfword_register);
     arm_bind("000xx1xx1011", arm_load_store_halfword_immediate);
-    arm_bind("000xx0xx11x1", arm_load_signed_byte_or_signed_halfword_register);
-    arm_bind("000xx1xx11x1", arm_load_signed_byte_or_signed_halfword_immediate);
+    arm_bind("000xx0xx11x1", arm_load_signed_halfword_or_signed_byte_register);
+    arm_bind("000xx1xx11x1", arm_load_signed_halfword_or_signed_byte_immediate);
     arm_bind("00010x001001", arm_swap);
     arm_bind("000100100001", arm_branch_and_exchange);
-    arm_bind("00010x10xxx1", NULL);  // arm_branch_and_exchange?
+    //arm_bind("00010x10xxx1", NULL);  // arm_branch_and_exchange?
     arm_bind("00110010xxxx", arm_special_data_processing_immediate);
     arm_bind("00110110xxxx", arm_special_data_processing_immediate);
 }
@@ -2978,30 +2927,29 @@ void arm_init_lookup(void) {
 void thumb_init_lookup(void) {
     memset(thumb_lookup, 0, sizeof(void *) * 256);
 
-    thumb_bind("xxxxxxxx", thumb_undefined_instruction);
-    thumb_bind("0000xxxx", thumb_shift_by_immediate);
-    thumb_bind("00010xxx", thumb_shift_by_immediate);
-    thumb_bind("000110xx", thumb_add_subtract_register);
-    thumb_bind("000111xx", thumb_add_subtract_immediate);
-    thumb_bind("001xxxxx", thumb_add_subtract_compare_move_immediate);
+    thumb_bind("000xxxxx", thumb_shift_by_immediate);
+    thumb_bind("000110xx", thumb_add_or_subtract_register);
+    thumb_bind("000111xx", thumb_add_or_subtract_immediate);
+    thumb_bind("001xxxxx", thumb_add_subtract_compare_or_move_immediate);
     thumb_bind("010000xx", thumb_data_processing_register);
     thumb_bind("010001xx", thumb_special_data_processing);
-    thumb_bind("01000111", thumb_branch_exchange_instruction_set);
+    thumb_bind("01000111", thumb_branch_and_exchange);
     thumb_bind("01001xxx", thumb_load_from_literal_pool);
-    thumb_bind("0101xxxx", thumb_load_store_register_offset);
-    thumb_bind("011xxxxx", thumb_load_store_word_byte_immediate_offset);
-    thumb_bind("1000xxxx", thumb_load_store_halfword_immediate_offset);
-    thumb_bind("1001xxxx", thumb_load_store_to_from_stack);
+    thumb_bind("0101xxxx", thumb_load_store_register);
+    thumb_bind("011xxxxx", thumb_load_store_word_or_byte_immediate);
+    thumb_bind("1000xxxx", thumb_load_store_halfword_immediate);
+    thumb_bind("1001xxxx", thumb_load_store_to_or_from_stack);
     thumb_bind("1010xxxx", thumb_add_to_sp_or_pc);
     thumb_bind("1011x0xx", thumb_adjust_stack_pointer);
-    thumb_bind("1011x1xx", thumb_push_pop_register_list);
+    thumb_bind("1011x1xx", thumb_push_or_pop_register_list);
     thumb_bind("1100xxxx", thumb_load_store_multiple);
     thumb_bind("1101xxxx", thumb_conditional_branch);
     thumb_bind("11011110", thumb_undefined_instruction);
     thumb_bind("11011111", thumb_software_interrupt);
     thumb_bind("11100xxx", thumb_unconditional_branch);
-    thumb_bind("11110xxx", thumb_bl_prefix);
-    thumb_bind("11111xxx", thumb_bl_suffix);
+    thumb_bind("11101xxx", thumb_undefined_instruction);
+    thumb_bind("11110xxx", thumb_branch_with_link_prefix);
+    thumb_bind("11111xxx", thumb_branch_with_link_suffix);
 }
 
 void gba_init(const char *filename) {
