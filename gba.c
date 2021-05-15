@@ -2918,80 +2918,90 @@ void thumb_step(void) {
     }
 }
 
-void arm_bind(uint32_t n, uint32_t m, void (*f)(void)) {
+void lookup_bind(void (**lookup)(void), char *mask, void (*f)(void)) {
+    uint32_t n = 0;
+    uint32_t m = 0;
+    for (char *p = mask; *p != '\0'; p++) {
+        n <<= 1;
+        m <<= 1;
+        switch (*p) {
+            case '1': n |= 1; break;
+            case 'x': m |= 1; break;
+        }
+    }
+
     uint32_t s = m;
     while (true) {
-        arm_lookup[n | s] = f;
+        lookup[n | s] = f;
         if (s == 0) break;
         s = (s - 1) & m;
     }
 }
 
-void thumb_bind(uint16_t n, uint16_t m, void (*f)(void)) {
-    uint16_t s = m;
-    while (true) {
-        thumb_lookup[n | s] = f;
-        if (s == 0) break;
-        s = (s - 1) & m;
-    }
+void arm_bind(char *mask, void (*f)(void)) {
+    lookup_bind(arm_lookup, mask, f);
+}
+
+void thumb_bind(char *mask, void (*f)(void)) {
+    lookup_bind(thumb_lookup, mask, f);
 }
 
 void arm_init_lookup(void) {
     memset(arm_lookup, 0, sizeof(void *) * 4096);
 
-    arm_bind(0x000, 0xfff, arm_undefined_instruction);
+    arm_bind("xxxxxxxxxxxx", arm_undefined_instruction);
 
-    arm_bind(0x000, 0x1ff, arm_data_processing_register);
-    arm_bind(0x200, 0x1ff, arm_data_processing_immediate);
-    arm_bind(0x400, 0x1ff, arm_single_data_transfer_immediate);
-    arm_bind(0x600, 0x1fe, arm_single_data_transfer_register);
-    arm_bind(0x800, 0x1ff, arm_block_data_transfer);
-    arm_bind(0xa00, 0x1ff, arm_branch);
-    arm_bind(0xc00, 0x1ff, NULL);  // arm_coprocessor_load_store
-    arm_bind(0xe00, 0x0ff, NULL);  // arm_coprocessor_data_processing
-    arm_bind(0xf00, 0x0ff, arm_software_interrupt);
-    arm_bind(0x100, 0x04f, arm_special_data_processing_register);
-    arm_bind(0x120, 0x04e, arm_special_data_processing_register);
-    arm_bind(0x009, 0x030, arm_multiply);
-    arm_bind(0x089, 0x070, arm_multiply_long);
-    arm_bind(0x00b, 0x1b0, arm_load_store_halfword_register);
-    arm_bind(0x04b, 0x1b0, arm_load_store_halfword_immediate);
-    arm_bind(0x00d, 0x1b2, arm_load_signed_byte_or_signed_halfword_register);
-    arm_bind(0x04d, 0x1b2, arm_load_signed_byte_or_signed_halfword_immediate);
-    arm_bind(0x109, 0x040, arm_swap);
-    arm_bind(0x121, 0x000, arm_branch_and_exchange);
-    //arm_bind(0x121, 0x04e, NULL);  // branch_and_exchange or undefined_instruction?
-    arm_bind(0x320, 0x00f, arm_special_data_processing_immediate);
-    arm_bind(0x360, 0x00f, arm_special_data_processing_immediate);
+    arm_bind("000xxxxxxxxx", arm_data_processing_register);
+    arm_bind("001xxxxxxxxx", arm_data_processing_immediate);
+    arm_bind("010xxxxxxxxx", arm_single_data_transfer_immediate);
+    arm_bind("011xxxxxxxx0", arm_single_data_transfer_register);
+    arm_bind("100xxxxxxxxx", arm_block_data_transfer);
+    arm_bind("101xxxxxxxxx", arm_branch);
+    arm_bind("110xxxxxxxxx", NULL);  // arm_coprocessor_load_store
+    arm_bind("1110xxxxxxxx", NULL);  // arm_coprocessor_data_processing
+    arm_bind("1111xxxxxxxx", arm_software_interrupt);
+    arm_bind("00010x00xxxx", arm_special_data_processing_register);  // lower precedence than ldrh/strh
+    arm_bind("00010x10xxx0", arm_special_data_processing_register);
+    arm_bind("000000xx1001", arm_multiply);
+    arm_bind("00001xxx1001", arm_multiply_long);
+    arm_bind("000xx0xx1011", arm_load_store_halfword_register);
+    arm_bind("000xx1xx1011", arm_load_store_halfword_immediate);
+    arm_bind("000xx0xx11x1", arm_load_signed_byte_or_signed_halfword_register);
+    arm_bind("000xx1xx11x1", arm_load_signed_byte_or_signed_halfword_immediate);
+    arm_bind("00010x001001", arm_swap);
+    arm_bind("000100100001", arm_branch_and_exchange);
+    arm_bind("00010x10xxx1", NULL);  // arm_branch_and_exchange?
+    arm_bind("00110010xxxx", arm_special_data_processing_immediate);
+    arm_bind("00110110xxxx", arm_special_data_processing_immediate);
 }
 
 void thumb_init_lookup(void) {
     memset(thumb_lookup, 0, sizeof(void *) * 256);
 
-    thumb_bind(0x00, 0xff, thumb_undefined_instruction);
-    thumb_bind(0x00, 0x0f, thumb_shift_by_immediate);
-    thumb_bind(0x10, 0x07, thumb_shift_by_immediate);
-    thumb_bind(0x18, 0x03, thumb_add_subtract_register);
-    thumb_bind(0x1c, 0x03, thumb_add_subtract_immediate);
-    thumb_bind(0x20, 0x1f, thumb_add_subtract_compare_move_immediate);
-    thumb_bind(0x40, 0x03, thumb_data_processing_register);
-    thumb_bind(0x44, 0x03, thumb_special_data_processing);
-    thumb_bind(0x47, 0x00, thumb_branch_exchange_instruction_set);
-    thumb_bind(0x48, 0x07, thumb_load_from_literal_pool);
-    thumb_bind(0x50, 0x0f, thumb_load_store_register_offset);
-    thumb_bind(0x60, 0x1f, thumb_load_store_word_byte_immediate_offset);
-    thumb_bind(0x80, 0x0f, thumb_load_store_halfword_immediate_offset);
-    thumb_bind(0x90, 0x0f, thumb_load_store_to_from_stack);
-    thumb_bind(0xa0, 0x0f, thumb_add_to_sp_or_pc);
-    thumb_bind(0xb0, 0x0b, thumb_adjust_stack_pointer);
-    thumb_bind(0xb4, 0x0b, thumb_push_pop_register_list);
-    thumb_bind(0xc0, 0x0f, thumb_load_store_multiple);
-    thumb_bind(0xd0, 0x0f, thumb_conditional_branch);
-    thumb_bind(0xde, 0x00, thumb_undefined_instruction);
-    thumb_bind(0xdf, 0x00, thumb_software_interrupt);
-    thumb_bind(0xe0, 0x07, thumb_unconditional_branch);
-    thumb_bind(0xf0, 0x07, thumb_bl_prefix);
-    thumb_bind(0xf8, 0x07, thumb_bl_suffix);
+    thumb_bind("xxxxxxxx", thumb_undefined_instruction);
+    thumb_bind("0000xxxx", thumb_shift_by_immediate);
+    thumb_bind("00010xxx", thumb_shift_by_immediate);
+    thumb_bind("000110xx", thumb_add_subtract_register);
+    thumb_bind("000111xx", thumb_add_subtract_immediate);
+    thumb_bind("001xxxxx", thumb_add_subtract_compare_move_immediate);
+    thumb_bind("010000xx", thumb_data_processing_register);
+    thumb_bind("010001xx", thumb_special_data_processing);
+    thumb_bind("01000111", thumb_branch_exchange_instruction_set);
+    thumb_bind("01001xxx", thumb_load_from_literal_pool);
+    thumb_bind("0101xxxx", thumb_load_store_register_offset);
+    thumb_bind("011xxxxx", thumb_load_store_word_byte_immediate_offset);
+    thumb_bind("1000xxxx", thumb_load_store_halfword_immediate_offset);
+    thumb_bind("1001xxxx", thumb_load_store_to_from_stack);
+    thumb_bind("1010xxxx", thumb_add_to_sp_or_pc);
+    thumb_bind("1011x0xx", thumb_adjust_stack_pointer);
+    thumb_bind("1011x1xx", thumb_push_pop_register_list);
+    thumb_bind("1100xxxx", thumb_load_store_multiple);
+    thumb_bind("1101xxxx", thumb_conditional_branch);
+    thumb_bind("11011110", thumb_undefined_instruction);
+    thumb_bind("11011111", thumb_software_interrupt);
+    thumb_bind("11100xxx", thumb_unconditional_branch);
+    thumb_bind("11110xxx", thumb_bl_prefix);
+    thumb_bind("11111xxx", thumb_bl_suffix);
 }
 
 void gba_init(const char *filename) {
@@ -3103,7 +3113,7 @@ void gba_draw_tiled_bg(uint32_t mode, int bg, int y, uint32_t tile_base, uint32_
         uint32_t map_address = map_base + (map_y * 32 + map_x) * 2;
         uint16_t info = *(uint16_t *)&video_ram[map_address];
         uint16_t tile_no = info & 0x3ff;
-        bool hflip = (info & (1 << 10)) != 0;  // FIXME
+        bool hflip = (info & (1 << 10)) != 0;
         bool vflip = (info & (1 << 11)) != 0;
         uint16_t palette_no = (info >> 12) & 0xf;
 
@@ -3244,6 +3254,8 @@ void gba_dma_update(void) {
         uint32_t dmacnt = io_read_word(REG_DMA0CNT_L + 12 * ch);
 
         if ((dmacnt & DMA_ENABLE) != 0) {
+            // FIXME check dma start condition
+
             uint32_t dst_ctrl = (dmacnt >> 21) & 3;
             uint32_t src_ctrl = (dmacnt >> 23) & 3;
             uint32_t dst_addr = io_read_word(REG_DMA0DAD + 12 * ch);
