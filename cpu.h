@@ -1,6 +1,21 @@
 #define BIT(x, i) (((x) >> (i)) & 1)
 #define BITS(x, i, j) (((x) >> (i)) & ((1 << ((j) - (i) + 1)) - 1))
+
+#define ASR(x, i) (((x) & (1 << 31)) != 0 ? ~(~(x) >> (i)) : (x) >> (i))
+#define ROR(x, i) (((x) >> (i)) | ((x) << (32 - (i))))
 #define ZERO_EXTEND(x, i) if ((x) & (1 << (i))) { (x) |= ~((1 << ((i) + 1)) - 1); }
+
+#define FLAG_C() (cpsr & PSR_C ? true : false)
+//#define FLAG_T() (cpsr & PSR_T ? true : false)
+
+#define ASSIGN_N(x) if ((x)) { cpsr |= PSR_N; } else { cpsr &= ~PSR_N; }
+#define ASSIGN_Z(x) if ((x)) { cpsr |= PSR_Z; } else { cpsr &= ~PSR_Z; }
+#define ASSIGN_C(x) if ((x)) { cpsr |= PSR_C; } else { cpsr &= ~PSR_C; }
+#define ASSIGN_V(x) if ((x)) { cpsr |= PSR_V; } else { cpsr &= ~PSR_V; }
+
+#define CLEAR_C() cpsr &= ~PSR_C
+
+#define SIZEOF_INSTR (cpsr & PSR_T ? 2 : 4)
 
 #define ARM_AND 0
 #define ARM_EOR 1
@@ -109,8 +124,6 @@ uint32_t memory_read_word(uint32_t address);
 void memory_write_word(uint32_t address, uint32_t value);
 
 void arm_init(void);
-uint32_t asr(uint32_t x, uint32_t n);
-uint32_t ror(uint32_t x, uint32_t n);
 uint32_t align_word(uint32_t address, uint32_t value);
 uint32_t align_halfword(uint32_t address, uint16_t value);
 uint32_t bit_count(uint32_t x);

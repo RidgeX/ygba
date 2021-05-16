@@ -462,7 +462,7 @@ void thumb_add_to_sp_or_pc(void) {
         printf(",");
         print_register(SP ? REG_SP : REG_PC);
         printf(",");
-        print_immediate(ror(imm, 30));
+        print_immediate(ROR(imm, 30));
         printf("\n");
     }
 #endif
@@ -489,7 +489,7 @@ void thumb_adjust_stack_pointer(void) {
         print_mnemonic(opc == 1 ? "sub" : "add");
         print_register(REG_SP);
         printf(",");
-        print_immediate(ror(imm, 30));
+        print_immediate(ROR(imm, 30));
         printf("\n");
     }
 #endif
