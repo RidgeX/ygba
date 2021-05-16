@@ -9,10 +9,10 @@
 // LSR Rd, Rm, #<shift_imm>
 // ASR Rd, Rm, #<shift_imm>
 void thumb_shift_by_immediate(void) {
-    uint32_t opc = (thumb_op >> 11) & 3;
-    uint32_t imm = (thumb_op >> 6) & 0x1f;
-    uint32_t Rm = (thumb_op >> 3) & 7;
-    uint32_t Rd = (thumb_op >> 0) & 7;
+    uint32_t opc = BITS(thumb_op, 11, 12);
+    uint32_t imm = BITS(thumb_op, 6, 10);
+    uint32_t Rm = BITS(thumb_op, 3, 5);
+    uint32_t Rd = BITS(thumb_op, 0, 2);
 
 #ifdef DEBUG
     if (log_instructions && log_thumb_instructions) {
@@ -43,10 +43,10 @@ void thumb_shift_by_immediate(void) {
 // ADD Rd, Rn, Rm
 // SUB Rd, Rn, Rm
 void thumb_add_or_subtract_register(void) {
-    uint32_t opc = (thumb_op >> 9) & 1;
-    uint32_t Rm = (thumb_op >> 6) & 7;
-    uint32_t Rn = (thumb_op >> 3) & 7;
-    uint32_t Rd = (thumb_op >> 0) & 7;
+    uint32_t opc = BIT(thumb_op, 9);
+    uint32_t Rm = BITS(thumb_op, 6, 8);
+    uint32_t Rn = BITS(thumb_op, 3, 5);
+    uint32_t Rd = BITS(thumb_op, 0, 2);
 
 #ifdef DEBUG
     if (log_instructions && log_thumb_instructions) {
@@ -75,10 +75,10 @@ void thumb_add_or_subtract_register(void) {
 // ADD Rd, Rn, #<3_bit_immediate>
 // SUB Rd, Rn, #<3_bit_immediate>
 void thumb_add_or_subtract_immediate(void) {
-    uint32_t opc = (thumb_op >> 9) & 1;
-    uint32_t imm = (thumb_op >> 6) & 7;
-    uint32_t Rn = (thumb_op >> 3) & 7;
-    uint32_t Rd = (thumb_op >> 0) & 7;
+    uint32_t opc = BIT(thumb_op, 9);
+    uint32_t imm = BITS(thumb_op, 6, 8);
+    uint32_t Rn = BITS(thumb_op, 3, 5);
+    uint32_t Rd = BITS(thumb_op, 0, 2);
 
 #ifdef DEBUG
     if (log_instructions && log_thumb_instructions) {
@@ -109,9 +109,9 @@ void thumb_add_or_subtract_immediate(void) {
 // ADD Rd, #<8_bit_immediate>
 // SUB Rd, #<8_bit_immediate>
 void thumb_add_subtract_compare_or_move_immediate(void) {
-    uint32_t opc = (thumb_op >> 11) & 3;
-    uint32_t Rdn = (thumb_op >> 8) & 7;
-    uint32_t imm = (thumb_op >> 0) & 0xff;
+    uint32_t opc = BITS(thumb_op, 11, 12);
+    uint32_t Rdn = BITS(thumb_op, 8, 10);
+    uint32_t imm = BITS(thumb_op, 0, 7);
 
 #ifdef DEBUG
     if (log_instructions && log_thumb_instructions) {
@@ -156,9 +156,9 @@ void thumb_add_subtract_compare_or_move_immediate(void) {
 // BIC Rd, Rm
 // MVN Rd, Rm
 void thumb_data_processing_register(void) {
-    uint32_t opc = (thumb_op >> 6) & 0xf;
-    uint32_t Rms = (thumb_op >> 3) & 7;
-    uint32_t Rdn = (thumb_op >> 0) & 7;
+    uint32_t opc = BITS(thumb_op, 6, 9);
+    uint32_t Rms = BITS(thumb_op, 3, 5);
+    uint32_t Rdn = BITS(thumb_op, 0, 2);
 
 #ifdef DEBUG
     if (log_instructions && log_thumb_instructions) {
@@ -220,9 +220,9 @@ void thumb_data_processing_register(void) {
 // CMP Rn, Rm
 // MOV Rd, Rm
 void thumb_special_data_processing(void) {
-    uint32_t opc = (thumb_op >> 8) & 3;
-    uint32_t Rm = (thumb_op >> 3) & 0xf;
-    uint32_t Rdn = ((thumb_op >> 7) & 1) << 3 | ((thumb_op >> 0) & 7);
+    uint32_t opc = BITS(thumb_op, 8, 9);
+    uint32_t Rm = BITS(thumb_op, 3, 6);
+    uint32_t Rdn = BIT(thumb_op, 7) << 3 | BITS(thumb_op, 0, 2);
 
 #ifdef DEBUG
     if (log_instructions && log_thumb_instructions) {
@@ -252,8 +252,8 @@ void thumb_special_data_processing(void) {
 
 // BX Rm
 void thumb_branch_and_exchange(void) {
-    bool L = (thumb_op >> 7) & 1;
-    uint32_t Rm = (thumb_op >> 3) & 0xf;
+    bool L = BIT(thumb_op, 7);
+    uint32_t Rm = BITS(thumb_op, 3, 6);
     uint32_t sbz = thumb_op & 7;
 
 #ifdef DEBUG
@@ -274,8 +274,8 @@ void thumb_branch_and_exchange(void) {
 
 // LDR Rd, [PC, #8_bit_offset]
 void thumb_load_from_literal_pool(void) {
-    uint32_t Rd = (thumb_op >> 8) & 7;
-    uint32_t imm = (thumb_op >> 0) & 0xff;
+    uint32_t Rd = BITS(thumb_op, 8, 10);
+    uint32_t imm = BITS(thumb_op, 0, 7);
 
 #ifdef DEBUG
     if (log_instructions && log_thumb_instructions) {
@@ -283,7 +283,7 @@ void thumb_load_from_literal_pool(void) {
         print_mnemonic("ldr");
         print_register(Rd);
         printf(",");
-        print_address((r[15] & ~3) + (imm << 2));
+        print_address((r[REG_PC] & ~3) + (imm << 2));
         printf("\n");
     }
 #endif
@@ -301,10 +301,10 @@ void thumb_load_from_literal_pool(void) {
 // LDRB Rd, [Rn, Rm]
 // LDRSH Rd, [Rn, Rm]
 void thumb_load_store_register(void) {
-    uint32_t opc = (thumb_op >> 9) & 7;
-    uint32_t Rm = (thumb_op >> 6) & 7;
-    uint32_t Rn = (thumb_op >> 3) & 7;
-    uint32_t Rd = (thumb_op >> 0) & 7;
+    uint32_t opc = BITS(thumb_op, 9, 11);
+    uint32_t Rm = BITS(thumb_op, 6, 8);
+    uint32_t Rn = BITS(thumb_op, 3, 5);
+    uint32_t Rd = BITS(thumb_op, 0, 2);
 
 #ifdef DEBUG
     if (log_instructions && log_thumb_instructions) {
@@ -353,11 +353,11 @@ void thumb_load_store_register(void) {
 // STRB Rd, [Rn, #5_bit_offset]
 // LDRB Rd, [Rn, #5_bit_offset]
 void thumb_load_store_word_or_byte_immediate(void) {
-    bool B = (thumb_op >> 12) & 1;
-    bool L = (thumb_op >> 11) & 1;
-    uint32_t imm = (thumb_op >> 6) & 0x1f;
-    uint32_t Rn = (thumb_op >> 3) & 7;
-    uint32_t Rd = (thumb_op >> 0) & 7;
+    bool B = BIT(thumb_op, 12);
+    bool L = BIT(thumb_op, 11);
+    uint32_t imm = BITS(thumb_op, 6, 10);
+    uint32_t Rn = BITS(thumb_op, 3, 5);
+    uint32_t Rd = BITS(thumb_op, 0, 2);
 
 #ifdef DEBUG
     if (log_instructions && log_thumb_instructions) {
@@ -391,10 +391,10 @@ void thumb_load_store_word_or_byte_immediate(void) {
 // STRH Rd, [Rn, #5_bit_offset]
 // LDRH Rd, [Rn, #5_bit_offset]
 void thumb_load_store_halfword_immediate(void) {
-    bool L = (thumb_op >> 11) & 1;
-    uint32_t imm = (thumb_op >> 6) & 0x1f;
-    uint32_t Rn = (thumb_op >> 3) & 7;
-    uint32_t Rd = (thumb_op >> 0) & 7;
+    bool L = BIT(thumb_op, 11);
+    uint32_t imm = BITS(thumb_op, 6, 10);
+    uint32_t Rn = BITS(thumb_op, 3, 5);
+    uint32_t Rd = BITS(thumb_op, 0, 2);
 
 #ifdef DEBUG
     if (log_instructions && log_thumb_instructions) {
@@ -409,7 +409,7 @@ void thumb_load_store_halfword_immediate(void) {
     }
 #endif
 
-    arm_op = COND_AL << 28 | Rn << 16 | Rd << 12 | (imm & 0x18) << 5 | 0xb << 4 | (imm & 7) << 1;
+    arm_op = COND_AL << 28 | Rn << 16 | Rd << 12 | BITS(imm, 3, 4) << 8 | 0xb << 4 | BITS(imm, 0, 2) << 1;
     if (L) {
         arm_op |= 0x1d << 20;
     } else {
@@ -421,9 +421,9 @@ void thumb_load_store_halfword_immediate(void) {
 // STR Rd, [SP, #8_bit_offset]
 // LDR Rd, [SP, #8_bit_offset]
 void thumb_load_store_to_or_from_stack(void) {
-    bool L = (thumb_op >> 11) & 1;
-    uint32_t Rd = (thumb_op >> 8) & 7;
-    uint32_t imm = (thumb_op >> 0) & 0xff;
+    bool L = BIT(thumb_op, 11);
+    uint32_t Rd = BITS(thumb_op, 8, 10);
+    uint32_t imm = BITS(thumb_op, 0, 7);
 
 #ifdef DEBUG
     if (log_instructions && log_thumb_instructions) {
@@ -450,9 +450,9 @@ void thumb_load_store_to_or_from_stack(void) {
 // ADD Rd, PC, #<8_bit_immediate>
 // ADD Rd, SP, #<8_bit_immediate>
 void thumb_add_to_sp_or_pc(void) {
-    bool SP = (thumb_op >> 11) & 1;
-    uint32_t Rd = (thumb_op >> 8) & 7;
-    uint32_t imm = (thumb_op >> 0) & 0xff;
+    bool SP = BIT(thumb_op, 11);
+    uint32_t Rd = BITS(thumb_op, 8, 10);
+    uint32_t imm = BITS(thumb_op, 0, 7);
 
 #ifdef DEBUG
     if (log_instructions && log_thumb_instructions) {
@@ -479,8 +479,8 @@ void thumb_add_to_sp_or_pc(void) {
 // ADD SP, SP, #<7_bit_immediate>
 // SUB SP, SP, #<7_bit_immediate>
 void thumb_adjust_stack_pointer(void) {
-    uint32_t opc = (thumb_op >> 7) & 1;
-    uint32_t imm = (thumb_op >> 0) & 0x7f;
+    uint32_t opc = BIT(thumb_op, 7);
+    uint32_t imm = BITS(thumb_op, 0, 6);
     uint32_t sbz = thumb_op & 0xb00;
 
 #ifdef DEBUG
@@ -508,9 +508,9 @@ void thumb_adjust_stack_pointer(void) {
 // PUSH {<register_list>, <LR>}
 // POP {<register_list>, <PC>}
 void thumb_push_or_pop_register_list(void) {
-    bool L = (thumb_op >> 11) & 1;
-    bool R = (thumb_op >> 8) & 1;
-    uint32_t rlist = (thumb_op >> 0) & 0xff;
+    bool L = BIT(thumb_op, 11);
+    bool R = BIT(thumb_op, 8);
+    uint32_t rlist = BITS(thumb_op, 0, 7);
     uint32_t sbz = thumb_op & 0x200;
 
 #ifdef DEBUG
@@ -543,9 +543,9 @@ void thumb_push_or_pop_register_list(void) {
 // STMIA Rn!, {<register_list>}
 // LDMIA Rn!, {<register_list>}
 void thumb_load_store_multiple(void) {
-    bool L = (thumb_op >> 11) & 1;
-    uint32_t Rn = (thumb_op >> 8) & 7;
-    uint32_t rlist = (thumb_op >> 0) & 0xff;
+    bool L = BIT(thumb_op, 11);
+    uint32_t Rn = BITS(thumb_op, 8, 10);
+    uint32_t rlist = BITS(thumb_op, 0, 7);
 
 #ifdef DEBUG
     if (log_instructions && log_thumb_instructions) {
@@ -569,9 +569,9 @@ void thumb_load_store_multiple(void) {
 
 // B<cond> <target_address>
 void thumb_conditional_branch(void) {
-    uint32_t cond = (thumb_op >> 8) & 0xf;
-    uint32_t imm = (thumb_op >> 0) & 0xff;
-    if (imm & 0x80) imm |= ~0xff;
+    uint32_t cond = BITS(thumb_op, 8, 11);
+    uint32_t imm = BITS(thumb_op, 0, 7);
+    ZERO_EXTEND(imm, 7);
 
 #ifdef DEBUG
     if (log_instructions && log_thumb_instructions) {
@@ -592,20 +592,20 @@ void thumb_conditional_branch(void) {
             case COND_GT: print_mnemonic("bgt"); break;
             case COND_LE: print_mnemonic("ble"); break;
         }
-        print_address(r[15] + (imm << 1));
+        print_address(r[REG_PC] + (imm << 1));
         printf("\n");
     }
 #endif
 
     if (condition_passed(cond)) {
-        r[15] += imm << 1;
+        r[REG_PC] += imm << 1;
         branch_taken = true;
     }
 }
 
 // SWI <8_bit_immediate>
 void thumb_software_interrupt(void) {
-    uint32_t imm = (thumb_op >> 0) & 0xff;
+    uint32_t imm = BITS(thumb_op, 0, 7);
 
 #ifdef DEBUG
     if (log_instructions && log_thumb_instructions) {
@@ -622,26 +622,26 @@ void thumb_software_interrupt(void) {
 
 // B <target_address>
 void thumb_unconditional_branch(void) {
-    uint32_t imm = (thumb_op >> 0) & 0x7ff;
-    if (imm & 0x400) imm |= ~0x7ff;
+    uint32_t imm = BITS(thumb_op, 0, 10);
+    ZERO_EXTEND(imm, 10);
 
 #ifdef DEBUG
     if (log_instructions && log_thumb_instructions) {
         thumb_print_opcode();
         print_mnemonic("b");
-        print_address(r[15] + (imm << 1));
+        print_address(r[REG_PC] + (imm << 1));
         printf("\n");
     }
 #endif
 
-    r[15] += imm << 1;
+    r[REG_PC] += imm << 1;
     branch_taken = true;
 }
 
 // BL <target_address>
 void thumb_branch_with_link_prefix(void) {
-    uint32_t imm = (thumb_op >> 0) & 0x7ff;
-    if (imm & 0x400) imm |= ~0x7ff;
+    uint32_t imm = BITS(thumb_op, 0, 10);
+    ZERO_EXTEND(imm, 10);
 
 #ifdef DEBUG
     if (log_instructions && log_thumb_instructions) {
@@ -651,13 +651,13 @@ void thumb_branch_with_link_prefix(void) {
     }
 #endif
 
-    r[14] = r[15] + (imm << 12);
+    r[REG_LR] = r[REG_PC] + (imm << 12);
 }
 
 // BL <target_address>
 void thumb_branch_with_link_suffix(void) {
-    uint32_t imm = (thumb_op >> 0) & 0x7ff;
-    uint32_t target_address = r[14] + (imm << 1);
+    uint32_t imm = BITS(thumb_op, 0, 10);
+    uint32_t target_address = r[REG_LR] + (imm << 1);
 
 #ifdef DEBUG
     if (log_instructions && log_thumb_instructions) {
@@ -668,7 +668,7 @@ void thumb_branch_with_link_suffix(void) {
     }
 #endif
 
-    r[14] = (r[15] - 2) | 1;
-    r[15] = target_address;
+    r[REG_LR] = (r[REG_PC] - 2) | 1;
+    r[REG_PC] = target_address;
     branch_taken = true;
 }

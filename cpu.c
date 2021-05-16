@@ -42,7 +42,7 @@ void arm_init(void) {
         r[15] = 0x08000000;
         cpsr = PSR_MODE_SYS;
     } else {
-        r[15] = PC_RESET;
+        r[15] = VEC_RESET;
         cpsr = PSR_I | PSR_F | PSR_MODE_SVC;
     }
 }
@@ -406,7 +406,7 @@ void arm_hardware_interrupt(void) {
     r14_irq = r[15] - (T ? 2 : 4);  // | (T ? 1 : 0); FIXME?
     spsr_irq = cpsr;
     write_cpsr((cpsr & ~(PSR_T | PSR_MODE)) | PSR_I | PSR_MODE_IRQ);
-    r[15] = PC_IRQ;
+    r[15] = VEC_IRQ;
     branch_taken = true;
     halted = false;
 }

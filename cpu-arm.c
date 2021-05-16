@@ -526,7 +526,7 @@ void arm_software_interrupt(void) {
     r14_svc = r[15] - (T ? 2 : 4);
     spsr_svc = cpsr;
     write_cpsr((cpsr & ~(PSR_T | PSR_MODE)) | PSR_I | PSR_MODE_SVC);
-    r[15] = PC_SWI;
+    r[15] = VEC_SWI;
     branch_taken = true;
 }
 

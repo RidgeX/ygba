@@ -1,3 +1,7 @@
+#define BIT(x, i) (((x) >> (i)) & 1)
+#define BITS(x, i, j) (((x) >> (i)) & ((1 << ((j) - (i) + 1)) - 1))
+#define ZERO_EXTEND(x, i) if ((x) & (1 << (i))) { (x) |= ~((1 << ((i) + 1)) - 1); }
+
 #define ARM_AND 0
 #define ARM_EOR 1
 #define ARM_SUB 2
@@ -31,14 +35,6 @@
 #define COND_LE 0xd
 #define COND_AL 0xe
 #define COND_NV 0xf
-
-#define PC_RESET          0
-#define PC_UNDEF          4
-#define PC_SWI            8
-#define PC_ABORT_PREFETCH 0xc
-#define PC_ABORT_DATA     0x10
-#define PC_IRQ            0x18
-#define PC_FIQ            0x1c
 
 #define PSR_N    (1 << 31)
 #define PSR_Z    (1 << 30)
@@ -82,6 +78,14 @@
 #define THUMB_MUL 0xd
 #define THUMB_BIC 0xe
 #define THUMB_MVN 0xf
+
+#define VEC_RESET          0
+#define VEC_UNDEF          4
+#define VEC_SWI            8
+#define VEC_ABORT_PREFETCH 0xc
+#define VEC_ABORT_DATA     0x10
+#define VEC_IRQ            0x18
+#define VEC_FIQ            0x1c
 
 extern bool log_instructions;
 extern bool log_arm_instructions;
