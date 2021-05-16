@@ -288,61 +288,6 @@ void arm_data_processing_immediate(void) {
     }
 }
 
-void arm_load_store_word_or_byte_immediate(void) {
-    bool P = BIT(arm_op, 24);
-    bool U = BIT(arm_op, 23);
-    bool B = BIT(arm_op, 22);
-    bool W = BIT(arm_op, 21);
-    bool L = BIT(arm_op, 20);
-    uint32_t Rn = BITS(arm_op, 16, 19);
-    uint32_t Rd = BITS(arm_op, 12, 15);
-    uint32_t imm = BITS(arm_op, 0, 11);
-
-#ifdef DEBUG
-    if (log_instructions) {
-        arm_print_opcode();
-        if (L) {
-            print_mnemonic(B ? "ldrb" : "ldr");
-        } else {
-            print_mnemonic(B ? "strb" : "str");
-        }
-        print_register(Rd);
-        printf(",[");
-        print_register(Rn);
-        printf(P ? "," : "],");
-        if (!U) printf("-");
-        print_immediate(imm);
-        if (P) printf("]");
-        if (W) printf("!");
-        printf("\n");
-    }
-#endif
-
-    uint32_t n = r[Rn];
-    if (Rn == REG_PC) n &= ~3;
-    if (P) n += (U ? imm : -imm);
-    if (L) {
-        if (B) {
-            r[Rd] = memory_read_byte(n);
-        } else {
-            r[Rd] = align_word(n, memory_read_word(n));
-        }
-        if (Rd == REG_PC) branch_taken = true;
-    } else {
-        if (B) {
-            memory_write_byte(n, (uint8_t) r[Rd]);
-        } else {
-            if (Rd == REG_PC) {
-                memory_write_word(n, r[Rd] + 4);
-            } else {
-                memory_write_word(n, r[Rd]);
-            }
-        }
-    }
-    if (!P) n += (U ? imm : -imm);
-    if (((P && W) || !P) && !(L && Rd == Rn)) r[Rn] = n;
-}
-
 void arm_load_store_word_or_byte_register(void) {
     bool P = BIT(arm_op, 24);
     bool U = BIT(arm_op, 23);
@@ -399,6 +344,61 @@ void arm_load_store_word_or_byte_register(void) {
         }
     }
     if (!P) n += (U ? m : -m);
+    if (((P && W) || !P) && !(L && Rd == Rn)) r[Rn] = n;
+}
+
+void arm_load_store_word_or_byte_immediate(void) {
+    bool P = BIT(arm_op, 24);
+    bool U = BIT(arm_op, 23);
+    bool B = BIT(arm_op, 22);
+    bool W = BIT(arm_op, 21);
+    bool L = BIT(arm_op, 20);
+    uint32_t Rn = BITS(arm_op, 16, 19);
+    uint32_t Rd = BITS(arm_op, 12, 15);
+    uint32_t imm = BITS(arm_op, 0, 11);
+
+#ifdef DEBUG
+    if (log_instructions) {
+        arm_print_opcode();
+        if (L) {
+            print_mnemonic(B ? "ldrb" : "ldr");
+        } else {
+            print_mnemonic(B ? "strb" : "str");
+        }
+        print_register(Rd);
+        printf(",[");
+        print_register(Rn);
+        printf(P ? "," : "],");
+        if (!U) printf("-");
+        print_immediate(imm);
+        if (P) printf("]");
+        if (W) printf("!");
+        printf("\n");
+    }
+#endif
+
+    uint32_t n = r[Rn];
+    if (Rn == REG_PC) n &= ~3;
+    if (P) n += (U ? imm : -imm);
+    if (L) {
+        if (B) {
+            r[Rd] = memory_read_byte(n);
+        } else {
+            r[Rd] = align_word(n, memory_read_word(n));
+        }
+        if (Rd == REG_PC) branch_taken = true;
+    } else {
+        if (B) {
+            memory_write_byte(n, (uint8_t) r[Rd]);
+        } else {
+            if (Rd == REG_PC) {
+                memory_write_word(n, r[Rd] + 4);
+            } else {
+                memory_write_word(n, r[Rd]);
+            }
+        }
+    }
+    if (!P) n += (U ? imm : -imm);
     if (((P && W) || !P) && !(L && Rd == Rn)) r[Rn] = n;
 }
 

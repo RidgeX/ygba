@@ -154,8 +154,8 @@ bool thumb_print_rlist(uint32_t rlist);
 // cpu-arm.c
 void arm_data_processing_register(void);
 void arm_data_processing_immediate(void);
-void arm_load_store_word_or_byte_immediate(void);
 void arm_load_store_word_or_byte_register(void);
+void arm_load_store_word_or_byte_immediate(void);
 void arm_load_store_multiple(void);
 void arm_branch(void);
 void arm_software_interrupt(void);
