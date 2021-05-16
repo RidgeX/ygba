@@ -12,6 +12,7 @@
 #define ASSIGN_Z(x) if ((x)) { cpsr |= PSR_Z; } else { cpsr &= ~PSR_Z; }
 #define ASSIGN_C(x) if ((x)) { cpsr |= PSR_C; } else { cpsr &= ~PSR_C; }
 #define ASSIGN_V(x) if ((x)) { cpsr |= PSR_V; } else { cpsr &= ~PSR_V; }
+#define ASSIGN_T(x) if ((x)) { cpsr |= PSR_T; } else { cpsr &= ~PSR_T; }
 
 #define CLEAR_C() cpsr &= ~PSR_C
 
