@@ -140,15 +140,15 @@ static void arm_shifter_flags(uint32_t shop, uint32_t s, uint32_t Rm) {
 // BIC{S}
 // MVN{S}
 void arm_data_processing_register(void) {
-    uint32_t opc = (arm_op >> 21) & 0xf;
-    bool S = (arm_op >> 20) & 1;
-    uint32_t Rn = (arm_op >> 16) & 0xf;
-    uint32_t Rd = (arm_op >> 12) & 0xf;
-    uint32_t Rs = (arm_op >> 8) & 0xf;
-    uint32_t shamt = (arm_op >> 7) & 0x1f;
-    uint32_t shop = (arm_op >> 5) & 3;
-    bool shreg = (arm_op >> 4) & 1;
-    uint32_t Rm = (arm_op >> 0) & 0xf;
+    uint32_t opc = BITS(arm_op, 21, 24);
+    bool S = BIT(arm_op, 20);
+    uint32_t Rn = BITS(arm_op, 16, 19);
+    uint32_t Rd = BITS(arm_op, 12, 15);
+    uint32_t Rs = BITS(arm_op, 8, 11);
+    uint32_t shamt = BITS(arm_op, 7, 11);
+    uint32_t shop = BITS(arm_op, 5, 6);
+    bool shreg = BIT(arm_op, 4);
+    uint32_t Rm = BITS(arm_op, 0, 3);
 
     bool is_test_or_compare = (opc == ARM_TST || opc == ARM_TEQ || opc == ARM_CMP || opc == ARM_CMN);
     bool is_move = (opc == ARM_MOV || opc == ARM_MVN);
@@ -224,12 +224,12 @@ void arm_data_processing_register(void) {
 }
 
 void arm_data_processing_immediate(void) {
-    uint32_t opc = (arm_op >> 21) & 0xf;
-    bool S = (arm_op >> 20) & 1;
-    uint32_t Rn = (arm_op >> 16) & 0xf;
-    uint32_t Rd = (arm_op >> 12) & 0xf;
-    uint32_t rot = (arm_op >> 8) & 0xf;
-    uint32_t imm_unrotated = arm_op & 0xff;
+    uint32_t opc = BITS(arm_op, 21, 24);
+    bool S = BIT(arm_op, 20);
+    uint32_t Rn = BITS(arm_op, 16, 19);
+    uint32_t Rd = BITS(arm_op, 12, 15);
+    uint32_t rot = BITS(arm_op, 8, 11);
+    uint32_t imm_unrotated = BITS(arm_op, 0, 7);
     uint64_t imm = ror(imm_unrotated, 2 * rot);
 
     bool is_test_or_compare = (opc == ARM_TST || opc == ARM_TEQ || opc == ARM_CMP || opc == ARM_CMN);
@@ -298,14 +298,14 @@ void arm_data_processing_immediate(void) {
 }
 
 void arm_load_store_word_or_byte_immediate(void) {
-    bool P = (arm_op >> 24) & 1;
-    bool U = (arm_op >> 23) & 1;
-    bool B = (arm_op >> 22) & 1;
-    bool W = (arm_op >> 21) & 1;
-    bool L = (arm_op >> 20) & 1;
-    uint32_t Rn = (arm_op >> 16) & 0xf;
-    uint32_t Rd = (arm_op >> 12) & 0xf;
-    uint32_t imm = arm_op & 0xfff;
+    bool P = BIT(arm_op, 24);
+    bool U = BIT(arm_op, 23);
+    bool B = BIT(arm_op, 22);
+    bool W = BIT(arm_op, 21);
+    bool L = BIT(arm_op, 20);
+    uint32_t Rn = BITS(arm_op, 16, 19);
+    uint32_t Rd = BITS(arm_op, 12, 15);
+    uint32_t imm = BITS(arm_op, 0, 11);
 
 #ifdef DEBUG
     if (log_instructions) {
@@ -353,16 +353,16 @@ void arm_load_store_word_or_byte_immediate(void) {
 }
 
 void arm_load_store_word_or_byte_register(void) {
-    bool P = (arm_op >> 24) & 1;
-    bool U = (arm_op >> 23) & 1;
-    bool B = (arm_op >> 22) & 1;
-    bool W = (arm_op >> 21) & 1;
-    bool L = (arm_op >> 20) & 1;
-    uint32_t Rn = (arm_op >> 16) & 0xf;
-    uint32_t Rd = (arm_op >> 12) & 0xf;
-    uint32_t shamt = (arm_op >> 7) & 0x1f;
-    uint32_t shop = (arm_op >> 5) & 3;
-    uint32_t Rm = arm_op & 0xf;
+    bool P = BIT(arm_op, 24);
+    bool U = BIT(arm_op, 23);
+    bool B = BIT(arm_op, 22);
+    bool W = BIT(arm_op, 21);
+    bool L = BIT(arm_op, 20);
+    uint32_t Rn = BITS(arm_op, 16, 19);
+    uint32_t Rd = BITS(arm_op, 12, 15);
+    uint32_t shamt = BITS(arm_op, 7, 11);
+    uint32_t shop = BITS(arm_op, 5, 6);
+    uint32_t Rm = BITS(arm_op, 0, 3);
 
 #ifdef DEBUG
     if (log_instructions) {
@@ -385,7 +385,7 @@ void arm_load_store_word_or_byte_register(void) {
     }
 #endif
 
-    assert((arm_op & (1 << 4)) == 0);
+    assert(BIT(arm_op, 4) == 0);
 
     if ((shop == SHIFT_LSR || shop == SHIFT_ASR) && shamt == 0) shamt = 32;
     uint32_t m = arm_shifter_op(r[Rm], shamt, shop, shamt, false, false);
@@ -412,13 +412,13 @@ void arm_load_store_word_or_byte_register(void) {
 }
 
 void arm_load_store_multiple(void) {
-    bool P = (arm_op >> 24) & 1;
-    bool U = (arm_op >> 23) & 1;
-    bool S = (arm_op >> 22) & 1;
-    bool W = (arm_op >> 21) & 1;
-    bool L = (arm_op >> 20) & 1;
-    uint32_t Rn = (arm_op >> 16) & 0xf;
-    uint32_t rlist = arm_op & 0xffff;
+    bool P = BIT(arm_op, 24);
+    bool U = BIT(arm_op, 23);
+    bool S = BIT(arm_op, 22);
+    bool W = BIT(arm_op, 21);
+    bool L = BIT(arm_op, 20);
+    uint32_t Rn = BITS(arm_op, 16, 19);
+    uint32_t rlist = BITS(arm_op, 0, 15);
 
 #ifdef DEBUG
     if (log_instructions && log_arm_instructions) {
@@ -494,21 +494,21 @@ void arm_load_store_multiple(void) {
 }
 
 void arm_branch(void) {
-    bool L = (arm_op >> 24) & 1;
-    uint32_t imm = arm_op & 0xffffff;
-    if (arm_op & 0x800000) imm |= ~0xffffff;
+    bool L = BIT(arm_op, 24);
+    uint32_t imm = BITS(arm_op, 0, 23);
+    ZERO_EXTEND(imm, 23);
 
 #ifdef DEBUG
     if (log_instructions && log_arm_instructions) {
         arm_print_opcode();
         print_mnemonic(L ? "bl" : "b");
-        print_address(r[15] + (imm << 2));
+        print_address(r[REG_PC] + (imm << 2));
         printf("\n");
     }
 #endif
 
-    if (L) r[14] = r[15] - 4;
-    r[15] += imm << 2;
+    if (L) r[REG_LR] = r[REG_PC] - 4;
+    r[REG_PC] += imm << 2;
     branch_taken = true;
 }
 
@@ -517,26 +517,26 @@ void arm_software_interrupt(void) {
     if (log_instructions && log_arm_instructions) {
         arm_print_opcode();
         print_mnemonic("swi");
-        print_address(arm_op & 0xffffff);
+        print_address(BITS(arm_op, 0, 23));
         printf("\n");
     }
 #endif
 
     bool T = (cpsr & PSR_T) != 0;
-    r14_svc = r[15] - (T ? 2 : 4);
+    r14_svc = r[REG_PC] - (T ? 2 : 4);
     spsr_svc = cpsr;
     write_cpsr((cpsr & ~(PSR_T | PSR_MODE)) | PSR_I | PSR_MODE_SVC);
-    r[15] = VEC_SWI;
+    r[REG_PC] = VEC_SWI;
     branch_taken = true;
 }
 
 void arm_multiply(void) {
-    bool A = (arm_op >> 21) & 1;
-    bool S = (arm_op >> 20) & 1;
-    uint32_t Rd = (arm_op >> 16) & 0xf;
-    uint32_t Rn = (arm_op >> 12) & 0xf;
-    uint32_t Rs = (arm_op >> 8) & 0xf;
-    uint32_t Rm = arm_op & 0xf;
+    bool A = BIT(arm_op, 21);
+    bool S = BIT(arm_op, 20);
+    uint32_t Rd = BITS(arm_op, 16, 19);
+    uint32_t Rn = BITS(arm_op, 12, 15);
+    uint32_t Rs = BITS(arm_op, 8, 11);
+    uint32_t Rm = BITS(arm_op, 0, 3);
 
 #ifdef DEBUG
     if (log_instructions && log_arm_instructions) {
@@ -573,13 +573,13 @@ void arm_multiply(void) {
 }
 
 void arm_multiply_long(void) {
-    bool U = (arm_op >> 22) & 1;
-    bool A = (arm_op >> 21) & 1;
-    bool S = (arm_op >> 20) & 1;
-    uint32_t RdHi = (arm_op >> 16) & 0xf;
-    uint32_t RdLo = (arm_op >> 12) & 0xf;
-    uint32_t Rs = (arm_op >> 8) & 0xf;
-    uint32_t Rm = arm_op & 0xf;
+    bool U = BIT(arm_op, 22);
+    bool A = BIT(arm_op, 21);
+    bool S = BIT(arm_op, 20);
+    uint32_t RdHi = BITS(arm_op, 16, 19);
+    uint32_t RdLo = BITS(arm_op, 12, 15);
+    uint32_t Rs = BITS(arm_op, 8, 11);
+    uint32_t Rm = BITS(arm_op, 0, 3);
 
 #ifdef DEBUG
     if (log_instructions && log_arm_instructions) {
@@ -629,16 +629,16 @@ void arm_multiply_long(void) {
 }
 
 void arm_load_store_halfword_register(void) {
-    bool P = (arm_op >> 24) & 1;
-    bool U = (arm_op >> 23) & 1;
-    bool I = (arm_op >> 22) & 1;
-    bool W = (arm_op >> 21) & 1;
-    bool L = (arm_op >> 20) & 1;
-    uint32_t Rn = (arm_op >> 16) & 0xf;
-    uint32_t Rd = (arm_op >> 12) & 0xf;
-    uint32_t sbz = (arm_op >> 8) & 0xf;
-    uint32_t opc = (arm_op >> 4) & 0xf;
-    uint32_t Rm = arm_op & 0xf;
+    bool P = BIT(arm_op, 24);
+    bool U = BIT(arm_op, 23);
+    bool I = BIT(arm_op, 22);
+    bool W = BIT(arm_op, 21);
+    bool L = BIT(arm_op, 20);
+    uint32_t Rn = BITS(arm_op, 16, 19);
+    uint32_t Rd = BITS(arm_op, 12, 15);
+    uint32_t sbz = BITS(arm_op, 8, 11);
+    uint32_t opc = BITS(arm_op, 4, 7);
+    uint32_t Rm = BITS(arm_op, 0, 3);
 
 #ifdef DEBUG
     if (log_instructions && log_arm_instructions) {
@@ -675,15 +675,15 @@ void arm_load_store_halfword_register(void) {
 }
 
 void arm_load_store_halfword_immediate(void) {
-    bool P = (arm_op >> 24) & 1;
-    bool U = (arm_op >> 23) & 1;
-    bool I = (arm_op >> 22) & 1;
-    bool W = (arm_op >> 21) & 1;
-    bool L = (arm_op >> 20) & 1;
-    uint32_t Rn = (arm_op >> 16) & 0xf;
-    uint32_t Rd = (arm_op >> 12) & 0xf;
-    uint32_t imm = (arm_op & 0xf) | ((arm_op >> 4) & 0xf0);
-    uint32_t opc = (arm_op >> 4) & 0xf;
+    bool P = BIT(arm_op, 24);
+    bool U = BIT(arm_op, 23);
+    bool I = BIT(arm_op, 22);
+    bool W = BIT(arm_op, 21);
+    bool L = BIT(arm_op, 20);
+    uint32_t Rn = BITS(arm_op, 16, 19);
+    uint32_t Rd = BITS(arm_op, 12, 15);
+    uint32_t opc = BITS(arm_op, 4, 7);
+    uint32_t imm = BITS(arm_op, 8, 11) << 4 | BITS(arm_op, 0, 3);
 
 #ifdef DEBUG
     if (log_instructions && log_arm_instructions) {
@@ -718,16 +718,16 @@ void arm_load_store_halfword_immediate(void) {
 }
 
 void arm_load_signed_halfword_or_signed_byte_register(void) {
-    bool P = (arm_op >> 24) & 1;
-    bool U = (arm_op >> 23) & 1;
-    bool I = (arm_op >> 22) & 1;
-    bool W = (arm_op >> 21) & 1;
-    bool L = (arm_op >> 20) & 1;
-    uint32_t Rn = (arm_op >> 16) & 0xf;
-    uint32_t Rd = (arm_op >> 12) & 0xf;
-    uint32_t sbz = (arm_op >> 8) & 0xf;
-    uint32_t opc = (arm_op >> 4) & 0xf;
-    uint32_t Rm = arm_op & 0xf;
+    bool P = BIT(arm_op, 24);
+    bool U = BIT(arm_op, 23);
+    bool I = BIT(arm_op, 22);
+    bool W = BIT(arm_op, 21);
+    bool L = BIT(arm_op, 20);
+    uint32_t Rn = BITS(arm_op, 16, 19);
+    uint32_t Rd = BITS(arm_op, 12, 15);
+    uint32_t sbz = BITS(arm_op, 8, 11);
+    uint32_t opc = BITS(arm_op, 4, 7);
+    uint32_t Rm = BITS(arm_op, 0, 3);
 
 #ifdef DEBUG
     if (log_instructions && log_arm_instructions) {
@@ -779,15 +779,15 @@ void arm_load_signed_halfword_or_signed_byte_register(void) {
 }
 
 void arm_load_signed_halfword_or_signed_byte_immediate(void) {
-    bool P = (arm_op >> 24) & 1;
-    bool U = (arm_op >> 23) & 1;
-    bool I = (arm_op >> 22) & 1;
-    bool W = (arm_op >> 21) & 1;
-    bool L = (arm_op >> 20) & 1;
-    uint32_t Rn = (arm_op >> 16) & 0xf;
-    uint32_t Rd = (arm_op >> 12) & 0xf;
-    uint32_t imm = (arm_op & 0xf) | ((arm_op >> 4) & 0xf0);
-    uint32_t opc = (arm_op >> 4) & 0xf;
+    bool P = BIT(arm_op, 24);
+    bool U = BIT(arm_op, 23);
+    bool I = BIT(arm_op, 22);
+    bool W = BIT(arm_op, 21);
+    bool L = BIT(arm_op, 20);
+    uint32_t Rn = BITS(arm_op, 16, 19);
+    uint32_t Rd = BITS(arm_op, 12, 15);
+    uint32_t opc = BITS(arm_op, 4, 7);
+    uint32_t imm = BITS(arm_op, 8, 11) << 4 | BITS(arm_op, 0, 3);
 
 #ifdef DEBUG
     if (log_instructions && log_arm_instructions) {
@@ -837,11 +837,12 @@ void arm_load_signed_halfword_or_signed_byte_immediate(void) {
 }
 
 void arm_special_data_processing_register(void) {
-    bool R = (arm_op >> 22) & 1;
-    bool b21 = (arm_op >> 21) & 1;
-    uint32_t mask_type = (arm_op >> 16) & 0xf;
-    uint32_t Rd = (arm_op >> 12) & 0xf;
-    uint32_t Rm = arm_op & 0xf;
+    bool R = BIT(arm_op, 22);
+    bool b21 = BIT(arm_op, 21);
+    uint32_t mask_type = BITS(arm_op, 16, 19);
+    uint32_t Rd = BITS(arm_op, 12, 15);
+    uint32_t Rm = BITS(arm_op, 0, 3);
+    uint32_t sbz = BITS(arm_op, 4, 11);
 
 #ifdef DEBUG
     if (log_instructions && log_arm_instructions) {
@@ -869,10 +870,10 @@ void arm_special_data_processing_register(void) {
 
     if (b21) {
         assert(Rd == 0xf);
-        assert((arm_op & 0xff0) == 0);
+        assert(sbz == 0);
     } else {
         assert(mask_type == 0xf);
-        assert((arm_op & 0xfff) == 0);
+        assert(sbz == 0 && Rm == 0);
     }
 
     if (b21) {
@@ -898,11 +899,11 @@ void arm_special_data_processing_register(void) {
 }
 
 void arm_special_data_processing_immediate(void) {
-    bool R = (arm_op >> 22) & 1;
-    uint32_t mask_type = (arm_op >> 16) & 0xf;
-    uint32_t sbo = (arm_op >> 12) & 0xf;
-    uint32_t rot = (arm_op >> 8) & 0xf;
-    uint32_t imm = ror(arm_op & 0xff, 2 * rot);
+    bool R = BIT(arm_op, 22);
+    uint32_t mask_type = BITS(arm_op, 16, 19);
+    uint32_t sbo = BITS(arm_op, 12, 15);
+    uint32_t rot = BITS(arm_op, 8, 11);
+    uint32_t imm = ror(BITS(arm_op, 0, 7), 2 * rot);
 
 #ifdef DEBUG
     if (log_instructions && log_arm_instructions) {
@@ -940,11 +941,11 @@ void arm_special_data_processing_immediate(void) {
 }
 
 void arm_swap(void) {
-    bool B = (arm_op >> 22) & 1;
-    uint32_t Rn = (arm_op >> 16) & 0xf;
-    uint32_t Rd = (arm_op >> 12) & 0xf;
-    uint32_t sbz = (arm_op >> 8) & 0xf;
-    uint32_t Rm = arm_op & 0xf;
+    bool B = BIT(arm_op, 22);
+    uint32_t Rn = BITS(arm_op, 16, 19);
+    uint32_t Rd = BITS(arm_op, 12, 15);
+    uint32_t sbz = BITS(arm_op, 8, 11);
+    uint32_t Rm = BITS(arm_op, 0, 3);
 
 #ifdef DEBUG
     if (log_instructions && log_arm_instructions) {
@@ -974,8 +975,8 @@ void arm_swap(void) {
 }
 
 void arm_branch_and_exchange(void) {
-    uint32_t sbo = (arm_op >> 8) & 0xfff;
-    uint32_t Rm = arm_op & 0xf;
+    uint32_t sbo = BITS(arm_op, 8, 19);
+    uint32_t Rm = BITS(arm_op, 0, 3);
 
 #ifdef DEBUG
     if (log_instructions && log_arm_instructions) {
@@ -993,6 +994,6 @@ void arm_branch_and_exchange(void) {
     }
 
     if ((r[Rm] & 1) != 0) { cpsr |= PSR_T; } else { cpsr &= ~PSR_T; }
-    r[15] = r[Rm] & ~1;
+    r[REG_PC] = r[Rm] & ~1;
     branch_taken = true;
 }

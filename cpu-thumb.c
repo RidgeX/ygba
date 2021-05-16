@@ -254,7 +254,7 @@ void thumb_special_data_processing(void) {
 void thumb_branch_and_exchange(void) {
     bool L = BIT(thumb_op, 7);
     uint32_t Rm = BITS(thumb_op, 3, 6);
-    uint32_t sbz = thumb_op & 7;
+    uint32_t sbz = BITS(thumb_op, 0, 2);
 
 #ifdef DEBUG
     if (log_instructions && log_thumb_instructions) {
@@ -481,7 +481,7 @@ void thumb_add_to_sp_or_pc(void) {
 void thumb_adjust_stack_pointer(void) {
     uint32_t opc = BIT(thumb_op, 7);
     uint32_t imm = BITS(thumb_op, 0, 6);
-    uint32_t sbz = thumb_op & 0xb00;
+    uint32_t sbz = BITS(thumb_op, 8, 11) & 0xb;
 
 #ifdef DEBUG
     if (log_instructions && log_thumb_instructions) {
@@ -511,7 +511,7 @@ void thumb_push_or_pop_register_list(void) {
     bool L = BIT(thumb_op, 11);
     bool R = BIT(thumb_op, 8);
     uint32_t rlist = BITS(thumb_op, 0, 7);
-    uint32_t sbz = thumb_op & 0x200;
+    uint32_t sbz = BIT(thumb_op, 9);
 
 #ifdef DEBUG
     if (log_instructions && log_thumb_instructions) {
