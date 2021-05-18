@@ -716,7 +716,7 @@ Uint32 rgb555(uint32_t pixel) {
 }
 
 void gba_draw_blank(int y) {
-    Uint32 clear_color = rgb555(0x7fff);
+    Uint32 clear_color = rgb555(0);
 
     Uint32 *pixels;
     int pitch;
@@ -787,11 +787,11 @@ void gba_draw_tiled_bg(uint32_t mode, int bg, int y, uint32_t tile_base, uint32_
             uint8_t pixel_indexes = tile[offset];
             uint8_t pixel_index_0 = (pixel_indexes >> (hflip ? 4 : 0)) & 0xf;
             uint8_t pixel_index_1 = (pixel_indexes >> (hflip ? 0 : 4)) & 0xf;
-            if (true) { //pixel_index_0 != 0) {
+            if (pixel_index_0 != 0) {
                 uint16_t pixel_0 = *(uint16_t *)&palette_ram[palette_no * 32 + pixel_index_0 * 2];
                 gba_draw_tiled_final(pixels, pitch, (x / 8) * 8 + i, y/*, h, v*/, pixel_0);
             }
-            if (true) { //pixel_index_1 != 0) {
+            if (pixel_index_1 != 0) {
                 uint16_t pixel_1 = *(uint16_t *)&palette_ram[palette_no * 32 + pixel_index_1 * 2];
                 gba_draw_tiled_final(pixels, pitch, (x / 8) * 8 + i + 1, y/*, h, v*/, pixel_1);
             }
