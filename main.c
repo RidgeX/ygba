@@ -17,10 +17,11 @@ uint64_t start_logging_at = 0;
 //uint64_t end_logging_at = 200000;
 uint32_t ppu_cycles = 0;
 uint32_t timer_cycles = 0;
-//bool interrupt_raised = false;
 uint32_t last_bios_access = 0xe4;
 bool skip_bios = true;
+//bool has_eeprom = false;
 bool has_flash = false;
+//bool has_rtc = false;
 bool has_sram = false;
 
 #define SCREEN_WIDTH  240
@@ -133,6 +134,20 @@ uint8_t save_sram[0x10000];
 #define REG_RCNT       (MEM_IO + 0x134)
 #define REG_IE         (MEM_IO + 0x200)
 #define REG_IF         (MEM_IO + 0x202)
+    #define INT_VBLANK     (1 << 0)
+    #define INT_HBLANK     (1 << 1)
+    #define INT_VCOUNT     (1 << 2)
+    #define INT_TIMER0     (1 << 3)
+    #define INT_TIMER1     (1 << 4)
+    #define INT_TIMER2     (1 << 5)
+    #define INT_TIMER3     (1 << 6)
+    #define INT_COM        (1 << 7)
+    #define INT_DMA0       (1 << 8)
+    #define INT_DMA1       (1 << 9)
+    #define INT_DMA2       (1 << 10)
+    #define INT_DMA3       (1 << 11)
+    #define INT_BUTTON     (1 << 12)
+    #define INT_CART       (1 << 13)
 #define REG_WAITCNT    (MEM_IO + 0x204)
 #define REG_IME        (MEM_IO + 0x208)
 #define REG_POSTFLG    (MEM_IO + 0x300)
@@ -210,7 +225,7 @@ void io_write_byte(uint32_t address, uint8_t value) {
         case REG_TM3CNT_L + 1: assert(false); break;
 
         case REG_IF:
-            io_if = (io_if & 0xff00) | value;  // FIXME? xor value
+            io_if &= ~value;
             break;
 
         case REG_IME:
@@ -405,7 +420,7 @@ void io_write_halfword(uint32_t address, uint16_t value) {
             break;
 
         case REG_IE: io_ie = value; break;
-        case REG_IF: io_if = value; break;  // FIXME? xor value
+        case REG_IF: io_if &= ~value; break;
 
         //case IO_WAITCNT:
         //    io_waitcnt = value;
@@ -524,7 +539,7 @@ void io_write_word(uint32_t address, uint32_t value) {
 
         case REG_IE:
             io_ie = (uint16_t) value;
-            io_if = (uint16_t)(value >> 16);
+            io_if &= ~(uint16_t)(value >> 16);
             break;
 
         case REG_WAITCNT:
@@ -912,7 +927,7 @@ void gba_draw_tiled_cull(Uint32 *pixels, int pitch, int x, int y, int h, uint32_
 }
 
 void gba_draw_tiled_bg(uint32_t mode, int y, uint32_t bgcnt, uint32_t hofs, uint32_t vofs) {
-    assert(mode == 0);  // FIXME
+    //assert(mode == 0);  // FIXME
 
     uint32_t tile_base = ((bgcnt >> 2) & 3) * 16384;
     uint32_t map_base = ((bgcnt >> 8) & 0x1f) * 2048;
@@ -996,6 +1011,8 @@ void gba_draw_scanline(void) {
         case 0:
         case 1:
         case 2:
+        //case 6:
+        //case 7:
             gba_draw_tiled(mode, io_vcount);
             break;
 
@@ -1022,17 +1039,14 @@ void gba_ppu_update(void) {
             io_dispstat &= ~DSTAT_IN_VBL;
         } else if (io_vcount == 160) {
             io_dispstat |= DSTAT_IN_VBL;
-            if ((io_dispstat & DSTAT_VBL_IRQ) != 0 && io_ime == 1 && (io_ie & (1 << 0)) != 0) {
-                io_if |= 1 << 0;
-                arm_hardware_interrupt();
-                //interrupt_raised = true;
+            if ((io_dispstat & DSTAT_VBL_IRQ) != 0 && io_ime == 1 && (io_ie & INT_VBLANK) != 0) {
+                io_if |= INT_VBLANK;
             }
         }
         if (io_vcount == (uint8_t)(io_dispstat >> 8)) {
             io_dispstat |= DSTAT_IN_VCT;
-            if ((io_dispstat & DSTAT_VCT_IRQ) != 0 && io_ime == 1 && (io_ie & (1 << 2)) != 0) {
-                //io_if |= 1 << 2;
-                //interrupt_raised = true;
+            if ((io_dispstat & DSTAT_VCT_IRQ) != 0 && io_ime == 1 && (io_ie & INT_VCOUNT) != 0) {
+                io_if |= INT_VCOUNT;
             }
         } else {
             io_dispstat &= ~DSTAT_IN_VCT;
@@ -1040,9 +1054,8 @@ void gba_ppu_update(void) {
     }
     if (ppu_cycles % 1232 == 960) {
         io_dispstat |= DSTAT_IN_HBL;
-        if ((io_dispstat & DSTAT_HBL_IRQ) != 0 && io_ime == 1 && (io_ie & (1 << 1)) != 0) {
-            //io_if |= 1 << 1;
-            //interrupt_raised = true;
+        if ((io_dispstat & DSTAT_HBL_IRQ) != 0 && io_ime == 1 && (io_ie & INT_HBLANK) != 0) {
+            //io_if |= INT_HBLANK;
         }
     }
     ppu_cycles = (ppu_cycles + 1) % 280896;
@@ -1050,6 +1063,7 @@ void gba_ppu_update(void) {
 
 void gba_timer_update(void) {
     timer_cycles = (timer_cycles + 1) % 1024;
+    bool last_increment = false;
     for (int i = 0; i < 4; i++) {
         uint16_t *counter, *reload, *control;
         switch (i) {
@@ -1061,24 +1075,28 @@ void gba_timer_update(void) {
         }
         if (*control & (1 << 7)) {
             bool increment = false;
-            assert((*control & (1 << 2)) == 0);  // FIXME countup timing
-            uint32_t prescaler = *control & 3;
-            switch (prescaler) {
-                case 0: increment = (ppu_cycles % 1) == 0; break;
-                case 1: increment = (ppu_cycles % 64) == 0; break;
-                case 2: increment = (ppu_cycles % 256) == 0; break;
-                case 3: increment = (ppu_cycles % 1024) == 0; break;
-                default: abort();
+            if (*control & (1 << 2)) {
+                increment = last_increment;
+            } else {
+                uint32_t prescaler = *control & 3;
+                switch (prescaler) {
+                    case 0: increment = true; break;
+                    case 1: increment = (ppu_cycles % 64) == 0; break;
+                    case 2: increment = (ppu_cycles % 256) == 0; break;
+                    case 3: increment = (ppu_cycles % 1024) == 0; break;
+                    default: abort();
+                }
             }
             if (increment) {
                 *counter = *counter + 1;
-            }
-            if (*counter == 0) {
-                *counter = *reload;
-                if ((*control & (1 << 6)) != 0 && io_ime == 1 && (io_ie & (1 << (3 + i))) != 0) {
-                    assert(false);
-                    //io_if |= 1 << (3 + i);
-                    //interrupt_raised = true;
+                if (*counter == 0) {
+                    *counter = *reload;
+                    if ((*control & (1 << 6)) != 0 && io_ime == 1 && (io_ie & (1 << (3 + i))) != 0) {
+                        io_if |= 1 << (3 + i);
+                    }
+                    last_increment = true;
+                } else {
+                    last_increment = false;
                 }
             }
         }
@@ -1148,15 +1166,10 @@ void gba_dma_update(void) {
         io_write_word(REG_DMA0SAD + 12 * ch, src_addr);
 
         if ((dmacnt & DMA_IRQ) != 0 && io_ime == 1 && (io_ie & (1 << (8 + ch))) != 0) {
-            assert(false);
-            //io_if |= 1 << (8 + ch);
-            //interrupt_raised = true;
+            io_if |= 1 << (8 + ch);
         }
 
-        if ((dmacnt & DMA_REPEAT) != 0) {
-            assert(start_timing != DMA_NOW);
-            continue;
-        }
+        if ((dmacnt & DMA_REPEAT) != 0) continue;
 
         dmacnt &= ~DMA_ENABLE;
         io_write_word(REG_DMA0CNT_L + 12 * ch, dmacnt);
@@ -1168,10 +1181,9 @@ void gba_emulate(void) {
         gba_timer_update();
         gba_dma_update();
         gba_ppu_update();
-        //if (interrupt_raised) {  // FIXME (cpsr & PSR_I) == 0?
-            //arm_hardware_interrupt();
-            //interrupt_raised = false;
-        //}
+        if ((cpsr & PSR_I) == 0 && io_if != 0) {
+            arm_hardware_interrupt();
+        }
         if (ppu_cycles == 0) break;
 
         if (!halted) {
