@@ -10,14 +10,16 @@
 
 #include "cpu.h"
 
-#define LOG_BAD_MEMORY_ACCESS
+//#define LOG_BAD_MEMORY_ACCESS
 
 bool single_step = false;
 uint64_t start_logging_at = 0;
 //uint64_t end_logging_at = 200000;
 uint64_t cycles = 0;
 uint32_t last_bios_access = 0xe4;
-bool has_sram = true;
+bool skip_bios = true;
+bool has_flash = false;
+bool has_sram = false;
 
 #define SCREEN_WIDTH  240
 #define SCREEN_HEIGHT 160
@@ -35,7 +37,8 @@ uint8_t palette_ram[0x400];
 uint8_t video_ram[0x18000];
 uint8_t object_ram[0x400];
 uint8_t game_rom[0x2000000];
-uint8_t save_ram[0x10000];
+uint8_t save_flash[0x10000];
+uint8_t save_sram[0x10000];
 
 #define MEM_IO        0x4000000
 #define MEM_VRAM      0x6000000
@@ -475,14 +478,19 @@ uint8_t memory_read_byte(uint32_t address) {
         return game_rom[address & 0x1ffffff];
     }
     if (address >= 0x0e000000 && address < 0x10000000) {
-        if (has_sram) {
-            return save_ram[address & 0xffff];
+        if (has_flash) {
+            printf("memory_read_byte(0x%08x);\n", address);  // TODO
+            return -1;
         }
+        if (has_sram) {
+            return save_sram[address & 0xffff];
+        }
+        return 0;  // FIXME -1
     }
 #ifdef LOG_BAD_MEMORY_ACCESS
     printf("memory_read_byte(0x%08x);\n", address);
 #endif
-    return -1;
+    return 0;
 }
 
 void memory_write_byte(uint32_t address, uint8_t value) {
@@ -519,10 +527,13 @@ void memory_write_byte(uint32_t address, uint8_t value) {
         //return;  // Read only
     }
     if (address >= 0x0e000000 && address < 0x10000000) {
-        if (has_sram) {
-            save_ram[address & 0xffff] = value;
-            return;
+        if (has_flash) {
+            printf("memory_write_byte(0x%08x, 0x%02x);\n", address, value);  // TODO
         }
+        if (has_sram) {
+            save_sram[address & 0xffff] = value;
+        }
+        return;
     }
 #ifdef LOG_BAD_MEMORY_ACCESS
     printf("memory_write_byte(0x%08x, 0x%02x);\n", address, value);
@@ -558,15 +569,20 @@ uint16_t memory_read_halfword(uint32_t address) {
         return *(uint16_t *)&game_rom[address & 0x1fffffe];
     }
     if (address >= 0x0e000000 && address < 0x10000000) {
+        if (has_flash) {
+            printf("memory_read_halfword(0x%08x);\n", address);  // TODO
+            return -1;
+        }
         if (has_sram) {
-            uint8_t value = save_ram[address & 0xffff];
+            uint8_t value = save_sram[address & 0xffff];
             return value | value << 8;
         }
+        return 0;  // FIXME -1
     }
 #ifdef LOG_BAD_MEMORY_ACCESS
     printf("memory_read_halfword(0x%08x);\n", address);
 #endif
-    return -1;
+    return 0;
 }
 
 void memory_write_halfword(uint32_t address, uint16_t value) {
@@ -603,10 +619,13 @@ void memory_write_halfword(uint32_t address, uint16_t value) {
         return;  // Read only
     }
     if (address >= 0x0e000000 && address < 0x10000000) {
-        if (has_sram) {
-            save_ram[address & 0xffff] = (uint8_t)(value >> 8 * (address & 1));
-            return;
+        if (has_flash) {
+            printf("memory_write_halfword(0x%08x, 0x%04x);\n", address, value);  // TODO
         }
+        if (has_sram) {
+            save_sram[address & 0xffff] = (uint8_t)(value >> 8 * (address & 1));
+        }
+        return;
     }
 #ifdef LOG_BAD_MEMORY_ACCESS
     printf("memory_write_halfword(0x%08x, 0x%04x);\n", address, value);
@@ -645,15 +664,20 @@ uint32_t memory_read_word(uint32_t address) {
         return *(uint32_t *)&game_rom[address & 0x1fffffc];
     }
     if (address >= 0x0e000000 && address < 0x10000000) {
+        if (has_flash) {
+            printf("memory_read_word(0x%08x);\n", address);  // TODO
+            return -1;
+        }
         if (has_sram) {
-            uint8_t value = save_ram[address & 0xffff];
+            uint8_t value = save_sram[address & 0xffff];
             return value | value << 8 | value << 16 | value << 24;
         }
+        return 0;  // FIXME -1
     }
 #ifdef LOG_BAD_MEMORY_ACCESS
     printf("memory_read_word(0x%08x);\n", address);
 #endif
-    return -1;
+    return 0;
 }
 
 void memory_write_word(uint32_t address, uint32_t value) {
@@ -693,10 +717,13 @@ void memory_write_word(uint32_t address, uint32_t value) {
         return;  // Read only
     }
     if (address >= 0x0e000000 && address < 0x10000000) {
-        if (has_sram) {
-            save_ram[address & 0xffff] = (uint32_t)(value >> 8 * (address & 3));
-            return;
+        if (has_flash) {
+            printf("memory_write_word(0x%08x, 0x%08x);\n", address, value);  // TODO
         }
+        if (has_sram) {
+            save_sram[address & 0xffff] = (uint32_t)(value >> 8 * (address & 3));
+        }
+        return;
     }
 #ifdef LOG_BAD_MEMORY_ACCESS
     printf("memory_write_word(0x%08x, 0x%08x);\n", address, value);
@@ -721,9 +748,11 @@ void gba_init(const char *filename) {
     fclose(fp);
 
     memset(r, 0, sizeof(uint32_t) * 16);
-    memset(save_ram, 0xff, sizeof(uint8_t) * 0x10000);
 
-    arm_init();
+    memset(save_flash, 0xff, sizeof(uint8_t) * sizeof(save_flash));
+    memset(save_sram, 0xff, sizeof(uint8_t) * sizeof(save_sram));
+
+    arm_init_registers(skip_bios);
 
     branch_taken = true;
     io_vcount = 227;

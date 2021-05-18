@@ -125,7 +125,7 @@ void memory_write_halfword(uint32_t address, uint16_t value);
 uint32_t memory_read_word(uint32_t address);
 void memory_write_word(uint32_t address, uint32_t value);
 
-void arm_init(void);
+void arm_init_registers(bool skip_bios);
 uint32_t align_word(uint32_t address, uint32_t value);
 uint32_t align_halfword(uint32_t address, uint16_t value);
 uint32_t bit_count(uint32_t x);

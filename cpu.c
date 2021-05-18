@@ -12,7 +12,6 @@ bool log_thumb_instructions = true;
 bool log_registers = false;
 bool halted = false;
 uint64_t instruction_count = 0;
-bool skip_bios = true;
 
 uint32_t r[16];
 uint32_t r8_usr, r9_usr, r10_usr, r11_usr, r12_usr, r13_usr, r14_usr;
@@ -33,13 +32,17 @@ uint16_t thumb_op;
 uint16_t thumb_pipeline[2];
 void (*thumb_lookup[256])(void);
 
-void arm_init(void) {
-    r[13] = 0x03007f00;
-    r13_irq = 0x03007fa0;
-    r13_svc = 0x03007fe0;
-    r[15] = skip_bios ? 0x08000000 : VEC_RESET;
-    cpsr = PSR_MODE_SYS;
-    //cpsr = PSR_I | PSR_F | PSR_MODE_SVC;
+void arm_init_registers(bool skip_bios) {
+    if (skip_bios) {
+        r[13] = 0x03007f00;
+        r13_irq = 0x03007fa0;
+        r13_svc = 0x03007fe0;
+        r[15] = 0x08000000;
+        cpsr = PSR_MODE_SYS;
+    } else {
+        r[15] = VEC_RESET;
+        cpsr = PSR_I | PSR_F | PSR_MODE_SVC;
+    }
 }
 
 uint32_t align_word(uint32_t address, uint32_t value) {
