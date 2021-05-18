@@ -10,6 +10,8 @@
 
 #include "cpu.h"
 
+//#define LOG_BAD_MEMORY_ACCESS
+
 bool single_step = false;
 uint64_t start_logging_at = 0;
 //uint64_t end_logging_at = 200000;
@@ -102,6 +104,7 @@ uint8_t game_rom[0x2000000];
     #define DMA_RELOAD     3
     #define DMA_REPEAT     (1 << 25)
     #define DMA_32         (1 << 26)
+    #define DMA_DRQ        (1 << 27)
     #define DMA_NOW        0
     #define DMA_AT_VBLANK  1
     #define DMA_AT_HBLANK  2
@@ -159,7 +162,9 @@ uint8_t io_read_byte(uint32_t address) {
             return (uint8_t) io_vcount;
 
         default:
+#ifdef LOG_BAD_MEMORY_ACCESS
             printf("io_read_byte(0x%08x);\n", address);
+#endif
             return 0;
     }
 }
@@ -185,7 +190,9 @@ void io_write_byte(uint32_t address, uint8_t value) {
             break;
 
         default:
+#ifdef LOG_BAD_MEMORY_ACCESS
             printf("io_write_byte(0x%08x, 0x%02x);\n", address, value);
+#endif
             break;
     }
 }
@@ -242,7 +249,9 @@ uint16_t io_read_halfword(uint32_t address) {
         case REG_IME: return io_ime;
 
         default:
+#ifdef LOG_BAD_MEMORY_ACCESS
             printf("io_read_halfword(0x%08x);\n", address);
+#endif
             return 0;
     }
 }
@@ -290,12 +299,12 @@ void io_write_halfword(uint32_t address, uint16_t value) {
 
         case IO_WININ:
             io_winin = value;
-            printf("WININ = 0x%04x\n", io_winin);
+            //printf("WININ = 0x%04x\n", io_winin);
             break;
 
         case IO_WINOUT:
             io_winout = value;
-            printf("WINOUT = 0x%04x\n", io_winout);
+            //printf("WINOUT = 0x%04x\n", io_winout);
             break;
 
         //case IO_SOUNDBIAS:
@@ -334,7 +343,9 @@ void io_write_halfword(uint32_t address, uint16_t value) {
         case REG_IME: io_ime = value; break;
 
         default:
+#ifdef LOG_BAD_MEMORY_ACCESS
             printf("io_write_halfword(0x%08x, 0x%04x);\n", address, value);
+#endif
             break;
     }
 }
@@ -374,7 +385,9 @@ uint32_t io_read_word(uint32_t address) {
             return io_ime;
 
         default:
+#ifdef LOG_BAD_MEMORY_ACCESS
             printf("io_read_word(0x%08x);\n", address);
+#endif
             return 0;
     }
 }
@@ -424,7 +437,9 @@ void io_write_word(uint32_t address, uint32_t value) {
             break;
 
         default:
+#ifdef LOG_BAD_MEMORY_ACCESS
             printf("io_write_word(0x%08x, 0x%08x);\n", address, value);
+#endif
             break;
     }
 }
@@ -457,7 +472,9 @@ uint8_t memory_read_byte(uint32_t address) {
     if (address >= 0x08000000 && address < 0x0e000000) {
         return game_rom[address & 0x1ffffff];
     }
+#ifdef LOG_BAD_MEMORY_ACCESS
     printf("memory_read_byte(0x%08x);\n", address);
+#endif
     return 0;
 }
 
@@ -494,11 +511,13 @@ void memory_write_byte(uint32_t address, uint8_t value) {
     if (address >= 0x08000000 && address < 0x0e000000) {
         //return;  // Read only
     }
+#ifdef LOG_BAD_MEMORY_ACCESS
     printf("memory_write_byte(0x%08x, 0x%02x);\n", address, value);
+#endif
 }
 
 uint16_t memory_read_halfword(uint32_t address) {
-    assert((address & 1) == 0);
+    address &= ~1;
     if (address < 0x4000) {
         if (r[15] < 0x4000) last_bios_access = address;
         return *(uint16_t *)&system_rom[last_bios_access];
@@ -526,7 +545,9 @@ uint16_t memory_read_halfword(uint32_t address) {
     if (address >= 0x08000000 && address < 0x0e000000) {
         return *(uint16_t *)&game_rom[address & 0x1ffffff];
     }
+#ifdef LOG_BAD_MEMORY_ACCESS
     printf("memory_read_halfword(0x%08x);\n", address);
+#endif
     return 0;
 }
 
@@ -564,7 +585,9 @@ void memory_write_halfword(uint32_t address, uint16_t value) {
     if (address >= 0x08000000 && address < 0x0e000000) {
         return;  // Read only
     }
+#ifdef LOG_BAD_MEMORY_ACCESS
     printf("memory_write_halfword(0x%08x, 0x%04x);\n", address, value);
+#endif
 }
 
 uint32_t memory_read_word(uint32_t address) {
@@ -602,7 +625,9 @@ uint32_t memory_read_word(uint32_t address) {
     if (address >= 0x0e000000 && address < 0x0e010000) {
         // TODO
     }
+#ifdef LOG_BAD_MEMORY_ACCESS
     printf("memory_read_word(0x%08x);\n", address);
+#endif
     return 0;
 }
 
@@ -643,7 +668,12 @@ void memory_write_word(uint32_t address, uint32_t value) {
     if (address >= 0x08000000 && address < 0x0e000000) {
         return;  // Read only
     }
+    if (address >= 0x0e000000 && address < 0x0e010000) {
+        return;  // TODO
+    }
+#ifdef LOG_BAD_MEMORY_ACCESS
     printf("memory_write_word(0x%08x, 0x%08x);\n", address, value);
+#endif
 }
 
 void gba_init(const char *filename) {
@@ -852,10 +882,10 @@ void gba_dma_transfer_halfwords(uint32_t dst_ctrl, uint32_t src_ctrl, uint32_t d
     for (uint32_t i = 0; i < len; i++) {
         uint16_t value = memory_read_halfword(src_addr + src_off);
         memory_write_halfword(dst_addr + dst_off, value);
-        if (dst_ctrl == DMA_INC) dst_off += 2;
-        if (dst_ctrl == DMA_DEC) dst_off -= 2;
+        if (dst_ctrl == DMA_INC || dst_ctrl == DMA_RELOAD) dst_off += 2;
+        else if (dst_ctrl == DMA_DEC) dst_off -= 2;
         if (src_ctrl == DMA_INC) src_off += 2;
-        if (src_ctrl == DMA_DEC) src_off -= 2;
+        else if (src_ctrl == DMA_DEC) src_off -= 2;
     }
 }
 
@@ -865,10 +895,10 @@ void gba_dma_transfer_words(uint32_t dst_ctrl, uint32_t src_ctrl, uint32_t dst_a
     for (uint32_t i = 0; i < len; i++) {
         uint32_t value = memory_read_word(src_addr + src_off);
         memory_write_word(dst_addr + dst_off, value);
-        if (dst_ctrl == DMA_INC) dst_off += 4;
-        if (dst_ctrl == DMA_DEC) dst_off -= 4;
+        if (dst_ctrl == DMA_INC || dst_ctrl == DMA_RELOAD) dst_off += 4;
+        else if (dst_ctrl == DMA_DEC) dst_off -= 4;
         if (src_ctrl == DMA_INC) src_off += 4;
-        if (src_ctrl == DMA_DEC) src_off -= 4;
+        else if (src_ctrl == DMA_DEC) src_off -= 4;
     }
 }
 
@@ -879,28 +909,43 @@ void gba_dma_update(void) {
         if ((dmacnt & DMA_ENABLE) == 0) continue;
 
         uint32_t start_timing = (dmacnt >> 28) & 3;
-        assert(start_timing == 0);
+        if (start_timing == DMA_AT_VBLANK && io_vcount != 160) continue;
+        if (start_timing == DMA_AT_HBLANK && cycles % 1232 != 960) continue;
+        if (start_timing == DMA_AT_REFRESH && cycles != 0) continue;
 
         uint32_t dst_ctrl = (dmacnt >> 21) & 3;
         uint32_t src_ctrl = (dmacnt >> 23) & 3;
-        uint32_t dst_addr = io_read_word(REG_DMA0DAD + 12 * ch);
-        uint32_t src_addr = io_read_word(REG_DMA0SAD + 12 * ch);
+        uint32_t dst_addr = io_read_word(REG_DMA0DAD + 12 * ch) & 0x0fffffff;
+        uint32_t src_addr = io_read_word(REG_DMA0SAD + 12 * ch) & 0x0fffffff;
         uint32_t len = (ch == 3 ? dmacnt & 0xffff : dmacnt & 0x3fff);
         if (len == 0) len = (ch == 3 ? 0x10000 : 0x4000);
 
-        assert(dst_ctrl != DMA_REPEAT);
-        assert(src_ctrl != DMA_REPEAT);
+        assert(src_ctrl != DMA_RELOAD);
+        assert((dmacnt & DMA_DRQ) == 0);
+        assert((dmacnt & DMA_IRQ) == 0);
 
-        if ((dmacnt & DMA_32) != 0) {
+        bool transfer_word = (dmacnt & DMA_32) != 0;
+        if (transfer_word) {
             gba_dma_transfer_words(dst_ctrl, src_ctrl, dst_addr, src_addr, len);
         } else {
             gba_dma_transfer_halfwords(dst_ctrl, src_ctrl, dst_addr, src_addr, len);
         }
-
-        if ((dmacnt & DMA_REPEAT) == 0) {
-            dmacnt &= ~DMA_ENABLE;
-            io_write_word(REG_DMA0CNT_L + 12 * ch, dmacnt);
+        if (dst_ctrl != DMA_RELOAD) {
+            if (dst_ctrl == DMA_INC) dst_addr += (transfer_word ? 4 : 2) * len;
+            else if (dst_ctrl == DMA_DEC) dst_addr -= (transfer_word ? 4 : 2) * len;
+            io_write_word(REG_DMA0DAD + 12 * ch, dst_addr);
         }
+        if (src_ctrl == DMA_INC) src_addr += (transfer_word ? 4 : 2) * len;
+        else if (src_ctrl == DMA_DEC) src_addr -= (transfer_word ? 4 : 2) * len;
+        io_write_word(REG_DMA0SAD + 12 * ch, src_addr);
+
+        if ((dmacnt & DMA_REPEAT) != 0) {
+            assert(start_timing != DMA_NOW);
+            continue;
+        }
+
+        dmacnt &= ~DMA_ENABLE;
+        io_write_word(REG_DMA0CNT_L + 12 * ch, dmacnt);
     }
 }
 

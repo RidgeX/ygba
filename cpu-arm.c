@@ -1029,7 +1029,7 @@ void arm_branch_and_exchange(void) {
 #endif
 
     assert(sbo == 0xfff);
-    assert(BITS(r[Rm], 0, 1) != 2);
+    assert(BITS(r[Rm], 0, 1) != 2);  // FIXME
 
     ASSIGN_T(BIT(r[Rm], 0));
     r[REG_PC] = r[Rm] & ~1;
