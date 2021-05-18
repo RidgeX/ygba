@@ -15,7 +15,9 @@
 bool single_step = false;
 uint64_t start_logging_at = 0;
 //uint64_t end_logging_at = 200000;
-uint64_t cycles = 0;
+uint32_t ppu_cycles = 0;
+uint32_t timer_cycles = 0;
+//bool interrupt_raised = false;
 uint32_t last_bios_access = 0xe4;
 bool skip_bios = true;
 bool has_flash = false;
@@ -118,6 +120,12 @@ uint8_t save_sram[0x10000];
     #define DMA_ENABLE     (1 << 31)
 #define REG_TM0CNT_L   (MEM_IO + 0x100)
 #define REG_TM0CNT_H   (MEM_IO + 0x102)
+#define REG_TM1CNT_L   (MEM_IO + 0x104)
+#define REG_TM1CNT_H   (MEM_IO + 0x106)
+#define REG_TM2CNT_L   (MEM_IO + 0x108)
+#define REG_TM2CNT_H   (MEM_IO + 0x10a)
+#define REG_TM3CNT_L   (MEM_IO + 0x10c)
+#define REG_TM3CNT_H   (MEM_IO + 0x10e)
 #define REG_SIODATA32  (MEM_IO + 0x120)
 #define REG_SIOCNT     (MEM_IO + 0x128)
 #define REG_KEYINPUT   (MEM_IO + 0x130)
@@ -151,7 +159,10 @@ uint32_t io_dma0sad, io_dma0dad, io_dma0cnt;
 uint32_t io_dma1sad, io_dma1dad, io_dma1cnt;
 uint32_t io_dma2sad, io_dma2dad, io_dma2cnt;
 uint32_t io_dma3sad, io_dma3dad, io_dma3cnt;
-uint32_t io_tm0cnt;
+uint16_t timer_0_counter, timer_0_reload, timer_0_control;
+uint16_t timer_1_counter, timer_1_reload, timer_1_control;
+uint16_t timer_2_counter, timer_2_reload, timer_2_control;
+uint16_t timer_3_counter, timer_3_reload, timer_3_control;
 uint16_t io_keyinput;
 uint16_t io_keycnt;
 //uint16_t io_rcnt;
@@ -163,8 +174,16 @@ uint8_t io_haltcnt;
 
 uint8_t io_read_byte(uint32_t address) {
     switch (address) {
-        case REG_VCOUNT:
-            return (uint8_t) io_vcount;
+        case REG_VCOUNT: return (uint8_t) io_vcount;
+
+        case REG_TM0CNT_L + 0: return (uint8_t) timer_0_counter;
+        case REG_TM0CNT_L + 1: return (uint8_t)(timer_0_counter >> 8);
+        case REG_TM1CNT_L + 0: return (uint8_t) timer_1_counter;
+        case REG_TM1CNT_L + 1: return (uint8_t)(timer_1_counter >> 8);
+        case REG_TM2CNT_L + 0: return (uint8_t) timer_2_counter;
+        case REG_TM2CNT_L + 1: return (uint8_t)(timer_2_counter >> 8);
+        case REG_TM3CNT_L + 0: return (uint8_t) timer_3_counter;
+        case REG_TM3CNT_L + 1: return (uint8_t)(timer_3_counter >> 8);
 
         default:
 #ifdef LOG_BAD_MEMORY_ACCESS
@@ -180,6 +199,15 @@ void io_write_byte(uint32_t address, uint8_t value) {
         //    io_dispstat = (io_dispstat & 0xff) | value << 8;
         //    printf("DISPSTAT = 0x%04x\n", io_dispstat);
         //    break;
+
+        case REG_TM0CNT_L + 0: assert(false); break;
+        case REG_TM0CNT_L + 1: assert(false); break;
+        case REG_TM1CNT_L + 0: assert(false); break;
+        case REG_TM1CNT_L + 1: assert(false); break;
+        case REG_TM2CNT_L + 0: assert(false); break;
+        case REG_TM2CNT_L + 1: assert(false); break;
+        case REG_TM3CNT_L + 0: assert(false); break;
+        case REG_TM3CNT_L + 1: assert(false); break;
 
         case REG_IF:
             io_if = (io_if & 0xff00) | value;  // FIXME? xor value
@@ -234,7 +262,14 @@ uint16_t io_read_halfword(uint32_t address) {
         //case IO_DMA3CNT_H:
         //    return io_dma3cnt_h;
 
-        case REG_TM0CNT_L: return (uint16_t) io_tm0cnt;
+        case REG_TM0CNT_L: return timer_0_counter;
+        case REG_TM0CNT_H: return timer_0_control;
+        case REG_TM1CNT_L: return timer_1_counter;
+        case REG_TM1CNT_H: return timer_1_control;
+        case REG_TM2CNT_L: return timer_2_counter;
+        case REG_TM2CNT_H: return timer_2_control;
+        case REG_TM3CNT_L: return timer_3_counter;
+        case REG_TM3CNT_H: return timer_3_control;
 
         case REG_SIODATA32: return 0;  // FIXME
         case REG_SIOCNT: return 0;  // FIXME
@@ -333,8 +368,40 @@ void io_write_halfword(uint32_t address, uint16_t value) {
             io_dma3cnt = (io_dma3cnt & 0xffff) | value << 16;
             break;
 
+        case REG_TM0CNT_L:
+            timer_0_reload = value;
+            break;
+
         case REG_TM0CNT_H:
-            io_tm0cnt = (io_tm0cnt & 0xffff) | value << 16;
+            timer_0_control = value;
+            if (timer_0_control & 0x80) timer_0_counter = timer_0_reload;
+            break;
+
+        case REG_TM1CNT_L:
+            timer_1_reload = value;
+            break;
+
+        case REG_TM1CNT_H:
+            timer_1_control = value;
+            if (timer_1_control & 0x80) timer_1_counter = timer_1_reload;
+            break;
+
+        case REG_TM2CNT_L:
+            timer_2_reload = value;
+            break;
+
+        case REG_TM2CNT_H:
+            timer_2_control = value;
+            if (timer_2_control & 0x80) timer_2_counter = timer_2_reload;
+            break;
+
+        case REG_TM3CNT_L:
+            timer_3_reload = value;
+            break;
+
+        case REG_TM3CNT_H:
+            timer_3_control = value;
+            if (timer_3_control & 0x80) timer_3_counter = timer_3_reload;
             break;
 
         case REG_IE: io_ie = value; break;
@@ -375,6 +442,11 @@ uint32_t io_read_word(uint32_t address) {
         case REG_DMA3SAD: return io_dma3sad;
         case REG_DMA3DAD: return io_dma3dad;
         case REG_DMA3CNT_L: return io_dma3cnt;
+
+        case REG_TM0CNT_L: return timer_0_counter | timer_0_control << 16;
+        case REG_TM1CNT_L: return timer_1_counter | timer_1_control << 16;
+        case REG_TM2CNT_L: return timer_2_counter | timer_2_control << 16;
+        case REG_TM3CNT_L: return timer_3_counter | timer_3_control << 16;
 
         //case IO_KEYINPUT:
         //    io_keyinput = 0x3ff;
@@ -426,7 +498,29 @@ void io_write_word(uint32_t address, uint32_t value) {
         case REG_DMA3DAD: io_dma3dad = value; break;
         case REG_DMA3CNT_L: io_dma3cnt = value; break;
 
-        case REG_TM0CNT_L: io_tm0cnt = value; break;
+        case REG_TM0CNT_L:
+            timer_0_reload = (uint16_t) value;
+            timer_0_control = (uint16_t)(value >> 16);
+            if (timer_0_control & 0x80) timer_0_counter = timer_0_reload;
+            break;
+
+        case REG_TM1CNT_L:
+            timer_1_reload = (uint16_t) value;
+            timer_1_control = (uint16_t)(value >> 16);
+            if (timer_1_control & 0x80) timer_1_counter = timer_1_reload;
+            break;
+
+        case REG_TM2CNT_L:
+            timer_2_reload = (uint16_t) value;
+            timer_2_control = (uint16_t)(value >> 16);
+            if (timer_2_control & 0x80) timer_2_counter = timer_2_reload;
+            break;
+
+        case REG_TM3CNT_L:
+            timer_3_reload = (uint16_t) value;
+            timer_3_control = (uint16_t)(value >> 16);
+            if (timer_3_control & 0x80) timer_3_counter = timer_3_reload;
+            break;
 
         case REG_IE:
             io_ie = (uint16_t) value;
@@ -485,7 +579,7 @@ uint8_t memory_read_byte(uint32_t address) {
         if (has_sram) {
             return save_sram[address & 0xffff];
         }
-        return 0;  // FIXME -1
+        //return 0;  // FIXME -1
     }
 #ifdef LOG_BAD_MEMORY_ACCESS
     printf("memory_read_byte(0x%08x);\n", address);
@@ -529,11 +623,12 @@ void memory_write_byte(uint32_t address, uint8_t value) {
     if (address >= 0x0e000000 && address < 0x10000000) {
         if (has_flash) {
             printf("memory_write_byte(0x%08x, 0x%02x);\n", address, value);  // TODO
+            return;
         }
         if (has_sram) {
             save_sram[address & 0xffff] = value;
+            return;
         }
-        return;
     }
 #ifdef LOG_BAD_MEMORY_ACCESS
     printf("memory_write_byte(0x%08x, 0x%02x);\n", address, value);
@@ -577,7 +672,7 @@ uint16_t memory_read_halfword(uint32_t address) {
             uint8_t value = save_sram[address & 0xffff];
             return value | value << 8;
         }
-        return 0;  // FIXME -1
+        //return 0;  // FIXME -1
     }
 #ifdef LOG_BAD_MEMORY_ACCESS
     printf("memory_read_halfword(0x%08x);\n", address);
@@ -616,16 +711,17 @@ void memory_write_halfword(uint32_t address, uint16_t value) {
         return;
     }
     if (address >= 0x08000000 && address < 0x0e000000) {
-        return;  // Read only
+        //return;  // Read only
     }
     if (address >= 0x0e000000 && address < 0x10000000) {
         if (has_flash) {
             printf("memory_write_halfword(0x%08x, 0x%04x);\n", address, value);  // TODO
+            return;
         }
         if (has_sram) {
             save_sram[address & 0xffff] = (uint8_t)(value >> 8 * (address & 1));
+            return;
         }
-        return;
     }
 #ifdef LOG_BAD_MEMORY_ACCESS
     printf("memory_write_halfword(0x%08x, 0x%04x);\n", address, value);
@@ -672,7 +768,7 @@ uint32_t memory_read_word(uint32_t address) {
             uint8_t value = save_sram[address & 0xffff];
             return value | value << 8 | value << 16 | value << 24;
         }
-        return 0;  // FIXME -1
+        //return 0;  // FIXME -1
     }
 #ifdef LOG_BAD_MEMORY_ACCESS
     printf("memory_read_word(0x%08x);\n", address);
@@ -714,16 +810,17 @@ void memory_write_word(uint32_t address, uint32_t value) {
         return;
     }
     if (address >= 0x08000000 && address < 0x0e000000) {
-        return;  // Read only
+        //return;  // Read only
     }
     if (address >= 0x0e000000 && address < 0x10000000) {
         if (has_flash) {
             printf("memory_write_word(0x%08x, 0x%08x);\n", address, value);  // TODO
+            return;
         }
         if (has_sram) {
             save_sram[address & 0xffff] = (uint32_t)(value >> 8 * (address & 3));
+            return;
         }
-        return;
     }
 #ifdef LOG_BAD_MEMORY_ACCESS
     printf("memory_write_word(0x%08x, 0x%08x);\n", address, value);
@@ -897,8 +994,7 @@ void gba_draw_scanline(void) {
 }
 
 void gba_ppu_update(void) {
-    bool interrupts_enabled = io_ime == 1;  // (cpsr & PSR_I) == 0 FIXME?
-    if (cycles % 1232 == 0) {
+    if (ppu_cycles % 1232 == 0) {
         io_dispstat &= ~DSTAT_IN_HBL;
         if (io_vcount < 160) {
             gba_draw_scanline();
@@ -908,29 +1004,67 @@ void gba_ppu_update(void) {
             io_dispstat &= ~DSTAT_IN_VBL;
         } else if (io_vcount == 160) {
             io_dispstat |= DSTAT_IN_VBL;
-            if (interrupts_enabled && (io_dispstat & DSTAT_VBL_IRQ) != 0 && (io_ie & (1 << 0)) != 0) {
+            if ((io_dispstat & DSTAT_VBL_IRQ) != 0 && io_ime == 1 && (io_ie & (1 << 0)) != 0) {
                 io_if |= 1 << 0;
                 arm_hardware_interrupt();
+                //interrupt_raised = true;
             }
         }
         if (io_vcount == (uint8_t)(io_dispstat >> 8)) {
             io_dispstat |= DSTAT_IN_VCT;
-            if (interrupts_enabled && (io_dispstat & DSTAT_VCT_IRQ) != 0 && (io_ie & (1 << 2)) != 0) {
+            if ((io_dispstat & DSTAT_VCT_IRQ) != 0 && io_ime == 1 && (io_ie & (1 << 2)) != 0) {
                 //io_if |= 1 << 2;
-                //arm_hardware_interrupt();
+                //interrupt_raised = true;
             }
         } else {
             io_dispstat &= ~DSTAT_IN_VCT;
         }
     }
-    if (cycles % 1232 == 960) {
+    if (ppu_cycles % 1232 == 960) {
         io_dispstat |= DSTAT_IN_HBL;
-        if (interrupts_enabled && (io_dispstat & DSTAT_HBL_IRQ) != 0 && (io_ie & (1 << 1)) != 0) {
+        if ((io_dispstat & DSTAT_HBL_IRQ) != 0 && io_ime == 1 && (io_ie & (1 << 1)) != 0) {
             //io_if |= 1 << 1;
-            //arm_hardware_interrupt();
+            //interrupt_raised = true;
         }
     }
-    cycles = (cycles + 1) % 280896;
+    ppu_cycles = (ppu_cycles + 1) % 280896;
+}
+
+void gba_timer_update(void) {
+    timer_cycles = (timer_cycles + 1) % 1024;
+    for (int i = 0; i < 4; i++) {
+        uint16_t *counter, *reload, *control;
+        switch (i) {
+            case 0: counter = &timer_0_counter; reload = &timer_0_reload; control = &timer_0_control; break;
+            case 1: counter = &timer_1_counter; reload = &timer_1_reload; control = &timer_1_control; break;
+            case 2: counter = &timer_2_counter; reload = &timer_2_reload; control = &timer_2_control; break;
+            case 3: counter = &timer_3_counter; reload = &timer_3_reload; control = &timer_3_control; break;
+            default: abort();
+        }
+        if (*control & (1 << 7)) {
+            bool increment = false;
+            assert((*control & (1 << 2)) == 0);  // FIXME countup timing
+            uint32_t prescaler = *control & 3;
+            switch (prescaler) {
+                case 0: increment = (ppu_cycles % 1) == 0; break;
+                case 1: increment = (ppu_cycles % 64) == 0; break;
+                case 2: increment = (ppu_cycles % 256) == 0; break;
+                case 3: increment = (ppu_cycles % 1024) == 0; break;
+                default: abort();
+            }
+            if (increment) {
+                *counter = *counter + 1;
+            }
+            if (*counter == 0) {
+                *counter = *reload;
+                if ((*control & (1 << 6)) != 0 && io_ime == 1 && (io_ie & (1 << (3 + i))) != 0) {
+                    assert(false);
+                    //io_if |= 1 << (3 + i);
+                    //interrupt_raised = true;
+                }
+            }
+        }
+    }
 }
 
 void gba_dma_transfer_halfwords(uint32_t dst_ctrl, uint32_t src_ctrl, uint32_t dst_addr, uint32_t src_addr, uint32_t len) {
@@ -967,8 +1101,8 @@ void gba_dma_update(void) {
 
         uint32_t start_timing = (dmacnt >> 28) & 3;
         if (start_timing == DMA_AT_VBLANK && io_vcount != 160) continue;
-        if (start_timing == DMA_AT_HBLANK && cycles % 1232 != 960) continue;
-        if (start_timing == DMA_AT_REFRESH && cycles != 0) continue;
+        if (start_timing == DMA_AT_HBLANK && ppu_cycles % 1232 != 960) continue;
+        if (start_timing == DMA_AT_REFRESH && ppu_cycles != 0) continue;
 
         uint32_t dst_ctrl = (dmacnt >> 21) & 3;
         uint32_t src_ctrl = (dmacnt >> 23) & 3;
@@ -995,10 +1129,10 @@ void gba_dma_update(void) {
         else if (src_ctrl == DMA_DEC) src_addr -= (transfer_word ? 4 : 2) * len;
         io_write_word(REG_DMA0SAD + 12 * ch, src_addr);
 
-        if ((dmacnt & DMA_IRQ) != 0) {
+        if ((dmacnt & DMA_IRQ) != 0 && io_ime == 1 && (io_ie & (1 << (8 + ch))) != 0) {
             assert(false);
             //io_if |= 1 << (8 + ch);
-            //arm_hardware_interrupt();
+            //interrupt_raised = true;
         }
 
         if ((dmacnt & DMA_REPEAT) != 0) {
@@ -1013,9 +1147,14 @@ void gba_dma_update(void) {
 
 void gba_emulate(void) {
     while (true) {
+        gba_timer_update();
         gba_dma_update();
         gba_ppu_update();
-        if (cycles == 0) break;
+        //if (interrupt_raised) {  // FIXME (cpsr & PSR_I) == 0?
+            //arm_hardware_interrupt();
+            //interrupt_raised = false;
+        //}
+        if (ppu_cycles == 0) break;
 
         if (!halted) {
             //if (r[15] == 0x00000300) single_step = true;

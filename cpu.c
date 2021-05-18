@@ -421,15 +421,13 @@ void thumb_init_lookup(void) {
 }
 
 void arm_hardware_interrupt(void) {
-    bool T = (cpsr & PSR_T) != 0;
-    r14_irq = r[15] - (T ? 2 : 4);  // | (T ? 1 : 0); FIXME?
+    r14_irq = r[15] - SIZEOF_INSTR;
     spsr_irq = cpsr;
     write_cpsr((cpsr & ~(PSR_T | PSR_MODE)) | PSR_I | PSR_MODE_IRQ);
     r[15] = VEC_IRQ;
     branch_taken = true;
     halted = false;
 }
-
 
 void print_psr(uint32_t psr) {
     putchar(psr & PSR_N ? 'N' : '-');
