@@ -151,7 +151,7 @@ void arm_data_processing_register(void) {
     bool is_move = (opc == ARM_MOV || opc == ARM_MVN);
 
 #ifdef DEBUG
-    if (log_instructions && log_arm_instructions) {
+    if (log_instructions && log_arm_instructions && !FLAG_T()) {
         arm_print_opcode();
         switch (opc) {
             case ARM_AND: print_mnemonic(S ? "ands" : "and"); break;
@@ -173,11 +173,11 @@ void arm_data_processing_register(void) {
         }
         if (!is_test_or_compare) {
             print_register(Rd);
-            printf(",");
+            printf(", ");
         }
         if (!is_move) {
             print_register(Rn);
-            printf(",");
+            printf(", ");
         }
         print_register(Rm);
         arm_print_shifter_op(shop, shamt, shreg, Rs);
@@ -245,7 +245,7 @@ void arm_data_processing_immediate(void) {
     bool is_move = (opc == ARM_MOV || opc == ARM_MVN);
 
 #ifdef DEBUG
-    if (log_instructions && log_arm_instructions) {
+    if (log_instructions && log_arm_instructions && !FLAG_T()) {
         arm_print_opcode();
         switch (opc) {
             case ARM_AND: print_mnemonic(S ? "ands" : "and"); break;
@@ -267,11 +267,11 @@ void arm_data_processing_immediate(void) {
         }
         if (!is_test_or_compare) {
             print_register(Rd);
-            printf(",");
+            printf(", ");
         }
         if (!is_move) {
             print_register(Rn);
-            printf(",");
+            printf(", ");
         }
         print_immediate(imm);
         printf("\n");
@@ -330,7 +330,7 @@ void arm_load_store_word_or_byte_register(void) {
     }
 
 #ifdef DEBUG
-    if (log_instructions) {
+    if (log_instructions && log_arm_instructions && !FLAG_T()) {
         arm_print_opcode();
         if (L) {
             print_mnemonic(B ? "ldrb" : "ldr");
@@ -338,9 +338,9 @@ void arm_load_store_word_or_byte_register(void) {
             print_mnemonic(B ? "strb" : "str");
         }
         print_register(Rd);
-        printf(",[");
+        printf(", [");
         print_register(Rn);
-        printf(P ? "," : "],");
+        printf(P ? ", " : "], ");
         if (!U) printf("-");
         print_register(Rm);
         arm_print_shifter_op(shop, shamt, false, 0);
@@ -387,7 +387,7 @@ void arm_load_store_word_or_byte_immediate(void) {
     assert(!T);
 
 #ifdef DEBUG
-    if (log_instructions) {
+    if (log_instructions && log_arm_instructions && !FLAG_T()) {
         arm_print_opcode();
         if (L) {
             print_mnemonic(B ? "ldrb" : "ldr");
@@ -395,13 +395,18 @@ void arm_load_store_word_or_byte_immediate(void) {
             print_mnemonic(B ? "strb" : "str");
         }
         print_register(Rd);
-        printf(",[");
-        print_register(Rn);
-        printf(P ? "," : "],");
-        if (!U) printf("-");
-        print_immediate(imm);
-        if (P) printf("]");
-        if (W) printf("!");
+        if (P && U && !W && Rn == REG_PC) {
+            uint32_t pc_rel_address = r[Rn] - SIZEOF_INSTR + imm;  // FIXME
+            printf(", =0x%08X  @ 0x%08X", memory_read_word(pc_rel_address), pc_rel_address);
+        } else {
+            printf(", [");
+            print_register(Rn);
+            printf(P ? ", " : "], ");
+            if (!U) printf("-");
+            print_immediate(imm);
+            if (P) printf("]");
+            if (W) printf("!");
+        }
         printf("\n");
     }
 #endif
@@ -441,32 +446,32 @@ void arm_load_store_multiple(void) {
     uint32_t rlist = BITS(arm_op, 0, 15);
 
 #ifdef DEBUG
-    if (log_instructions && log_arm_instructions) {
+    if (log_instructions && log_arm_instructions && !FLAG_T()) {
         arm_print_opcode();
         if (L) {
             if (!P && !U) {
-                print_mnemonic("ldmda");
+                print_mnemonic_d("ldm", "da");
             } else if (!P && U) {
-                print_mnemonic("ldmia");
+                print_mnemonic_d("ldm", "ia");
             } else if (P && !U) {
-                print_mnemonic("ldmdb");
+                print_mnemonic_d("ldm", "db");
             } else if (P && U) {
-                print_mnemonic("ldmib");
+                print_mnemonic_d("ldm", "ib");
             }
         } else {
             if (!P && !U) {
-                print_mnemonic("stmda");
+                print_mnemonic_d("stm", "da");
             } else if (!P && U) {
-                print_mnemonic("stmia");
+                print_mnemonic_d("stm", "ia");
             } else if (P && !U) {
-                print_mnemonic("stmdb");
+                print_mnemonic_d("stm", "db");
             } else if (P && U) {
-                print_mnemonic("stmib");
+                print_mnemonic_d("stm", "ib");
             }
         }
         print_register(Rn);
         if (W) printf("!");
-        printf(",{");
+        printf(", {");
         arm_print_rlist(rlist);
         printf("}\n");
     }
@@ -523,10 +528,10 @@ void arm_branch(void) {
     ZERO_EXTEND(imm, 23);
 
 #ifdef DEBUG
-    if (log_instructions && log_arm_instructions) {
+    if (log_instructions && log_arm_instructions && !FLAG_T()) {
         arm_print_opcode();
         print_mnemonic(L ? "bl" : "b");
-        print_address(r[REG_PC] + (imm << 2));
+        print_address(r[REG_PC] - SIZEOF_INSTR + (imm << 2));  // FIXME
         printf("\n");
     }
 #endif
@@ -538,7 +543,7 @@ void arm_branch(void) {
 
 void arm_software_interrupt(void) {
 #ifdef DEBUG
-    if (log_instructions && log_arm_instructions) {
+    if (log_instructions && log_arm_instructions && !FLAG_T()) {
         arm_print_opcode();
         print_mnemonic("swi");
         print_address(BITS(arm_op, 0, 23));
@@ -562,7 +567,7 @@ void arm_multiply(void) {
     uint32_t Rm = BITS(arm_op, 0, 3);
 
 #ifdef DEBUG
-    if (log_instructions && log_arm_instructions) {
+    if (log_instructions && log_arm_instructions && !FLAG_T()) {
         arm_print_opcode();
         if (A) {
             print_mnemonic(S ? "mlas" : "mla");
@@ -605,7 +610,7 @@ void arm_multiply_long(void) {
     uint32_t Rm = BITS(arm_op, 0, 3);
 
 #ifdef DEBUG
-    if (log_instructions && log_arm_instructions) {
+    if (log_instructions && log_arm_instructions && !FLAG_T()) {
         arm_print_opcode();
         if (U) {
             if (A) {
@@ -667,7 +672,7 @@ void arm_load_store_halfword_register(void) {
     assert(!T);
 
 #ifdef DEBUG
-    if (log_instructions && log_arm_instructions) {
+    if (log_instructions && log_arm_instructions && !FLAG_T()) {
         arm_print_opcode();
         print_mnemonic(L ? "ldrh" : "strh");
         print_register(Rd);
@@ -715,7 +720,7 @@ void arm_load_store_halfword_immediate(void) {
     assert(!T);
 
 #ifdef DEBUG
-    if (log_instructions && log_arm_instructions) {
+    if (log_instructions && log_arm_instructions && !FLAG_T()) {
         arm_print_opcode();
         print_mnemonic(L ? "ldrh" : "strh");
         print_register(Rd);
@@ -762,7 +767,7 @@ void arm_load_signed_halfword_or_signed_byte_register(void) {
     assert(!T);
 
 #ifdef DEBUG
-    if (log_instructions && log_arm_instructions) {
+    if (log_instructions && log_arm_instructions && !FLAG_T()) {
         arm_print_opcode();
         if (opc == 0xd) {
             print_mnemonic("ldrsb");
@@ -825,7 +830,7 @@ void arm_load_signed_halfword_or_signed_byte_immediate(void) {
     assert(!T);
 
 #ifdef DEBUG
-    if (log_instructions && log_arm_instructions) {
+    if (log_instructions && log_arm_instructions && !FLAG_T()) {
         arm_print_opcode();
         if (opc == 0xd) {
             print_mnemonic("ldrsb");
@@ -880,7 +885,7 @@ void arm_special_data_processing_register(void) {
     uint32_t sbz = BITS(arm_op, 4, 11);
 
 #ifdef DEBUG
-    if (log_instructions && log_arm_instructions) {
+    if (log_instructions && log_arm_instructions && !FLAG_T()) {
         arm_print_opcode();
         if (b21) {
             print_mnemonic("msr");
@@ -891,12 +896,12 @@ void arm_special_data_processing_register(void) {
                 case 9: printf("cf"); break;
                 default: assert(false); break;
             }
-            printf(",");
+            printf(", ");
             print_register(Rm);
         } else {
             print_mnemonic("mrs");
             print_register(Rd);
-            printf(",");
+            printf(", ");
             printf(R ? "spsr" : "cpsr");
         }
         printf("\n");
@@ -915,7 +920,7 @@ void arm_special_data_processing_register(void) {
         uint32_t mask = 0;
         switch (mask_type) {
             case 8: mask = 0xf0000000; break;
-            case 9: mask = 0xf000001f; break;  // Allow bit 4 to be set?
+            case 9: mask = 0xf00000ff; break;  // Allow bits T, M[4] to be set?
             default: assert(false); break;
         }
         if (R) {
@@ -941,7 +946,7 @@ void arm_special_data_processing_immediate(void) {
     uint32_t imm = ROR(BITS(arm_op, 0, 7), 2 * rot);
 
 #ifdef DEBUG
-    if (log_instructions && log_arm_instructions) {
+    if (log_instructions && log_arm_instructions && !FLAG_T()) {
         arm_print_opcode();
         print_mnemonic("msr");
         printf(R ? "spsr" : "cpsr");
@@ -963,9 +968,9 @@ void arm_special_data_processing_immediate(void) {
     uint32_t mask = 0;
     switch (mask_type) {
         case 0: mask = 0x00000000; break;
-        case 1: mask = 0x0000001f; break;  // Allow bit 4 to be set?
+        case 1: mask = 0x000000ff; break;  // Allow bits T, M[4] to be set?
         case 8: mask = 0xf0000000; break;
-        case 9: mask = 0xf000001f; break;  // Allow bit 4 to be set?
+        case 9: mask = 0xf00000ff; break;  // Allow bits T, M[4] to be set?
         default: assert(false); break;
     }
     if (R) {
@@ -983,7 +988,7 @@ void arm_swap(void) {
     uint32_t Rm = BITS(arm_op, 0, 3);
 
 #ifdef DEBUG
-    if (log_instructions && log_arm_instructions) {
+    if (log_instructions && log_arm_instructions && !FLAG_T()) {
         arm_print_opcode();
         print_mnemonic(B ? "swpb" : "swp");
         print_register(Rd);
@@ -1014,11 +1019,11 @@ void arm_branch_and_exchange(void) {
     uint32_t Rm = BITS(arm_op, 0, 3);
 
 #ifdef DEBUG
-    if (log_instructions && log_arm_instructions) {
+    if (log_instructions && log_arm_instructions && !FLAG_T()) {
         arm_print_opcode();
         print_mnemonic("bx");
         print_register(Rm);
-        printf("  ; Rm = 0x%x", r[Rm]);
+        //printf("  ; Rm = 0x%x", r[Rm]);
         printf("\n");
     }
 #endif

@@ -23,9 +23,9 @@ void thumb_shift_by_immediate(void) {
             case SHIFT_ASR: print_mnemonic("asr"); break;
         }
         print_register(Rd);
-        printf(",");
+        printf(", ");
         print_register(Rm);
-        printf(",");
+        printf(", ");
         print_immediate(imm);
         printf("\n");
     }
@@ -56,9 +56,9 @@ void thumb_add_or_subtract_register(void) {
             case 1: print_mnemonic("sub"); break;
         }
         print_register(Rd);
-        printf(",");
+        printf(", ");
         print_register(Rn);
-        printf(",");
+        printf(", ");
         print_register(Rm);
         printf("\n");
     }
@@ -88,9 +88,9 @@ void thumb_add_or_subtract_immediate(void) {
             case 1: print_mnemonic("sub"); break;
         }
         print_register(Rd);
-        printf(",");
+        printf(", ");
         print_register(Rn);
-        printf(",");
+        printf(", ");
         print_immediate(imm);
         printf("\n");
     }
@@ -123,7 +123,7 @@ void thumb_add_subtract_compare_or_move_immediate(void) {
             case 3: print_mnemonic("sub"); break;
         }
         print_register(Rdn);
-        printf(",");
+        printf(", ");
         print_immediate(imm);
         printf("\n");
     }
@@ -182,7 +182,7 @@ void thumb_data_processing_register(void) {
             case THUMB_MVN: print_mnemonic("mvn"); break;
         }
         print_register(Rdn);
-        printf(",");
+        printf(", ");
         print_register(Rms);
         printf("\n");
     }
@@ -233,7 +233,7 @@ void thumb_special_data_processing(void) {
             case 2: print_mnemonic("mov"); break;
         }
         print_register(Rdn);
-        printf(",");
+        printf(", ");
         print_register(Rm);
         printf("\n");
     }
@@ -282,8 +282,10 @@ void thumb_load_from_literal_pool(void) {
         thumb_print_opcode();
         print_mnemonic("ldr");
         print_register(Rd);
-        printf(",");
-        print_address((r[REG_PC] & ~3) + (imm << 2));
+        printf(", ");
+        uint32_t pc_rel_address = (r[REG_PC] & ~3) + (imm << 2);
+        if ((r[REG_PC] & 3) == 0) pc_rel_address -= 4;  // FIXME
+        printf("=0x%08X  @ 0x%08X", memory_read_word(pc_rel_address), pc_rel_address);
         printf("\n");
     }
 #endif
@@ -320,9 +322,9 @@ void thumb_load_store_register(void) {
             case 7: print_mnemonic("ldrsh"); break;
         }
         print_register(Rd);
-        printf(",[");
+        printf(", [");
         print_register(Rn);
-        printf(",");
+        printf(", ");
         print_register(Rm);
         printf("]\n");
     }
@@ -368,10 +370,10 @@ void thumb_load_store_word_or_byte_immediate(void) {
             print_mnemonic(B ? "strb" : "str");
         }
         print_register(Rd);
-        printf(",[");
+        printf(", [");
         print_register(Rn);
-        printf(",");
-        print_immediate(imm);
+        printf(", ");
+        print_immediate(B ? imm : imm << 2);
         printf("]\n");
     }
 #endif
@@ -401,10 +403,10 @@ void thumb_load_store_halfword_immediate(void) {
         thumb_print_opcode();
         print_mnemonic(L ? "ldrh" : "strh");
         print_register(Rd);
-        printf(",[");
+        printf(", [");
         print_register(Rn);
-        printf(",");
-        print_immediate(imm);
+        printf(", ");
+        print_immediate(imm << 1);
         printf("]\n");
     }
 #endif
@@ -430,10 +432,10 @@ void thumb_load_store_to_or_from_stack(void) {
         thumb_print_opcode();
         print_mnemonic(L ? "ldr" : "str");
         print_register(Rd);
-        printf(",[");
+        printf(", [");
         print_register(REG_SP);
-        printf(",");
-        print_immediate(imm);
+        printf(", ");
+        print_immediate(imm << 2);
         printf("]\n");
     }
 #endif
@@ -459,9 +461,9 @@ void thumb_add_to_sp_or_pc(void) {
         thumb_print_opcode();
         print_mnemonic("add");
         print_register(Rd);
-        printf(",");
+        printf(", ");
         print_register(SP ? REG_SP : REG_PC);
-        printf(",");
+        printf(", ");
         print_immediate(ROR(imm, 30));
         printf("\n");
     }
@@ -488,7 +490,7 @@ void thumb_adjust_stack_pointer(void) {
         thumb_print_opcode();
         print_mnemonic(opc == 1 ? "sub" : "add");
         print_register(REG_SP);
-        printf(",");
+        printf(", ");
         print_immediate(ROR(imm, 30));
         printf("\n");
     }
@@ -516,7 +518,10 @@ void thumb_push_or_pop_register_list(void) {
 #ifdef DEBUG
     if (log_instructions && log_thumb_instructions) {
         thumb_print_opcode();
-        print_mnemonic(L ? "pop" : "push");
+        //print_mnemonic(L ? "pop" : "push");
+        print_mnemonic(L ? "ldmia" : "stmdb");
+        print_register(REG_SP);
+        printf("!, ");
         printf("{");
         bool first = thumb_print_rlist(rlist);
         if (R) {
@@ -552,7 +557,7 @@ void thumb_load_store_multiple(void) {
         thumb_print_opcode();
         print_mnemonic(L ? "ldmia" : "stmia");
         print_register(Rn);
-        printf("!,{");
+        printf("!, {");
         thumb_print_rlist(rlist);
         printf("}\n");
     }
@@ -592,7 +597,8 @@ void thumb_conditional_branch(void) {
             case COND_GT: print_mnemonic("bgt"); break;
             case COND_LE: print_mnemonic("ble"); break;
         }
-        print_address(r[REG_PC] + (imm << 1));
+        uint32_t pc_rel_address = r[REG_PC] - SIZEOF_INSTR + (imm << 1);  // FIXME
+        print_address(pc_rel_address);
         printf("\n");
     }
 #endif
@@ -629,7 +635,8 @@ void thumb_unconditional_branch(void) {
     if (log_instructions && log_thumb_instructions) {
         thumb_print_opcode();
         print_mnemonic("b");
-        print_address(r[REG_PC] + (imm << 1));
+        uint32_t pc_rel_address = r[REG_PC] - SIZEOF_INSTR + (imm << 1);  // FIXME
+        print_address(pc_rel_address);
         printf("\n");
     }
 #endif
@@ -645,8 +652,8 @@ void thumb_branch_with_link_prefix(void) {
 
 #ifdef DEBUG
     if (log_instructions && log_thumb_instructions) {
-        thumb_print_opcode();
-        print_mnemonic("bl.1");
+        printf("%04X%04X: ", thumb_op, thumb_pipeline[0]);
+        print_mnemonic("bl");
         printf("\n");
     }
 #endif
@@ -662,8 +669,8 @@ void thumb_branch_with_link_suffix(void) {
 #ifdef DEBUG
     if (log_instructions && log_thumb_instructions) {
         thumb_print_opcode();
-        print_mnemonic("bl.2");
-        print_address(target_address);
+        print_mnemonic("bl");
+        //print_address(target_address);
         printf("\n");
     }
 #endif

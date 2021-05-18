@@ -12,6 +12,7 @@
 
 bool single_step = false;
 uint64_t start_logging_at = 0;
+//uint64_t end_logging_at = 200000;
 uint64_t cycles = 0;
 uint32_t last_bios_access = 0xe4;
 
@@ -107,6 +108,8 @@ uint8_t game_rom[0x2000000];
     #define DMA_AT_REFRESH 3
     #define DMA_IRQ        (1 << 30)
     #define DMA_ENABLE     (1 << 31)
+#define REG_TM0CNT_L   (MEM_IO + 0x100)
+#define REG_TM0CNT_H   (MEM_IO + 0x102)
 #define REG_SIODATA32  (MEM_IO + 0x120)
 #define REG_SIOCNT     (MEM_IO + 0x128)
 #define REG_KEYINPUT   (MEM_IO + 0x130)
@@ -140,12 +143,13 @@ uint32_t io_dma0sad, io_dma0dad, io_dma0cnt;
 uint32_t io_dma1sad, io_dma1dad, io_dma1cnt;
 uint32_t io_dma2sad, io_dma2dad, io_dma2cnt;
 uint32_t io_dma3sad, io_dma3dad, io_dma3cnt;
+uint32_t io_tm0cnt;
 uint16_t io_keyinput;
 uint16_t io_keycnt;
 //uint16_t io_rcnt;
 uint16_t io_ie;
 uint16_t io_if;
-//uint16_t io_waitcnt;
+uint16_t io_waitcnt;
 uint16_t io_ime;
 uint8_t io_haltcnt;
 
@@ -199,9 +203,12 @@ uint16_t io_read_halfword(uint32_t address) {
         case REG_BG0VOFS: return io_bg0vofs;
         case REG_BG1HOFS: return io_bg1hofs;
         case REG_BG1VOFS: return io_bg1vofs;
+        case REG_BG2HOFS: return io_bg2hofs;
+        case REG_BG2VOFS: return io_bg2vofs;
 
         case IO_SOUNDBIAS:
-            return io_soundbias;
+            return 0x200;  // FIXME
+            //return io_soundbias;
 
         //case IO_DMA0CNT_H:
         //    return io_dma0cnt_h;
@@ -214,6 +221,8 @@ uint16_t io_read_halfword(uint32_t address) {
 
         //case IO_DMA3CNT_H:
         //    return io_dma3cnt_h;
+
+        case REG_TM0CNT_L: return (uint16_t) io_tm0cnt;
 
         case REG_SIODATA32: return 0;  // FIXME
         case REG_SIOCNT: return 0;  // FIXME
@@ -289,10 +298,10 @@ void io_write_halfword(uint32_t address, uint16_t value) {
             printf("WINOUT = 0x%04x\n", io_winout);
             break;
 
-        case IO_SOUNDBIAS:
-            io_soundbias = value;
-            //printf("SOUNDBIAS = 0x%04x\n", io_soundbias);
-            break;
+        //case IO_SOUNDBIAS:
+        //    io_soundbias = value;
+        //    //printf("SOUNDBIAS = 0x%04x\n", io_soundbias);
+        //    break;
 
         case REG_DMA1CNT_H:
             io_dma1cnt = (io_dma1cnt & 0xffff) | value << 16;
@@ -308,6 +317,10 @@ void io_write_halfword(uint32_t address, uint16_t value) {
 
         case REG_DMA3CNT_H:
             io_dma3cnt = (io_dma3cnt & 0xffff) | value << 16;
+            break;
+
+        case REG_TM0CNT_H:
+            io_tm0cnt = (io_tm0cnt & 0xffff) | value << 16;
             break;
 
         case REG_IE: io_ie = value; break;
@@ -395,9 +408,15 @@ void io_write_word(uint32_t address, uint32_t value) {
         case REG_DMA3DAD: io_dma3dad = value; break;
         case REG_DMA3CNT_L: io_dma3cnt = value; break;
 
+        case REG_TM0CNT_L: io_tm0cnt = value; break;
+
         case REG_IE:
             io_ie = (uint16_t) value;
             io_if = (uint16_t)(value >> 16);
+            break;
+
+        case REG_WAITCNT:
+            io_waitcnt = (uint16_t) value;
             break;
 
         case REG_IME:
@@ -543,7 +562,7 @@ void memory_write_halfword(uint32_t address, uint16_t value) {
         return;
     }
     if (address >= 0x08000000 && address < 0x0e000000) {
-        //return;  // Read only
+        return;  // Read only
     }
     printf("memory_write_halfword(0x%08x, 0x%04x);\n", address, value);
 }
@@ -622,7 +641,7 @@ void memory_write_word(uint32_t address, uint32_t value) {
         return;
     }
     if (address >= 0x08000000 && address < 0x0e000000) {
-        //return;  // Read only
+        return;  // Read only
     }
     printf("memory_write_word(0x%08x, 0x%08x);\n", address, value);
 }
@@ -857,29 +876,30 @@ void gba_dma_update(void) {
     for (int ch = 0; ch < 4; ch++) {
         uint32_t dmacnt = io_read_word(REG_DMA0CNT_L + 12 * ch);
 
-        if ((dmacnt & DMA_ENABLE) != 0) {
-            // FIXME check dma start condition
+        if ((dmacnt & DMA_ENABLE) == 0) continue;
 
-            uint32_t dst_ctrl = (dmacnt >> 21) & 3;
-            uint32_t src_ctrl = (dmacnt >> 23) & 3;
-            uint32_t dst_addr = io_read_word(REG_DMA0DAD + 12 * ch);
-            uint32_t src_addr = io_read_word(REG_DMA0SAD + 12 * ch);
-            uint32_t len = (ch == 3 ? dmacnt & 0xffff : dmacnt & 0x3fff);
-            if (len == 0) len = (ch == 3 ? 0x10000 : 0x4000);
+        uint32_t start_timing = (dmacnt >> 28) & 3;
+        assert(start_timing == 0);
 
-            assert(dst_ctrl != DMA_REPEAT);
-            assert(src_ctrl != DMA_REPEAT);
+        uint32_t dst_ctrl = (dmacnt >> 21) & 3;
+        uint32_t src_ctrl = (dmacnt >> 23) & 3;
+        uint32_t dst_addr = io_read_word(REG_DMA0DAD + 12 * ch);
+        uint32_t src_addr = io_read_word(REG_DMA0SAD + 12 * ch);
+        uint32_t len = (ch == 3 ? dmacnt & 0xffff : dmacnt & 0x3fff);
+        if (len == 0) len = (ch == 3 ? 0x10000 : 0x4000);
 
-            if ((dmacnt & DMA_32) != 0) {
-                gba_dma_transfer_words(dst_ctrl, src_ctrl, dst_addr, src_addr, len);
-            } else {
-                gba_dma_transfer_halfwords(dst_ctrl, src_ctrl, dst_addr, src_addr, len);
-            }
+        assert(dst_ctrl != DMA_REPEAT);
+        assert(src_ctrl != DMA_REPEAT);
 
-            if ((dmacnt & DMA_REPEAT) == 0) {
-                dmacnt &= ~DMA_ENABLE;
-                io_write_word(REG_DMA0CNT_L + 12 * ch, dmacnt);
-            }
+        if ((dmacnt & DMA_32) != 0) {
+            gba_dma_transfer_words(dst_ctrl, src_ctrl, dst_addr, src_addr, len);
+        } else {
+            gba_dma_transfer_halfwords(dst_ctrl, src_ctrl, dst_addr, src_addr, len);
+        }
+
+        if ((dmacnt & DMA_REPEAT) == 0) {
+            dmacnt &= ~DMA_ENABLE;
+            io_write_word(REG_DMA0CNT_L + 12 * ch, dmacnt);
         }
     }
 }
@@ -912,6 +932,11 @@ void gba_emulate(void) {
                 char c = fgetc(stdin);
                 if (c == EOF) exit(EXIT_SUCCESS);
             }
+            /*
+            if (instruction_count == end_logging_at) {
+                exit(EXIT_SUCCESS);
+            }
+            */
 #endif
         }
     }

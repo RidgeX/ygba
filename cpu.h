@@ -6,7 +6,7 @@
 #define ZERO_EXTEND(x, i) if ((x) & (1 << (i))) { (x) |= ~((1 << ((i) + 1)) - 1); }
 
 #define FLAG_C() (cpsr & PSR_C ? true : false)
-//#define FLAG_T() (cpsr & PSR_T ? true : false)
+#define FLAG_T() (cpsr & PSR_T ? true : false)
 
 #define ASSIGN_N(x) if ((x)) { cpsr |= PSR_N; } else { cpsr &= ~PSR_N; }
 #define ASSIGN_Z(x) if ((x)) { cpsr |= PSR_Z; } else { cpsr &= ~PSR_Z; }
@@ -116,6 +116,7 @@ extern uint32_t spsr_svc;
 extern bool branch_taken;
 extern uint32_t arm_op;
 extern uint16_t thumb_op;
+extern uint16_t thumb_pipeline[2];
 
 uint8_t memory_read_byte(uint32_t address);
 void memory_write_byte(uint32_t address, uint8_t value);
@@ -144,6 +145,7 @@ void print_all_registers(void);
 void arm_print_opcode(void);
 void thumb_print_opcode(void);
 void print_mnemonic(char *s);
+void print_mnemonic_d(char *s, char *t);
 void print_register(uint32_t i);
 void print_immediate(uint32_t i);
 void print_address(uint32_t i);
