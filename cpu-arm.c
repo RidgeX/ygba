@@ -892,6 +892,7 @@ void arm_special_data_processing_register(void) {
             printf(R ? "spsr" : "cpsr");
             printf("_");
             switch (mask_type) {
+                case 1: printf("c"); break;
                 case 8: printf("f"); break;
                 case 9: printf("cf"); break;
                 default: assert(false); break;
@@ -919,6 +920,7 @@ void arm_special_data_processing_register(void) {
     if (b21) {
         uint32_t mask = 0;
         switch (mask_type) {
+            case 1: mask = 0x000000ff; break;  // Allow bits T, M[4] to be set?
             case 8: mask = 0xf0000000; break;
             case 9: mask = 0xf00000ff; break;  // Allow bits T, M[4] to be set?
             default: assert(false); break;
