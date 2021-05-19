@@ -560,12 +560,28 @@ void io_write_word(uint32_t address, uint32_t value) {
     }
 }
 
-#define MANUFACTURER_SST  0xbf
+#define MANUFACTURER_ATMEL     0x1f
+#define DEVICE_AT29LV512       0x3d  // 512 Kbit
+//#define DEVICE_AT29LV010     0x35  // 1 Mbit
+//#define DEVICE_AT29LV020     0xba  // 2 Mbit
+//#define DEVICE_AT29LV040     0x3b  // 4 Mbit
 
-#define DEVICE_SST39VF512 0xd4  // 512 Kbit
-#define DEVICE_SST39VF010 0xd5  // 1 Mbit
-#define DEVICE_SST39VF020 0xd6  // 2 Mbit
-#define DEVICE_SST39VF040 0xd7  // 4 Mbit
+#define MANUFACTURER_PANASONIC 0x32
+#define DEVICE_MN63F805MNP     0x1b  // 512 Kbit
+
+#define MANUFACTURER_SANYO     0x62
+#define DEVICE_LE26FV10N1TS    0x13  // 1 Mbit
+
+#define MANUFACTURER_SST       0xbf
+#define DEVICE_SST39VF512      0xd4  // 512 Kbit
+//#define DEVICE_SST39VF010    0xd5  // 1 Mbit
+//#define DEVICE_SST39VF020    0xd6  // 2 Mbit
+//#define DEVICE_SST39VF040    0xd7  // 4 Mbit
+//#define DEVICE_SST39VF080    0xd8  // 8 Mbit
+
+#define MANUFACTURER_MACRONIX  0xc2
+#define DEVICE_MX29L512        0x1c  // 512 Kbit
+#define DEVICE_MX29L010        0x09  // 1 Mbit
 
 uint32_t flash_bank = 0;
 uint32_t flash_state = 0;
@@ -581,7 +597,8 @@ uint8_t backup_read_byte(uint32_t address) {
         if (flash_id) {
             if (address == 0) return flash_manufacturer;
             if (address == 1) return flash_device;
-            return 0xff;
+            assert(false);
+            //return 0xff;
         }
         return backup_flash[flash_bank * 0x10000 + address];
     } else if (has_sram) {
@@ -594,6 +611,7 @@ uint8_t backup_read_byte(uint32_t address) {
 }
 
 void backup_write_byte(uint32_t address, uint8_t value) {
+    //printf("backup_write_byte(%08X, %02X);\n", address, value);  // FIXME
     if (has_eeprom) {
         assert(false);
     } else if (has_flash) {
@@ -602,6 +620,7 @@ void backup_write_byte(uint32_t address, uint8_t value) {
             case 4:
             case 8:
                 if (address == 0x5555 && value == 0xaa) { flash_state++; break; }
+                if (value != 0xf0) assert(false);
                 flash_state &= ~7;
                 break;
 
@@ -609,17 +628,19 @@ void backup_write_byte(uint32_t address, uint8_t value) {
             case 5:
             case 9:
                 if (address == 0x2aaa && value == 0x55) { flash_state++; break; }
+                assert(false);
                 flash_state &= ~7;
                 break;
 
             case 2:
             case 6:
             case 10:
-                if (!(flash_state & 4)) {  // Normal mode
+                if ((flash_state & ~3) == 0) {  // Normal mode
                     if (address == 0x5555 && value == 0x80) { flash_state = 4; break; }
                     if (address == 0x5555 && value == 0x90) { flash_state = 8; flash_id = true; break; }
                     if (address == 0x5555 && value == 0xa0) { flash_state = 3; break; }
                     if (address == 0x5555 && value == 0xb0) { flash_state = 7; break; }
+                    assert(false);
                 }
                 if (flash_state & 4) {  // Erase mode
                     if (address == 0x5555 && value == 0x10) {  // Chip erase
@@ -633,10 +654,13 @@ void backup_write_byte(uint32_t address, uint8_t value) {
                         memset(&backup_flash[flash_bank * 0x10000 + sector * 0x1000], 0xff, sizeof(uint8_t) * 0x1000);
                         break;
                     }
+                    assert(false);
                 }
                 if (flash_state & 8) {  // Software ID mode
                     if (address == 0x5555 && value == 0xf0) { flash_state = 0; flash_id = false; break; }
+                    assert(false);
                 }
+                assert(false);
                 flash_state &= ~7;
                 break;
 
@@ -646,6 +670,8 @@ void backup_write_byte(uint32_t address, uint8_t value) {
                 break;
 
             case 7:  // Bank switch
+                assert(address == 0);
+                assert(value == 0 || value == 1);
                 flash_bank = value & 1;
                 flash_state = 0;
                 break;
@@ -931,27 +957,27 @@ void gba_detect_cartridge_features(void) {
 
     uint8_t *eeprom_v = (uint8_t *) "EEPROM_V";
     match = boyer_moore_matcher(game_rom, game_rom_size, eeprom_v, 8);
-    if (match) has_eeprom = true;
+    if (match) { has_eeprom = true; }
 
     uint8_t *flash_v = (uint8_t *) "FLASH_V";
     match = boyer_moore_matcher(game_rom, game_rom_size, flash_v, 7);
-    if (match) has_flash = true;
+    if (match) { has_flash = true; flash_manufacturer = MANUFACTURER_SST; flash_device = DEVICE_SST39VF512; }
 
     uint8_t *flash512_v = (uint8_t *) "FLASH512_V";
     match = boyer_moore_matcher(game_rom, game_rom_size, flash512_v, 10);
-    if (match) has_flash = true;
+    if (match) { has_flash = true; flash_manufacturer = MANUFACTURER_SST; flash_device = DEVICE_SST39VF512; }
 
     uint8_t *flash1m_v = (uint8_t *) "FLASH1M_V";
     match = boyer_moore_matcher(game_rom, game_rom_size, flash1m_v, 9);
-    if (match) has_flash = true;
+    if (match) { has_flash = true; flash_manufacturer = MANUFACTURER_MACRONIX; flash_device = DEVICE_MX29L010; }
 
     uint8_t *sram_v = (uint8_t *) "SRAM_V";
     match = boyer_moore_matcher(game_rom, game_rom_size, sram_v, 6);
-    if (match) has_sram = true;
+    if (match) { has_sram = true; }
 
     uint8_t *sram_f_v = (uint8_t *) "SRAM_F_V";
     match = boyer_moore_matcher(game_rom, game_rom_size, sram_f_v, 8);
-    if (match) has_sram = true;  // FIXME?
+    if (match) { has_sram = true; }  // FIXME?
 
     printf("has_eeprom = %s\n", (has_eeprom ? "true" : "false"));
     printf("has_flash = %s\n", (has_flash ? "true" : "false"));
