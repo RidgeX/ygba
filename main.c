@@ -560,14 +560,29 @@ void io_write_word(uint32_t address, uint32_t value) {
     }
 }
 
+#define MANUFACTURER_SST  0xbf
+
+#define DEVICE_SST39VF512 0xd4  // 512 Kbit
+#define DEVICE_SST39VF010 0xd5  // 1 Mbit
+#define DEVICE_SST39VF020 0xd6  // 2 Mbit
+#define DEVICE_SST39VF040 0xd7  // 4 Mbit
+
 uint32_t flash_bank = 0;
 uint32_t flash_state = 0;
+bool flash_id = false;
+uint8_t flash_manufacturer = MANUFACTURER_SST;
+uint8_t flash_device = DEVICE_SST39VF512;
 
 uint8_t backup_read_byte(uint32_t address) {
     if (has_eeprom) {
         assert(false);
     } else if (has_flash) {
-        flash_state = 0;
+        flash_state &= ~7;
+        if (flash_id) {
+            if (address == 0) return flash_manufacturer;
+            if (address == 1) return flash_device;
+            return 0xff;
+        }
         return backup_flash[flash_bank * 0x10000 + address];
     } else if (has_sram) {
         return backup_sram[address];
@@ -575,7 +590,7 @@ uint8_t backup_read_byte(uint32_t address) {
 #ifdef LOG_BAD_MEMORY_ACCESS
     printf("backup_read_byte(0x%08x);\n", address);
 #endif
-    return -1;  // FIXME? 0
+    return 0xff;  // FIXME? 0
 }
 
 void backup_write_byte(uint32_t address, uint8_t value) {
@@ -585,34 +600,44 @@ void backup_write_byte(uint32_t address, uint8_t value) {
         switch (flash_state) {
             case 0:
             case 4:
+            case 8:
                 if (address == 0x5555 && value == 0xaa) { flash_state++; break; }
-                flash_state = 0;
+                flash_state &= ~7;
                 break;
 
             case 1:
             case 5:
+            case 9:
                 if (address == 0x2aaa && value == 0x55) { flash_state++; break; }
-                flash_state = 0;
+                flash_state &= ~7;
                 break;
 
             case 2:
             case 6:
-                if (flash_state == 2) {
+            case 10:
+                if (!(flash_state & 4)) {  // Normal mode
                     if (address == 0x5555 && value == 0x80) { flash_state = 4; break; }
+                    if (address == 0x5555 && value == 0x90) { flash_state = 8; flash_id = true; break; }
                     if (address == 0x5555 && value == 0xa0) { flash_state = 3; break; }
                     if (address == 0x5555 && value == 0xb0) { flash_state = 7; break; }
                 }
-                if (flash_state == 6) {
+                if (flash_state & 4) {  // Erase mode
                     if (address == 0x5555 && value == 0x10) {  // Chip erase
+                        printf("Chip erase\n");
                         memset(backup_flash, 0xff, sizeof(uint8_t) * sizeof(backup_flash));
+                        break;
                     }
                     if (value == 0x30) {  // Sector erase
-                        printf("Erase sector, address = 0x%x\n", address);  // FIXME
-                        assert(address == 0);
-                        memset(&backup_flash[flash_bank * 0x10000], 0xff, sizeof(uint8_t) * 0x1000);
+                        uint32_t sector = address >> 12;
+                        printf("Sector erase, sector = %d\n", sector);
+                        memset(&backup_flash[flash_bank * 0x10000 + sector * 0x1000], 0xff, sizeof(uint8_t) * 0x1000);
+                        break;
                     }
                 }
-                flash_state = 0;
+                if (flash_state & 8) {  // Software ID mode
+                    if (address == 0x5555 && value == 0xf0) { flash_state = 0; flash_id = false; break; }
+                }
+                flash_state &= ~7;
                 break;
 
             case 3:  // Byte program
@@ -621,9 +646,7 @@ void backup_write_byte(uint32_t address, uint8_t value) {
                 break;
 
             case 7:  // Bank switch
-                assert(address == 0);
-                assert(value == 0 || value == 1);
-                flash_bank = value;
+                flash_bank = value & 1;
                 flash_state = 0;
                 break;
 
