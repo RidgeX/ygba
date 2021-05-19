@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "algorithms.h"
 #include "cpu.h"
 
 //#define LOG_BAD_MEMORY_ACCESS
@@ -19,7 +20,7 @@ uint32_t ppu_cycles = 0;
 uint32_t timer_cycles = 0;
 uint32_t last_bios_access = 0xe4;
 bool skip_bios = true;
-//bool has_eeprom = false;
+bool has_eeprom = false;
 bool has_flash = false;
 //bool has_rtc = false;
 bool has_sram = false;
@@ -40,8 +41,9 @@ uint8_t palette_ram[0x400];
 uint8_t video_ram[0x18000];
 uint8_t object_ram[0x400];
 uint8_t game_rom[0x2000000];
-uint8_t save_flash[0x10000];
-uint8_t save_sram[0x10000];
+uint32_t game_rom_size;
+uint8_t backup_flash[0x20000];
+uint8_t backup_sram[0x10000];
 
 #define MEM_IO        0x4000000
 #define MEM_VRAM      0x6000000
@@ -558,6 +560,104 @@ void io_write_word(uint32_t address, uint32_t value) {
     }
 }
 
+uint32_t flash_bank = 0;
+uint32_t flash_state = 0;
+
+uint8_t backup_read_byte(uint32_t address) {
+    if (has_eeprom) {
+        assert(false);
+    } else if (has_flash) {
+        flash_state = 0;
+        return backup_flash[flash_bank * 0x10000 + address];
+    } else if (has_sram) {
+        return backup_sram[address];
+    }
+#ifdef LOG_BAD_MEMORY_ACCESS
+    printf("backup_read_byte(0x%08x);\n", address);
+#endif
+    return -1;  // FIXME? 0
+}
+
+void backup_write_byte(uint32_t address, uint8_t value) {
+    if (has_eeprom) {
+        assert(false);
+    } else if (has_flash) {
+        switch (flash_state) {
+            case 0:
+            case 4:
+                if (address == 0x5555 && value == 0xaa) { flash_state++; break; }
+                flash_state = 0;
+                break;
+
+            case 1:
+            case 5:
+                if (address == 0x2aaa && value == 0x55) { flash_state++; break; }
+                flash_state = 0;
+                break;
+
+            case 2:
+            case 6:
+                if (flash_state == 2) {
+                    if (address == 0x5555 && value == 0x80) { flash_state = 4; break; }
+                    if (address == 0x5555 && value == 0xa0) { flash_state = 3; break; }
+                    if (address == 0x5555 && value == 0xb0) { flash_state = 7; break; }
+                }
+                if (flash_state == 6) {
+                    if (address == 0x5555 && value == 0x10) {  // Chip erase
+                        memset(backup_flash, 0xff, sizeof(uint8_t) * sizeof(backup_flash));
+                    }
+                    if (value == 0x30) {  // Sector erase
+                        printf("Erase sector, address = 0x%x\n", address);  // FIXME
+                        assert(address == 0);
+                        memset(&backup_flash[flash_bank * 0x10000], 0xff, sizeof(uint8_t) * 0x1000);
+                    }
+                }
+                flash_state = 0;
+                break;
+
+            case 3:  // Byte program
+                backup_flash[flash_bank * 0x10000 + address] = value;
+                flash_state = 0;
+                break;
+
+            case 7:  // Bank switch
+                assert(address == 0);
+                assert(value == 0 || value == 1);
+                flash_bank = value;
+                flash_state = 0;
+                break;
+
+            default:
+                abort();
+        }
+        return;
+    } else if (has_sram) {
+        backup_sram[address] = value;
+        return;
+    }
+#ifdef LOG_BAD_MEMORY_ACCESS
+    printf("backup_write_byte(0x%08x, 0x%02x);\n", address, value);
+#endif
+}
+
+uint16_t backup_read_halfword(uint32_t address) {
+    uint16_t value = backup_read_byte(address);
+    return value | value << 8;
+}
+
+void backup_write_halfword(uint32_t address, uint16_t value) {
+    backup_write_byte(address, (uint8_t)(value >> 8 * (address & 1)));
+}
+
+uint32_t backup_read_word(uint32_t address) {
+    uint32_t value = backup_read_byte(address);
+    return value | value << 8 | value << 16 | value << 24;
+}
+
+void backup_write_word(uint32_t address, uint32_t value) {
+    backup_write_byte(address, (uint8_t)(value >> 8 * (address & 3)));
+}
+
 uint8_t memory_read_byte(uint32_t address) {
     if (address < 0x4000) {
         if (r[15] < 0x4000) last_bios_access = address;
@@ -587,14 +687,7 @@ uint8_t memory_read_byte(uint32_t address) {
         return game_rom[address & 0x1ffffff];
     }
     if (address >= 0x0e000000 && address < 0x10000000) {
-        if (has_flash) {
-            printf("memory_read_byte(0x%08x);\n", address);  // TODO
-            return -1;
-        }
-        if (has_sram) {
-            return save_sram[address & 0xffff];
-        }
-        //return 0;  // FIXME -1
+        return backup_read_byte(address & 0xffff);
     }
 #ifdef LOG_BAD_MEMORY_ACCESS
     printf("memory_read_byte(0x%08x);\n", address);
@@ -636,14 +729,8 @@ void memory_write_byte(uint32_t address, uint8_t value) {
         //return;  // Read only
     }
     if (address >= 0x0e000000 && address < 0x10000000) {
-        if (has_flash) {
-            printf("memory_write_byte(0x%08x, 0x%02x);\n", address, value);  // TODO
-            return;
-        }
-        if (has_sram) {
-            save_sram[address & 0xffff] = value;
-            return;
-        }
+        backup_write_byte(address & 0xffff, value);
+        return;
     }
 #ifdef LOG_BAD_MEMORY_ACCESS
     printf("memory_write_byte(0x%08x, 0x%02x);\n", address, value);
@@ -679,15 +766,7 @@ uint16_t memory_read_halfword(uint32_t address) {
         return *(uint16_t *)&game_rom[address & 0x1fffffe];
     }
     if (address >= 0x0e000000 && address < 0x10000000) {
-        if (has_flash) {
-            printf("memory_read_halfword(0x%08x);\n", address);  // TODO
-            return -1;
-        }
-        if (has_sram) {
-            uint8_t value = save_sram[address & 0xffff];
-            return value | value << 8;
-        }
-        //return 0;  // FIXME -1
+        return backup_read_halfword(address & 0xffff);
     }
 #ifdef LOG_BAD_MEMORY_ACCESS
     printf("memory_read_halfword(0x%08x);\n", address);
@@ -729,14 +808,7 @@ void memory_write_halfword(uint32_t address, uint16_t value) {
         //return;  // Read only
     }
     if (address >= 0x0e000000 && address < 0x10000000) {
-        if (has_flash) {
-            printf("memory_write_halfword(0x%08x, 0x%04x);\n", address, value);  // TODO
-            return;
-        }
-        if (has_sram) {
-            save_sram[address & 0xffff] = (uint8_t)(value >> 8 * (address & 1));
-            return;
-        }
+        backup_write_halfword(address & 0xffff, value);
     }
 #ifdef LOG_BAD_MEMORY_ACCESS
     printf("memory_write_halfword(0x%08x, 0x%04x);\n", address, value);
@@ -775,15 +847,7 @@ uint32_t memory_read_word(uint32_t address) {
         return *(uint32_t *)&game_rom[address & 0x1fffffc];
     }
     if (address >= 0x0e000000 && address < 0x10000000) {
-        if (has_flash) {
-            printf("memory_read_word(0x%08x);\n", address);  // TODO
-            return -1;
-        }
-        if (has_sram) {
-            uint8_t value = save_sram[address & 0xffff];
-            return value | value << 8 | value << 16 | value << 24;
-        }
-        //return 0;  // FIXME -1
+        return backup_read_word(address & 0xffff);
     }
 #ifdef LOG_BAD_MEMORY_ACCESS
     printf("memory_read_word(0x%08x);\n", address);
@@ -828,18 +892,47 @@ void memory_write_word(uint32_t address, uint32_t value) {
         //return;  // Read only
     }
     if (address >= 0x0e000000 && address < 0x10000000) {
-        if (has_flash) {
-            printf("memory_write_word(0x%08x, 0x%08x);\n", address, value);  // TODO
-            return;
-        }
-        if (has_sram) {
-            save_sram[address & 0xffff] = (uint32_t)(value >> 8 * (address & 3));
-            return;
-        }
+        backup_write_word(address & 0xffff, value);
     }
 #ifdef LOG_BAD_MEMORY_ACCESS
     printf("memory_write_word(0x%08x, 0x%08x);\n", address, value);
 #endif
+}
+
+void gba_detect_cartridge_features(void) {
+    void *match;
+
+    has_eeprom = false;
+    has_flash = false;
+    has_sram = false;
+
+    uint8_t *eeprom_v = (uint8_t *) "EEPROM_V";
+    match = boyer_moore_matcher(game_rom, game_rom_size, eeprom_v, 8);
+    if (match) has_eeprom = true;
+
+    uint8_t *flash_v = (uint8_t *) "FLASH_V";
+    match = boyer_moore_matcher(game_rom, game_rom_size, flash_v, 7);
+    if (match) has_flash = true;
+
+    uint8_t *flash512_v = (uint8_t *) "FLASH512_V";
+    match = boyer_moore_matcher(game_rom, game_rom_size, flash512_v, 10);
+    if (match) has_flash = true;
+
+    uint8_t *flash1m_v = (uint8_t *) "FLASH1M_V";
+    match = boyer_moore_matcher(game_rom, game_rom_size, flash1m_v, 9);
+    if (match) has_flash = true;
+
+    uint8_t *sram_v = (uint8_t *) "SRAM_V";
+    match = boyer_moore_matcher(game_rom, game_rom_size, sram_v, 6);
+    if (match) has_sram = true;
+
+    uint8_t *sram_f_v = (uint8_t *) "SRAM_F_V";
+    match = boyer_moore_matcher(game_rom, game_rom_size, sram_f_v, 8);
+    if (match) has_sram = true;  // FIXME?
+
+    printf("has_eeprom = %s\n", (has_eeprom ? "true" : "false"));
+    printf("has_flash = %s\n", (has_flash ? "true" : "false"));
+    printf("has_sram = %s\n", (has_sram ? "true" : "false"));
 }
 
 void gba_init(const char *filename) {
@@ -854,15 +947,16 @@ void gba_init(const char *filename) {
     fp = fopen(filename, "rb");
     assert(fp != NULL);
     fseek(fp, 0, SEEK_END);
-    uint32_t game_rom_size = ftell(fp);
+    game_rom_size = ftell(fp);
     fseek(fp, 0, SEEK_SET);
     fread(game_rom, sizeof(uint8_t), game_rom_size, fp);
     fclose(fp);
 
     memset(r, 0, sizeof(uint32_t) * 16);
 
-    memset(save_flash, 0xff, sizeof(uint8_t) * sizeof(save_flash));
-    memset(save_sram, 0xff, sizeof(uint8_t) * sizeof(save_sram));
+    gba_detect_cartridge_features();
+    memset(backup_flash, 0xff, sizeof(uint8_t) * sizeof(backup_flash));
+    memset(backup_sram, 0xff, sizeof(uint8_t) * sizeof(backup_sram));
 
     arm_init_registers(skip_bios);
 
