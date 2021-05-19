@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#include "algorithms.h"
 #include "cpu.h"
 
 static uint64_t arm_alu_op(uint32_t opc, uint64_t n, uint64_t m) {
@@ -477,7 +478,7 @@ void arm_load_store_multiple(void) {
     }
 #endif
 
-    uint32_t count = bit_count(rlist);
+    uint32_t count = bits_popcount(rlist);
     if (rlist == 0) {  // Empty rlist
         rlist |= 1 << REG_PC;
         count = 16;
@@ -505,7 +506,7 @@ void arm_load_store_multiple(void) {
                 if (i == REG_PC) {
                     memory_write_word(address, r[i] + SIZEOF_INSTR);
                 } else if (i == Rn) {
-                    if (lowest_set_bit(rlist) == Rn) {
+                    if (bits_ctz(rlist) == Rn) {
                         memory_write_word(address, old_base);
                     } else {
                         memory_write_word(address, new_base);

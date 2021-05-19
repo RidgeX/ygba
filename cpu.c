@@ -53,39 +53,6 @@ uint32_t align_halfword(uint32_t address, uint16_t value) {
     return ROR(value, 8 * (address & 1));
 }
 
-uint32_t bit_count(uint32_t x) {
-#ifdef __GNUC__
-    return __builtin_popcount(x);
-#else
-    x = x - ((x >> 1) & 0x55555555);
-    x = ((x >> 2) & 0x33333333) + (x & 0x33333333);
-    x = (x + (x >> 4)) & 0x0f0f0f0f;
-    x = (x + (x >> 16));
-    return (x + (x >> 8)) & 0x0000003f;
-#endif
-}
-
-uint32_t lowest_set_bit(uint32_t x) {
-#ifdef __GNUC__
-    return __builtin_ctz(x);
-#else
-    uint32_t t = ((x & 0x0000ffff) == 0) << 4;
-    x >>= t;
-    uint32_t r = t;
-    t = ((x & 0x00ff) == 0) << 3;
-    x >>= t;
-    r += t;
-    t = ((x & 0x0f) == 0) << 2;
-    x >>= t;
-    r += t;
-    t = ((x & 0x3) == 0) << 1;
-    x >>= t;
-    x &= 3;
-    r += t;
-    return r + ((2 - (x >> 1)) & -((x & 1) == 0));
-#endif
-}
-
 void mode_change(uint32_t old_mode, uint32_t new_mode) {
     if (old_mode == new_mode) return;
     if (old_mode == PSR_MODE_USR && new_mode == PSR_MODE_SYS) return;

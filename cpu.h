@@ -1,3 +1,6 @@
+#ifndef CPU_H
+#define CPU_H
+
 #define BIT(x, i) (((x) >> (i)) & 1)
 #define BITS(x, i, j) (((x) >> (i)) & ((1 << ((j) - (i) + 1)) - 1))
 
@@ -115,6 +118,7 @@ extern uint32_t cpsr;
 extern uint32_t spsr_svc;
 extern bool branch_taken;
 extern uint32_t arm_op;
+extern uint32_t arm_pipeline[2];
 extern uint16_t thumb_op;
 extern uint16_t thumb_pipeline[2];
 
@@ -128,8 +132,6 @@ void memory_write_word(uint32_t address, uint32_t value);
 void arm_init_registers(bool skip_bios);
 uint32_t align_word(uint32_t address, uint32_t value);
 uint32_t align_halfword(uint32_t address, uint16_t value);
-uint32_t bit_count(uint32_t x);
-uint32_t lowest_set_bit(uint32_t x);
 void mode_change(uint32_t old_mode, uint32_t new_mode);
 bool condition_passed(uint32_t cond);
 void write_cpsr(uint32_t psr);
@@ -195,3 +197,5 @@ void thumb_software_interrupt(void);
 void thumb_unconditional_branch(void);
 void thumb_branch_with_link_prefix(void);
 void thumb_branch_with_link_suffix(void);
+
+#endif  // CPU_H

@@ -42,6 +42,7 @@ uint8_t video_ram[0x18000];
 uint8_t object_ram[0x400];
 uint8_t game_rom[0x2000000];
 uint32_t game_rom_size;
+uint32_t game_rom_mask;
 uint8_t backup_flash[0x20000];
 uint8_t backup_sram[0x10000];
 
@@ -586,10 +587,11 @@ void io_write_word(uint32_t address, uint32_t value) {
 uint32_t flash_bank = 0;
 uint32_t flash_state = 0;
 bool flash_id = false;
-uint8_t flash_manufacturer = MANUFACTURER_SST;
-uint8_t flash_device = DEVICE_SST39VF512;
+uint8_t flash_manufacturer = 0;
+uint8_t flash_device = 0;
 
 uint8_t backup_read_byte(uint32_t address) {
+    //printf("backup_read_byte(0x%08x);\n", address);  // FIXME
     if (has_eeprom) {
         assert(false);
     } else if (has_flash) {
@@ -733,7 +735,7 @@ uint8_t memory_read_byte(uint32_t address) {
         return object_ram[address & 0x3ff];
     }    
     if (address >= 0x08000000 && address < 0x0e000000) {
-        return game_rom[address & 0x1ffffff];
+        return game_rom[address & game_rom_mask];
     }
     if (address >= 0x0e000000 && address < 0x10000000) {
         return backup_read_byte(address & 0xffff);
@@ -812,7 +814,7 @@ uint16_t memory_read_halfword(uint32_t address) {
         return *(uint16_t *)&object_ram[address & 0x3fe];
     }
     if (address >= 0x08000000 && address < 0x0e000000) {
-        return *(uint16_t *)&game_rom[address & 0x1fffffe];
+        return *(uint16_t *)&game_rom[address & (game_rom_mask & ~1)];
     }
     if (address >= 0x0e000000 && address < 0x10000000) {
         return backup_read_halfword(address & 0xffff);
@@ -893,7 +895,7 @@ uint32_t memory_read_word(uint32_t address) {
         return *(uint32_t *)&object_ram[address & 0x3fc];
     }
     if (address >= 0x08000000 && address < 0x0e000000) {
-        return *(uint32_t *)&game_rom[address & 0x1fffffc];
+        return *(uint32_t *)&game_rom[address & (game_rom_mask & ~3)];
     }
     if (address >= 0x0e000000 && address < 0x10000000) {
         return backup_read_word(address & 0xffff);
@@ -961,15 +963,15 @@ void gba_detect_cartridge_features(void) {
 
     uint8_t *flash_v = (uint8_t *) "FLASH_V";
     match = boyer_moore_matcher(game_rom, game_rom_size, flash_v, 7);
-    if (match) { has_flash = true; flash_manufacturer = MANUFACTURER_SST; flash_device = DEVICE_SST39VF512; }
+    if (match) { has_flash = true; flash_manufacturer = MANUFACTURER_PANASONIC; flash_device = DEVICE_MN63F805MNP; }
 
     uint8_t *flash512_v = (uint8_t *) "FLASH512_V";
     match = boyer_moore_matcher(game_rom, game_rom_size, flash512_v, 10);
-    if (match) { has_flash = true; flash_manufacturer = MANUFACTURER_SST; flash_device = DEVICE_SST39VF512; }
+    if (match) { has_flash = true; flash_manufacturer = MANUFACTURER_PANASONIC; flash_device = DEVICE_MN63F805MNP; }
 
     uint8_t *flash1m_v = (uint8_t *) "FLASH1M_V";
     match = boyer_moore_matcher(game_rom, game_rom_size, flash1m_v, 9);
-    if (match) { has_flash = true; flash_manufacturer = MANUFACTURER_MACRONIX; flash_device = DEVICE_MX29L010; }
+    if (match) { has_flash = true; flash_manufacturer = MANUFACTURER_SANYO; flash_device = DEVICE_LE26FV10N1TS; }
 
     uint8_t *sram_v = (uint8_t *) "SRAM_V";
     match = boyer_moore_matcher(game_rom, game_rom_size, sram_v, 6);
@@ -997,6 +999,8 @@ void gba_init(const char *filename) {
     assert(fp != NULL);
     fseek(fp, 0, SEEK_END);
     game_rom_size = ftell(fp);
+    assert(game_rom_size > 0);
+    game_rom_mask = next_power_of_2(game_rom_size) - 1;
     fseek(fp, 0, SEEK_SET);
     fread(game_rom, sizeof(uint8_t), game_rom_size, fp);
     fclose(fp);
