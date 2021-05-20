@@ -18,6 +18,7 @@ uint64_t start_logging_at = 0;
 //uint64_t end_logging_at = 200000;
 int ppu_cycles = 0;
 int timer_cycles = 0;
+bool halted = false;
 uint32_t last_bios_access = 0xe4;
 bool skip_bios = true;
 bool has_eeprom = false;
@@ -1365,6 +1366,7 @@ void gba_emulate(void) {
 
         if (!branch_taken && (cpsr & PSR_I) == 0 && io_if != 0) {
             arm_hardware_interrupt();
+            halted = false;
         }
     }
 }

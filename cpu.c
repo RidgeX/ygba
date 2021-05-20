@@ -10,7 +10,6 @@ bool log_instructions = false;
 bool log_arm_instructions = true;
 bool log_thumb_instructions = true;
 bool log_registers = false;
-bool halted = false;
 uint64_t instruction_count = 0;
 
 uint32_t r[16];
@@ -210,6 +209,12 @@ int arm_undefined_instruction(void) {
 
     assert(false);
 
+    r14_und = r[REG_PC] - SIZEOF_INSTR;  // ARM: PC + 4, Thumb: PC + 2
+    spsr_und = cpsr;
+    write_cpsr((cpsr & ~(PSR_T | PSR_MODE)) | PSR_I | PSR_MODE_UND);
+    r[REG_PC] = VEC_UNDEF;
+    branch_taken = true;
+
     return 1;
 }
 
@@ -220,7 +225,7 @@ int thumb_undefined_instruction(void) {
 
     assert(false);
 
-    return 1;
+    return arm_undefined_instruction();
 }
 
 int arm_step(void) {
@@ -393,15 +398,6 @@ void thumb_init_lookup(void) {
     thumb_bind("11101xxx", thumb_undefined_instruction);
     thumb_bind("11110xxx", thumb_branch_with_link_prefix);
     thumb_bind("11111xxx", thumb_branch_with_link_suffix);
-}
-
-void arm_hardware_interrupt(void) {
-    r14_irq = r[15] - (FLAG_T() ? 0 : 4);
-    spsr_irq = cpsr;
-    write_cpsr((cpsr & ~(PSR_T | PSR_MODE)) | PSR_I | PSR_MODE_IRQ);
-    r[15] = VEC_IRQ;
-    branch_taken = true;
-    halted = false;
 }
 
 void print_psr(uint32_t psr) {

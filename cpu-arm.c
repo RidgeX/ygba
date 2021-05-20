@@ -564,10 +564,20 @@ int arm_software_interrupt(void) {
     }
 #endif
 
-    r14_svc = r[REG_PC] - SIZEOF_INSTR;
+    r14_svc = r[REG_PC] - SIZEOF_INSTR;  // ARM: PC + 4, Thumb: PC + 2
     spsr_svc = cpsr;
     write_cpsr((cpsr & ~(PSR_T | PSR_MODE)) | PSR_I | PSR_MODE_SVC);
     r[REG_PC] = VEC_SWI;
+    branch_taken = true;
+
+    return 1;
+}
+
+int arm_hardware_interrupt(void) {
+    r14_irq = r[REG_PC] - (FLAG_T() ? 0 : 4);  // ARM: PC + 4, Thumb: PC + 4
+    spsr_irq = cpsr;
+    write_cpsr((cpsr & ~(PSR_T | PSR_MODE)) | PSR_I | PSR_MODE_IRQ);
+    r[REG_PC] = VEC_IRQ;
     branch_taken = true;
 
     return 1;
