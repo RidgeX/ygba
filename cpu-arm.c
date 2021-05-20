@@ -133,7 +133,7 @@ static void arm_shifter_flags(uint32_t shop, uint32_t s, uint32_t m) {
 // MOV{<cond>}{S} Rd, Rm{, <shifter_operand>}
 // BIC{<cond>}{S} Rd, Rn, Rm{, <shifter_operand>}
 // MVN{<cond>}{S} Rd, Rm{, <shifter_operand>}
-void arm_data_processing_register(void) {
+int arm_data_processing_register(void) {
     uint32_t opc = BITS(arm_op, 21, 24);
     bool S = BIT(arm_op, 20);
     uint32_t Rn = BITS(arm_op, 16, 19);
@@ -216,6 +216,8 @@ void arm_data_processing_register(void) {
             write_cpsr(read_spsr());  // Restores SPSR on ARMv4
         }
     }
+
+    return 1;
 }
 
 // AND{<cond>}{S} Rd, Rn, #<immediate>
@@ -234,7 +236,7 @@ void arm_data_processing_register(void) {
 // MOV{<cond>}{S} Rd, #<immediate>
 // BIC{<cond>}{S} Rd, Rn, #<immediate>
 // MVN{<cond>}{S} Rd, #<immediate>
-void arm_data_processing_immediate(void) {
+int arm_data_processing_immediate(void) {
     uint32_t opc = BITS(arm_op, 21, 24);
     bool S = BIT(arm_op, 20);
     uint32_t Rn = BITS(arm_op, 16, 19);
@@ -303,13 +305,15 @@ void arm_data_processing_immediate(void) {
             branch_taken = true;
         }
     }
+
+    return 1;
 }
 
 // STR{<cond>} Rd, <addressing_mode>
 // STR{<cond>}B Rd, <addressing_mode>
 // LDR{<cond>} Rd, <addressing_mode>
 // LDR{<cond>}B Rd, <addressing_mode>
-void arm_load_store_word_or_byte_register(void) {
+int arm_load_store_word_or_byte_register(void) {
     bool P = BIT(arm_op, 24);
     bool U = BIT(arm_op, 23);
     bool B = BIT(arm_op, 22);
@@ -372,9 +376,11 @@ void arm_load_store_word_or_byte_register(void) {
     }
     if (!P) n += (U ? m : -m);
     if ((!P || W) && (!L || Rd != Rn)) r[Rn] = n;
+
+    return 1;
 }
 
-void arm_load_store_word_or_byte_immediate(void) {
+int arm_load_store_word_or_byte_immediate(void) {
     bool P = BIT(arm_op, 24);
     bool U = BIT(arm_op, 23);
     bool B = BIT(arm_op, 22);
@@ -435,9 +441,11 @@ void arm_load_store_word_or_byte_immediate(void) {
     }
     if (!P) n += (U ? imm : -imm);
     if ((!P || W) && (!L || Rd != Rn)) r[Rn] = n;
+
+    return 1;
 }
 
-void arm_load_store_multiple(void) {
+int arm_load_store_multiple(void) {
     bool P = BIT(arm_op, 24);
     bool U = BIT(arm_op, 23);
     bool S = BIT(arm_op, 22);
@@ -521,9 +529,11 @@ void arm_load_store_multiple(void) {
     //assert(!W || !S);
     if (S) mode_change(PSR_MODE_USR, cpsr & PSR_MODE);
     if (W) r[Rn] = new_base;  // FIXME before or after mode change?
+
+    return 1;
 }
 
-void arm_branch(void) {
+int arm_branch(void) {
     bool L = BIT(arm_op, 24);
     uint32_t imm = BITS(arm_op, 0, 23);
     ZERO_EXTEND(imm, 23);
@@ -540,9 +550,11 @@ void arm_branch(void) {
     if (L) r[REG_LR] = r[REG_PC] - 4;
     r[REG_PC] += imm << 2;
     branch_taken = true;
+
+    return 1;
 }
 
-void arm_software_interrupt(void) {
+int arm_software_interrupt(void) {
 #ifdef DEBUG
     if (log_instructions && log_arm_instructions && !FLAG_T()) {
         arm_print_opcode();
@@ -557,9 +569,11 @@ void arm_software_interrupt(void) {
     write_cpsr((cpsr & ~(PSR_T | PSR_MODE)) | PSR_I | PSR_MODE_SVC);
     r[REG_PC] = VEC_SWI;
     branch_taken = true;
+
+    return 1;
 }
 
-void arm_multiply(void) {
+int arm_multiply(void) {
     bool A = BIT(arm_op, 21);
     bool S = BIT(arm_op, 20);
     uint32_t Rd = BITS(arm_op, 16, 19);
@@ -599,9 +613,11 @@ void arm_multiply(void) {
         ASSIGN_N(BIT(result, 31));
         ASSIGN_Z(result == 0);
     }
+
+    return 1;
 }
 
-void arm_multiply_long(void) {
+int arm_multiply_long(void) {
     bool U = BIT(arm_op, 22);
     bool A = BIT(arm_op, 21);
     bool S = BIT(arm_op, 20);
@@ -655,9 +671,11 @@ void arm_multiply_long(void) {
         ASSIGN_N(BIT(r[RdHi], 31));
         ASSIGN_Z(r[RdHi] == 0 && r[RdLo] == 0);
     }
+
+    return 1;
 }
 
-void arm_load_store_halfword_register(void) {
+int arm_load_store_halfword_register(void) {
     bool P = BIT(arm_op, 24);
     bool U = BIT(arm_op, 23);
     bool I = BIT(arm_op, 22);
@@ -704,9 +722,11 @@ void arm_load_store_halfword_register(void) {
     }
     if (!P) n += (U ? m : -m);
     if ((!P || W) && (!L || Rd != Rn)) r[Rn] = n;
+
+    return 1;
 }
 
-void arm_load_store_halfword_immediate(void) {
+int arm_load_store_halfword_immediate(void) {
     bool P = BIT(arm_op, 24);
     bool U = BIT(arm_op, 23);
     bool I = BIT(arm_op, 22);
@@ -750,9 +770,11 @@ void arm_load_store_halfword_immediate(void) {
     }
     if (!P) n += (U ? imm : -imm);
     if ((!P || W) && (!L || Rd != Rn)) r[Rn] = n;
+
+    return 1;
 }
 
-void arm_load_signed_halfword_or_signed_byte_register(void) {
+int arm_load_signed_halfword_or_signed_byte_register(void) {
     bool P = BIT(arm_op, 24);
     bool U = BIT(arm_op, 23);
     bool I = BIT(arm_op, 22);
@@ -814,9 +836,11 @@ void arm_load_signed_halfword_or_signed_byte_register(void) {
     if (Rd == REG_PC) branch_taken = true;
     if (!P) n += (U ? m : -m);
     if ((!P || W) && (!L || Rd != Rn)) r[Rn] = n;
+
+    return 1;
 }
 
-void arm_load_signed_halfword_or_signed_byte_immediate(void) {
+int arm_load_signed_halfword_or_signed_byte_immediate(void) {
     bool P = BIT(arm_op, 24);
     bool U = BIT(arm_op, 23);
     bool I = BIT(arm_op, 22);
@@ -875,9 +899,11 @@ void arm_load_signed_halfword_or_signed_byte_immediate(void) {
     if (Rd == REG_PC) branch_taken = true;
     if (!P) n += (U ? imm : -imm);
     if ((!P || W) && (!L || Rd != Rn)) r[Rn] = n;
+
+    return 1;
 }
 
-void arm_special_data_processing_register(void) {
+int arm_special_data_processing_register(void) {
     bool R = BIT(arm_op, 22);
     bool b21 = BIT(arm_op, 21);
     uint32_t mask_type = BITS(arm_op, 16, 19);
@@ -939,9 +965,11 @@ void arm_special_data_processing_register(void) {
         }
         assert(Rd != REG_PC);
     }
+
+    return 1;
 }
 
-void arm_special_data_processing_immediate(void) {
+int arm_special_data_processing_immediate(void) {
     bool R = BIT(arm_op, 22);
     uint32_t mask_type = BITS(arm_op, 16, 19);
     uint32_t sbo = BITS(arm_op, 12, 15);
@@ -981,9 +1009,11 @@ void arm_special_data_processing_immediate(void) {
     } else {
         write_cpsr((cpsr & ~mask) | (imm & mask));
     }
+
+    return 1;
 }
 
-void arm_swap(void) {
+int arm_swap(void) {
     bool B = BIT(arm_op, 22);
     uint32_t Rn = BITS(arm_op, 16, 19);
     uint32_t Rd = BITS(arm_op, 12, 15);
@@ -1015,9 +1045,11 @@ void arm_swap(void) {
         r[Rd] = temp;
     }
     assert(Rd != REG_PC);
+
+    return 1;
 }
 
-void arm_branch_and_exchange(void) {
+int arm_branch_and_exchange(void) {
     uint32_t sbo = BITS(arm_op, 8, 19);
     uint32_t Rm = BITS(arm_op, 0, 3);
 
@@ -1037,4 +1069,6 @@ void arm_branch_and_exchange(void) {
     ASSIGN_T(BIT(r[Rm], 0));
     r[REG_PC] = r[Rm] & ~1;
     branch_taken = true;
+
+    return 1;
 }

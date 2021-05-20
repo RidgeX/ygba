@@ -8,7 +8,7 @@
 // LSL Rd, Rm, #<shift_imm>
 // LSR Rd, Rm, #<shift_imm>
 // ASR Rd, Rm, #<shift_imm>
-void thumb_shift_by_immediate(void) {
+int thumb_shift_by_immediate(void) {
     uint32_t opc = BITS(thumb_op, 11, 12);
     uint32_t imm = BITS(thumb_op, 6, 10);
     uint32_t Rm = BITS(thumb_op, 3, 5);
@@ -37,12 +37,12 @@ void thumb_shift_by_immediate(void) {
         case SHIFT_LSR: arm_op |= SHIFT_LSR << 5; break;
         case SHIFT_ASR: arm_op |= SHIFT_ASR << 5; break;
     }
-    arm_data_processing_register();
+    return arm_data_processing_register();
 }
 
 // ADD Rd, Rn, Rm
 // SUB Rd, Rn, Rm
-void thumb_add_or_subtract_register(void) {
+int thumb_add_or_subtract_register(void) {
     uint32_t opc = BIT(thumb_op, 9);
     uint32_t Rm = BITS(thumb_op, 6, 8);
     uint32_t Rn = BITS(thumb_op, 3, 5);
@@ -69,12 +69,12 @@ void thumb_add_or_subtract_register(void) {
         case 0: arm_op |= ARM_ADD << 21; break;
         case 1: arm_op |= ARM_SUB << 21; break;
     }
-    arm_data_processing_register();
+    return arm_data_processing_register();
 }
 
 // ADD Rd, Rn, #<3_bit_immediate>
 // SUB Rd, Rn, #<3_bit_immediate>
-void thumb_add_or_subtract_immediate(void) {
+int thumb_add_or_subtract_immediate(void) {
     uint32_t opc = BIT(thumb_op, 9);
     uint32_t imm = BITS(thumb_op, 6, 8);
     uint32_t Rn = BITS(thumb_op, 3, 5);
@@ -101,14 +101,14 @@ void thumb_add_or_subtract_immediate(void) {
         case 0: arm_op |= ARM_ADD << 21; break;
         case 1: arm_op |= ARM_SUB << 21; break;
     }
-    arm_data_processing_immediate();
+    return arm_data_processing_immediate();
 }
 
 // MOV Rd, #<8_bit_immediate>
 // CMP Rn, #<8_bit_immediate>
 // ADD Rd, #<8_bit_immediate>
 // SUB Rd, #<8_bit_immediate>
-void thumb_add_subtract_compare_or_move_immediate(void) {
+int thumb_add_subtract_compare_or_move_immediate(void) {
     uint32_t opc = BITS(thumb_op, 11, 12);
     uint32_t Rdn = BITS(thumb_op, 8, 10);
     uint32_t imm = BITS(thumb_op, 0, 7);
@@ -136,7 +136,7 @@ void thumb_add_subtract_compare_or_move_immediate(void) {
         case 2: arm_op |= ARM_ADD << 21 | Rdn << 16 | Rdn << 12; break;
         case 3: arm_op |= ARM_SUB << 21 | Rdn << 16 | Rdn << 12; break;
     }
-    arm_data_processing_immediate();
+    return arm_data_processing_immediate();
 }
 
 // AND Rd, Rm
@@ -155,7 +155,7 @@ void thumb_add_subtract_compare_or_move_immediate(void) {
 // MUL Rd, Rm
 // BIC Rd, Rm
 // MVN Rd, Rm
-void thumb_data_processing_register(void) {
+int thumb_data_processing_register(void) {
     uint32_t opc = BITS(thumb_op, 6, 9);
     uint32_t Rms = BITS(thumb_op, 3, 5);
     uint32_t Rdn = BITS(thumb_op, 0, 2);
@@ -208,18 +208,18 @@ void thumb_data_processing_register(void) {
         case THUMB_MVN: arm_op |= ARM_MVN << 21 | Rdn << 12 | Rms; break;
     }
     if (opc == THUMB_MUL) {
-        arm_multiply();
+        return arm_multiply();
     } else if (opc == THUMB_NEG) {
-        arm_data_processing_immediate();
+        return arm_data_processing_immediate();
     } else {
-        arm_data_processing_register();
+        return arm_data_processing_register();
     }
 }
 
 // ADD Rd, Rm
 // CMP Rn, Rm
 // MOV Rd, Rm
-void thumb_special_data_processing(void) {
+int thumb_special_data_processing(void) {
     uint32_t opc = BITS(thumb_op, 8, 9);
     uint32_t Rm = BITS(thumb_op, 3, 6);
     uint32_t Rdn = BIT(thumb_op, 7) << 3 | BITS(thumb_op, 0, 2);
@@ -247,11 +247,11 @@ void thumb_special_data_processing(void) {
         case 1: arm_op |= ARM_CMP << 21 | 0x01 << 20 | Rdn << 16; break;
         case 2: arm_op |= ARM_MOV << 21 | Rdn << 12; break;
     }
-    arm_data_processing_register();
+    return arm_data_processing_register();
 }
 
 // BX Rm
-void thumb_branch_and_exchange(void) {
+int thumb_branch_and_exchange(void) {
     bool L = BIT(thumb_op, 7);
     uint32_t Rm = BITS(thumb_op, 3, 6);
     uint32_t sbz = BITS(thumb_op, 0, 2);
@@ -269,11 +269,11 @@ void thumb_branch_and_exchange(void) {
     assert(sbz == 0);  // should be zero
 
     arm_op = COND_AL << 28 | 0x12 << 20 | 0xfff << 8 | 0x1 << 4 | Rm;
-    arm_branch_and_exchange();
+    return arm_branch_and_exchange();
 }
 
 // LDR Rd, [PC, #8_bit_offset]
-void thumb_load_from_literal_pool(void) {
+int thumb_load_from_literal_pool(void) {
     uint32_t Rd = BITS(thumb_op, 8, 10);
     uint32_t imm = BITS(thumb_op, 0, 7);
 
@@ -291,7 +291,7 @@ void thumb_load_from_literal_pool(void) {
 #endif
 
     arm_op = COND_AL << 28 | 0x59 << 20 | REG_PC << 16 | Rd << 12 | imm << 2;
-    arm_load_store_word_or_byte_immediate();
+    return arm_load_store_word_or_byte_immediate();
 }
 
 // STR Rd, [Rn, Rm]
@@ -302,7 +302,7 @@ void thumb_load_from_literal_pool(void) {
 // LDRH Rd, [Rn, Rm]
 // LDRB Rd, [Rn, Rm]
 // LDRSH Rd, [Rn, Rm]
-void thumb_load_store_register(void) {
+int thumb_load_store_register(void) {
     uint32_t opc = BITS(thumb_op, 9, 11);
     uint32_t Rm = BITS(thumb_op, 6, 8);
     uint32_t Rn = BITS(thumb_op, 3, 5);
@@ -342,11 +342,11 @@ void thumb_load_store_register(void) {
         case 7: arm_op |= 0x19 << 20 | 0xf << 4; break;
     }
     if (opc == 1 || opc == 5) {
-        arm_load_store_halfword_register();
+        return arm_load_store_halfword_register();
     } else if (opc == 3 || opc == 7) {
-        arm_load_signed_halfword_or_signed_byte_register();
+        return arm_load_signed_halfword_or_signed_byte_register();
     } else {
-        arm_load_store_word_or_byte_register();
+        return arm_load_store_word_or_byte_register();
     }
 }
 
@@ -354,7 +354,7 @@ void thumb_load_store_register(void) {
 // LDR Rd, [Rn, #5_bit_offset]
 // STRB Rd, [Rn, #5_bit_offset]
 // LDRB Rd, [Rn, #5_bit_offset]
-void thumb_load_store_word_or_byte_immediate(void) {
+int thumb_load_store_word_or_byte_immediate(void) {
     bool B = BIT(thumb_op, 12);
     bool L = BIT(thumb_op, 11);
     uint32_t imm = BITS(thumb_op, 6, 10);
@@ -387,12 +387,12 @@ void thumb_load_store_word_or_byte_immediate(void) {
     if (L) {
         arm_op |= 0x01 << 20;
     }
-    arm_load_store_word_or_byte_immediate();
+    return arm_load_store_word_or_byte_immediate();
 }
 
 // STRH Rd, [Rn, #5_bit_offset]
 // LDRH Rd, [Rn, #5_bit_offset]
-void thumb_load_store_halfword_immediate(void) {
+int thumb_load_store_halfword_immediate(void) {
     bool L = BIT(thumb_op, 11);
     uint32_t imm = BITS(thumb_op, 6, 10);
     uint32_t Rn = BITS(thumb_op, 3, 5);
@@ -417,12 +417,12 @@ void thumb_load_store_halfword_immediate(void) {
     } else {
         arm_op |= 0x1c << 20;
     }
-    arm_load_store_halfword_immediate();
+    return arm_load_store_halfword_immediate();
 }
 
 // STR Rd, [SP, #8_bit_offset]
 // LDR Rd, [SP, #8_bit_offset]
-void thumb_load_store_to_or_from_stack(void) {
+int thumb_load_store_to_or_from_stack(void) {
     bool L = BIT(thumb_op, 11);
     uint32_t Rd = BITS(thumb_op, 8, 10);
     uint32_t imm = BITS(thumb_op, 0, 7);
@@ -446,12 +446,12 @@ void thumb_load_store_to_or_from_stack(void) {
     } else {
         arm_op |= 0x58 << 20;
     }
-    arm_load_store_word_or_byte_immediate();
+    return arm_load_store_word_or_byte_immediate();
 }
 
 // ADD Rd, PC, #<8_bit_immediate>
 // ADD Rd, SP, #<8_bit_immediate>
-void thumb_add_to_sp_or_pc(void) {
+int thumb_add_to_sp_or_pc(void) {
     bool SP = BIT(thumb_op, 11);
     uint32_t Rd = BITS(thumb_op, 8, 10);
     uint32_t imm = BITS(thumb_op, 0, 7);
@@ -475,12 +475,12 @@ void thumb_add_to_sp_or_pc(void) {
     } else {
         arm_op |= REG_PC << 16;
     }
-    arm_data_processing_immediate();
+    return arm_data_processing_immediate();
 }
 
 // ADD SP, SP, #<7_bit_immediate>
 // SUB SP, SP, #<7_bit_immediate>
-void thumb_adjust_stack_pointer(void) {
+int thumb_adjust_stack_pointer(void) {
     uint32_t opc = BIT(thumb_op, 7);
     uint32_t imm = BITS(thumb_op, 0, 6);
     uint32_t sbz = BITS(thumb_op, 8, 11) & 0xb;
@@ -504,12 +504,12 @@ void thumb_adjust_stack_pointer(void) {
     } else {
         arm_op |= ARM_ADD << 21;
     }
-    arm_data_processing_immediate();
+    return arm_data_processing_immediate();
 }
 
 // PUSH {<register_list>, <LR>}
 // POP {<register_list>, <PC>}
-void thumb_push_or_pop_register_list(void) {
+int thumb_push_or_pop_register_list(void) {
     bool L = BIT(thumb_op, 11);
     bool R = BIT(thumb_op, 8);
     uint32_t rlist = BITS(thumb_op, 0, 7);
@@ -542,12 +542,12 @@ void thumb_push_or_pop_register_list(void) {
         arm_op |= 0x92 << 20;
         if (R) arm_op |= 1 << REG_LR;
     }
-    arm_load_store_multiple();
+    return arm_load_store_multiple();
 }
 
 // STMIA Rn!, {<register_list>}
 // LDMIA Rn!, {<register_list>}
-void thumb_load_store_multiple(void) {
+int thumb_load_store_multiple(void) {
     bool L = BIT(thumb_op, 11);
     uint32_t Rn = BITS(thumb_op, 8, 10);
     uint32_t rlist = BITS(thumb_op, 0, 7);
@@ -569,11 +569,11 @@ void thumb_load_store_multiple(void) {
     } else {
         arm_op |= 0x8a << 20;
     }
-    arm_load_store_multiple();
+    return arm_load_store_multiple();
 }
 
 // B<cond> <target_address>
-void thumb_conditional_branch(void) {
+int thumb_conditional_branch(void) {
     uint32_t cond = BITS(thumb_op, 8, 11);
     uint32_t imm = BITS(thumb_op, 0, 7);
     ZERO_EXTEND(imm, 7);
@@ -607,10 +607,12 @@ void thumb_conditional_branch(void) {
         r[REG_PC] += imm << 1;
         branch_taken = true;
     }
+
+    return 1;
 }
 
 // SWI <8_bit_immediate>
-void thumb_software_interrupt(void) {
+int thumb_software_interrupt(void) {
     uint32_t imm = BITS(thumb_op, 0, 7);
 
 #ifdef DEBUG
@@ -623,11 +625,11 @@ void thumb_software_interrupt(void) {
 #endif
 
     arm_op = COND_AL << 28 | 0xf0 << 20 | imm;
-    arm_software_interrupt();
+    return arm_software_interrupt();
 }
 
 // B <target_address>
-void thumb_unconditional_branch(void) {
+int thumb_unconditional_branch(void) {
     uint32_t imm = BITS(thumb_op, 0, 10);
     ZERO_EXTEND(imm, 10);
 
@@ -643,10 +645,12 @@ void thumb_unconditional_branch(void) {
 
     r[REG_PC] += imm << 1;
     branch_taken = true;
+
+    return 1;
 }
 
 // BL <target_address>
-void thumb_branch_with_link_prefix(void) {
+int thumb_branch_with_link_prefix(void) {
     uint32_t imm = BITS(thumb_op, 0, 10);
     ZERO_EXTEND(imm, 10);
 
@@ -659,10 +663,12 @@ void thumb_branch_with_link_prefix(void) {
 #endif
 
     r[REG_LR] = r[REG_PC] + (imm << 12);
+
+    return 1;
 }
 
 // BL <target_address>
-void thumb_branch_with_link_suffix(void) {
+int thumb_branch_with_link_suffix(void) {
     uint32_t imm = BITS(thumb_op, 0, 10);
     uint32_t target_address = r[REG_LR] + (imm << 1);
 
@@ -678,4 +684,6 @@ void thumb_branch_with_link_suffix(void) {
     r[REG_LR] = (r[REG_PC] - 2) | 1;
     r[REG_PC] = target_address;
     branch_taken = true;
+
+    return 1;
 }

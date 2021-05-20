@@ -16,8 +16,8 @@
 bool single_step = false;
 uint64_t start_logging_at = 0;
 //uint64_t end_logging_at = 200000;
-uint32_t ppu_cycles = 0;
-uint32_t timer_cycles = 0;
+int ppu_cycles = 0;
+int timer_cycles = 0;
 uint32_t last_bios_access = 0xe4;
 bool skip_bios = true;
 bool has_eeprom = false;
@@ -1333,6 +1333,8 @@ void gba_emulate(void) {
         }
         if (ppu_cycles == 0) break;
 
+        int cpu_cycles = 1;
+
         if (!halted) {
             //if (r[15] == 0x00000300) single_step = true;
 
@@ -1343,11 +1345,12 @@ void gba_emulate(void) {
             }
 #endif
 
-            if (cpsr & PSR_T) {
-                thumb_step();
+            if (FLAG_T()) {
+                cpu_cycles = thumb_step();
             } else {
-                arm_step();
+                cpu_cycles = arm_step();
             }
+            assert(cpu_cycles == 1);
             instruction_count++;
 
 #ifdef DEBUG

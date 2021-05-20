@@ -26,11 +26,11 @@ bool branch_taken;
 
 uint32_t arm_op;
 uint32_t arm_pipeline[2];
-void (*arm_lookup[4096])(void);
+int (*arm_lookup[4096])(void);
 
 uint16_t thumb_op;
 uint16_t thumb_pipeline[2];
-void (*thumb_lookup[256])(void);
+int (*thumb_lookup[256])(void);
 
 void arm_init_registers(bool skip_bios) {
     if (skip_bios) {
@@ -203,23 +203,27 @@ void write_spsr(uint32_t psr) {
     }
 }
 
-void arm_undefined_instruction(void) {
+int arm_undefined_instruction(void) {
     arm_print_opcode();
     print_mnemonic("undefined");
     printf("\n");
 
     assert(false);
+
+    return 1;
 }
 
-void thumb_undefined_instruction(void) {
+int thumb_undefined_instruction(void) {
     thumb_print_opcode();
     print_mnemonic("undefined");
     printf("\n");
 
     assert(false);
+
+    return 1;
 }
 
-void arm_step(void) {
+int arm_step(void) {
     if (branch_taken) {
         arm_op = memory_read_word(r[15]);
         arm_pipeline[0] = memory_read_word(r[15] + 4);
@@ -239,17 +243,17 @@ void arm_step(void) {
 #endif
 
     uint32_t cond = (arm_op >> 28) & 0xf;
+    int cycles = 1;
     if (condition_passed(cond)) {
         uint32_t index = ((arm_op >> 4) & 0xf) | ((arm_op >> 16) & 0xff0);
-        void (*handler)(void) = arm_lookup[index];
-        if (handler != NULL) {
-            (*handler)();
-        } else {
+        int (*handler)(void) = arm_lookup[index];
+        if (handler == NULL) {
             arm_print_opcode();
             printf("unimplemented\n");
             printf("index = 0x%03x\n", index);
             assert(false);
         }
+        cycles = (*handler)();
     }
 #ifdef DEBUG
     else if (log_instructions) {
@@ -266,9 +270,11 @@ void arm_step(void) {
     if (!branch_taken) {
         r[15] += 4;
     }
+
+    return cycles;
 }
 
-void thumb_step(void) {
+int thumb_step(void) {
     if (branch_taken) {
         thumb_op = memory_read_halfword(r[15]);
         thumb_pipeline[0] = memory_read_halfword(r[15] + 2);
@@ -288,9 +294,9 @@ void thumb_step(void) {
 #endif
 
     uint16_t index = (thumb_op >> 8) & 0xff;
-    void (*handler)(void) = thumb_lookup[index];
+    int (*handler)(void) = thumb_lookup[index];
     assert(handler != NULL);
-    (*handler)();
+    int cycles = (*handler)();
 
 #ifdef DEBUG
     //if (log_registers) {
@@ -301,9 +307,11 @@ void thumb_step(void) {
     if (!branch_taken) {
         r[15] += 2;
     }
+
+    return cycles;
 }
 
-void lookup_bind(void (**lookup)(void), char *mask, void (*f)(void)) {
+void lookup_bind(int (**lookup)(void), char *mask, int (*f)(void)) {
     uint32_t n = 0;
     uint32_t m = 0;
     for (char *p = mask; *p != '\0'; p++) {
@@ -323,11 +331,11 @@ void lookup_bind(void (**lookup)(void), char *mask, void (*f)(void)) {
     }
 }
 
-void arm_bind(char *mask, void (*f)(void)) {
+void arm_bind(char *mask, int (*f)(void)) {
     lookup_bind(arm_lookup, mask, f);
 }
 
-void thumb_bind(char *mask, void (*f)(void)) {
+void thumb_bind(char *mask, int (*f)(void)) {
     lookup_bind(thumb_lookup, mask, f);
 }
 
