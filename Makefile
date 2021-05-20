@@ -1,11 +1,11 @@
 CFLAGS = -std=c99 -Wall -Wextra -Wpedantic -O2 -DDEBUG
 LIBS = -lmingw32 -lSDL2main -lSDL2
 
-gba: main.o algorithms.o cpu.o cpu-arm.o cpu-thumb.o
+gba: obj/algorithms.o obj/cpu.o obj/cpu-arm.o obj/cpu-thumb.o obj/main.o
 	gcc $(CFLAGS) -o $@ $^ $(LIBS)
 
-%.o: %.c
-	gcc $(CFLAGS) -c $<
+obj/%.o: %.c
+	gcc $(CFLAGS) -o $@ -c $<
 
 clean:
-	rm -f gba.exe *.o
+	rm -f gba.exe obj/*.o
