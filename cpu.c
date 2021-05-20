@@ -396,7 +396,7 @@ void thumb_init_lookup(void) {
 }
 
 void arm_hardware_interrupt(void) {
-    r14_irq = r[15] - SIZEOF_INSTR;
+    r14_irq = r[15] - (FLAG_T() ? 0 : 4);
     spsr_irq = cpsr;
     write_cpsr((cpsr & ~(PSR_T | PSR_MODE)) | PSR_I | PSR_MODE_IRQ);
     r[15] = VEC_IRQ;

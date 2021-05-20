@@ -1202,7 +1202,7 @@ void gba_ppu_update(void) {
     if (ppu_cycles % 1232 == 960) {
         io_dispstat |= DSTAT_IN_HBL;
         if ((io_dispstat & DSTAT_HBL_IRQ) != 0 && io_ime == 1 && (io_ie & INT_HBLANK) != 0) {
-            //io_if |= INT_HBLANK;
+            io_if |= INT_HBLANK;
         }
     }
     ppu_cycles = (ppu_cycles + 1) % 280896;
@@ -1328,9 +1328,6 @@ void gba_emulate(void) {
         gba_timer_update();
         gba_dma_update();
         gba_ppu_update();
-        if ((cpsr & PSR_I) == 0 && io_if != 0) {
-            arm_hardware_interrupt();
-        }
         if (ppu_cycles == 0) break;
 
         int cpu_cycles = 1;
@@ -1364,6 +1361,10 @@ void gba_emulate(void) {
             }
             */
 #endif
+        }
+
+        if (!branch_taken && (cpsr & PSR_I) == 0 && io_if != 0) {
+            arm_hardware_interrupt();
         }
     }
 }
