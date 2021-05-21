@@ -47,115 +47,146 @@ uint32_t game_rom_mask;
 uint8_t backup_flash[0x20000];
 uint8_t backup_sram[0x10000];
 
-#define MEM_IO        0x4000000
-#define MEM_VRAM      0x6000000
+#define DCNT_GB         (1 << 3)
+#define DCNT_PAGE       (1 << 4)
+#define DCNT_OAM_HBL    (1 << 5)
+#define DCNT_OBJ_1D     (1 << 6)
+#define DCNT_BLANK      (1 << 7)
+#define DCNT_BG0        (1 << 8)
+#define DCNT_BG1        (1 << 9)
+#define DCNT_BG2        (1 << 10)
+#define DCNT_BG3        (1 << 11)
+#define DCNT_OBJ        (1 << 12)
+#define DCNT_WIN0       (1 << 13)
+#define DCNT_WIN1       (1 << 14)
+#define DCNT_WINOBJ     (1 << 15)
 
-#define REG_DISPCNT    (MEM_IO + 0)
-    #define DCNT_GB        (1 << 3)
-    #define DCNT_PAGE      (1 << 4)
-    #define DCNT_OAM_HBL   (1 << 5)
-    #define DCNT_OBJ_1D    (1 << 6)
-    #define DCNT_BLANK     (1 << 7)
-    #define DCNT_BG0       (1 << 8)
-    #define DCNT_BG1       (1 << 9)
-    #define DCNT_BG2       (1 << 10)
-    #define DCNT_BG3       (1 << 11)
-    #define DCNT_OBJ       (1 << 12)
-    #define DCNT_WIN0      (1 << 13)
-    #define DCNT_WIN1      (1 << 14)
-    #define DCNT_WINOBJ    (1 << 15)
-#define REG_DISPSTAT   (MEM_IO + 4)
-    #define DSTAT_IN_VBL   (1 << 0)
-    #define DSTAT_IN_HBL   (1 << 1)
-    #define DSTAT_IN_VCT   (1 << 2)
-    #define DSTAT_VBL_IRQ  (1 << 3)
-    #define DSTAT_HBL_IRQ  (1 << 4)
-    #define DSTAT_VCT_IRQ  (1 << 5)
-#define REG_VCOUNT     (MEM_IO + 6)
-#define REG_BG0CNT     (MEM_IO + 8)
-#define REG_BG1CNT     (MEM_IO + 0xa)
-#define REG_BG2CNT     (MEM_IO + 0xc)
-#define REG_BG3CNT     (MEM_IO + 0xe)
-#define REG_BG0HOFS    (MEM_IO + 0x10)
-#define REG_BG0VOFS    (MEM_IO + 0x12)
-#define REG_BG1HOFS    (MEM_IO + 0x14)
-#define REG_BG1VOFS    (MEM_IO + 0x16)
-#define REG_BG2HOFS    (MEM_IO + 0x18)
-#define REG_BG2VOFS    (MEM_IO + 0x1a)
-#define REG_BG3HOFS    (MEM_IO + 0x1c)
-#define REG_BG3VOFS    (MEM_IO + 0x1e)
-#define IO_WIN0H       (MEM_IO+0x0040)
-#define IO_WIN1H       (MEM_IO+0x0042)
-#define IO_WIN0V       (MEM_IO+0x0044)
-#define IO_WIN1V       (MEM_IO+0x0046)
-#define IO_WININ       (MEM_IO+0x0048)
-#define IO_WINOUT      (MEM_IO+0x004a)
-#define IO_BLDCNT      (MEM_IO+0x0050)
-#define IO_BLDALPHA    (MEM_IO+0x0052)
-#define IO_BLDY        (MEM_IO+0x0054)
-#define IO_SOUNDBIAS   (MEM_IO+0x0088)
-#define REG_DMA0SAD    (MEM_IO + 0xb0)
-#define REG_DMA0DAD    (MEM_IO + 0xb4)
-#define REG_DMA0CNT_L  (MEM_IO + 0xb8)
-#define REG_DMA0CNT_H  (MEM_IO + 0xba)
-#define REG_DMA1SAD    (MEM_IO + 0xbc)
-#define REG_DMA1DAD    (MEM_IO + 0xc0)
-#define REG_DMA1CNT_L  (MEM_IO + 0xc4)
-#define REG_DMA1CNT_H  (MEM_IO + 0xc6)
-#define REG_DMA2SAD    (MEM_IO + 0xc8)
-#define REG_DMA2DAD    (MEM_IO + 0xcc)
-#define REG_DMA2CNT_L  (MEM_IO + 0xd0)
-#define REG_DMA2CNT_H  (MEM_IO + 0xd2)
-#define REG_DMA3SAD    (MEM_IO + 0xd4)
-#define REG_DMA3DAD    (MEM_IO + 0xd8)
-#define REG_DMA3CNT_L  (MEM_IO + 0xdc)
-#define REG_DMA3CNT_H  (MEM_IO + 0xde)
-    #define DMA_INC        0
-    #define DMA_DEC        1
-    #define DMA_FIXED      2
-    #define DMA_RELOAD     3
-    #define DMA_REPEAT     (1 << 25)
-    #define DMA_32         (1 << 26)
-    #define DMA_DRQ        (1 << 27)
-    #define DMA_NOW        0
-    #define DMA_AT_VBLANK  1
-    #define DMA_AT_HBLANK  2
-    #define DMA_AT_REFRESH 3
-    #define DMA_IRQ        (1 << 30)
-    #define DMA_ENABLE     (1 << 31)
-#define REG_TM0CNT_L   (MEM_IO + 0x100)
-#define REG_TM0CNT_H   (MEM_IO + 0x102)
-#define REG_TM1CNT_L   (MEM_IO + 0x104)
-#define REG_TM1CNT_H   (MEM_IO + 0x106)
-#define REG_TM2CNT_L   (MEM_IO + 0x108)
-#define REG_TM2CNT_H   (MEM_IO + 0x10a)
-#define REG_TM3CNT_L   (MEM_IO + 0x10c)
-#define REG_TM3CNT_H   (MEM_IO + 0x10e)
-#define REG_SIODATA32  (MEM_IO + 0x120)
-#define REG_SIOCNT     (MEM_IO + 0x128)
-#define REG_KEYINPUT   (MEM_IO + 0x130)
-#define REG_KEYCNT     (MEM_IO + 0x132)
-#define REG_RCNT       (MEM_IO + 0x134)
-#define REG_IE         (MEM_IO + 0x200)
-#define REG_IF         (MEM_IO + 0x202)
-    #define INT_VBLANK     (1 << 0)
-    #define INT_HBLANK     (1 << 1)
-    #define INT_VCOUNT     (1 << 2)
-    #define INT_TIMER0     (1 << 3)
-    #define INT_TIMER1     (1 << 4)
-    #define INT_TIMER2     (1 << 5)
-    #define INT_TIMER3     (1 << 6)
-    #define INT_COM        (1 << 7)
-    #define INT_DMA0       (1 << 8)
-    #define INT_DMA1       (1 << 9)
-    #define INT_DMA2       (1 << 10)
-    #define INT_DMA3       (1 << 11)
-    #define INT_BUTTON     (1 << 12)
-    #define INT_CART       (1 << 13)
-#define REG_WAITCNT    (MEM_IO + 0x204)
-#define REG_IME        (MEM_IO + 0x208)
-#define REG_POSTFLG    (MEM_IO + 0x300)
-#define REG_HALTCNT    (MEM_IO + 0x301)
+#define DSTAT_IN_VBL    (1 << 0)
+#define DSTAT_IN_HBL    (1 << 1)
+#define DSTAT_IN_VCT    (1 << 2)
+#define DSTAT_VBL_IRQ   (1 << 3)
+#define DSTAT_HBL_IRQ   (1 << 4)
+#define DSTAT_VCT_IRQ   (1 << 5)
+
+#define DMA_INC         0
+#define DMA_DEC         1
+#define DMA_FIXED       2
+#define DMA_RELOAD      3
+#define DMA_REPEAT      (1 << 25)
+#define DMA_32          (1 << 26)
+#define DMA_DRQ         (1 << 27)
+#define DMA_NOW         0
+#define DMA_AT_VBLANK   1
+#define DMA_AT_HBLANK   2
+#define DMA_AT_REFRESH  3
+#define DMA_IRQ         (1 << 30)
+#define DMA_ENABLE      (1 << 31)
+
+#define INT_VBLANK      (1 << 0)
+#define INT_HBLANK      (1 << 1)
+#define INT_VCOUNT      (1 << 2)
+#define INT_TIMER0      (1 << 3)
+#define INT_TIMER1      (1 << 4)
+#define INT_TIMER2      (1 << 5)
+#define INT_TIMER3      (1 << 6)
+#define INT_COM         (1 << 7)
+#define INT_DMA0        (1 << 8)
+#define INT_DMA1        (1 << 9)
+#define INT_DMA2        (1 << 10)
+#define INT_DMA3        (1 << 11)
+#define INT_BUTTON      (1 << 12)
+#define INT_CART        (1 << 13)
+
+#define REG_DISPCNT     0
+#define REG_DISPSTAT    4
+#define REG_VCOUNT      6
+#define REG_BG0CNT      8
+#define REG_BG1CNT      0xa
+#define REG_BG2CNT      0xc
+#define REG_BG3CNT      0xe
+#define REG_BG0HOFS     0x10
+#define REG_BG0VOFS     0x12
+#define REG_BG1HOFS     0x14
+#define REG_BG1VOFS     0x16
+#define REG_BG2HOFS     0x18
+#define REG_BG2VOFS     0x1a
+#define REG_BG3HOFS     0x1c
+#define REG_BG3VOFS     0x1e
+#define REG_BG2PA       0x20
+#define REG_BG2PB       0x22
+#define REG_BG2PC       0x24
+#define REG_BG2PD       0x26
+#define REG_BG2X_L      0x28
+#define REG_BG2X_H      0x2a
+#define REG_BG2Y_L      0x2c
+#define REG_BG2Y_H      0x2e
+#define REG_BG3PA       0x30
+#define REG_BG3PB       0x32
+#define REG_BG3PC       0x34
+#define REG_BG3PD       0x36
+#define REG_BG3X_L      0x38
+#define REG_BG3X_H      0x3a
+#define REG_BG3Y_L      0x3c
+#define REG_BG3Y_H      0x3e
+#define REG_WIN0H       0x40
+#define REG_WIN1H       0x42
+#define REG_WIN0V       0x44
+#define REG_WIN1V       0x46
+#define REG_WININ       0x48
+#define REG_WINOUT      0x4a
+#define REG_MOSAIC      0x4c
+#define REG_BLDCNT      0x50
+#define REG_BLDALPHA    0x52
+#define REG_BLDY        0x54
+#define REG_SOUND1CNT_L 0x60
+#define REG_SOUND1CNT_H 0x62
+#define REG_SOUND1CNT_X 0x64
+#define REG_SOUND2CNT_L 0x68
+#define REG_SOUND2CNT_H 0x6c
+#define REG_SOUND3CNT_L 0x70
+#define REG_SOUND3CNT_H 0x72
+#define REG_SOUND3CNT_X 0x74
+#define REG_SOUND4CNT_L 0x78
+#define REG_SOUND4CNT_H 0x7c
+#define REG_SOUNDCNT_L  0x80
+#define REG_SOUNDCNT_H  0x82
+#define REG_SOUNDCNT_X  0x84
+#define REG_SOUNDBIAS   0x88
+#define REG_DMA0SAD     0xb0
+#define REG_DMA0DAD     0xb4
+#define REG_DMA0CNT_L   0xb8
+#define REG_DMA0CNT_H   0xba
+#define REG_DMA1SAD     0xbc
+#define REG_DMA1DAD     0xc0
+#define REG_DMA1CNT_L   0xc4
+#define REG_DMA1CNT_H   0xc6
+#define REG_DMA2SAD     0xc8
+#define REG_DMA2DAD     0xcc
+#define REG_DMA2CNT_L   0xd0
+#define REG_DMA2CNT_H   0xd2
+#define REG_DMA3SAD     0xd4
+#define REG_DMA3DAD     0xd8
+#define REG_DMA3CNT_L   0xdc
+#define REG_DMA3CNT_H   0xde
+#define REG_TM0CNT_L    0x100
+#define REG_TM0CNT_H    0x102
+#define REG_TM1CNT_L    0x104
+#define REG_TM1CNT_H    0x106
+#define REG_TM2CNT_L    0x108
+#define REG_TM2CNT_H    0x10a
+#define REG_TM3CNT_L    0x10c
+#define REG_TM3CNT_H    0x10e
+#define REG_SIODATA32   0x120
+#define REG_SIOCNT      0x128
+#define REG_KEYINPUT    0x130
+#define REG_KEYCNT      0x132
+#define REG_RCNT        0x134
+#define REG_IE          0x200
+#define REG_IF          0x202
+#define REG_WAITCNT     0x204
+#define REG_IME         0x208
+#define REG_POSTFLG     0x300
+#define REG_HALTCNT     0x301
 
 uint16_t io_dispcnt;
 uint16_t io_dispstat;
@@ -164,15 +195,41 @@ uint16_t io_bg0cnt;
 uint16_t io_bg1cnt;
 uint16_t io_bg2cnt;
 uint16_t io_bg3cnt;
-uint16_t io_bg0hofs, io_bg0vofs;
-uint16_t io_bg1hofs, io_bg1vofs;
-uint16_t io_bg2hofs, io_bg2vofs;
+uint16_t io_bg0hofs;
+uint16_t io_bg0vofs;
+uint16_t io_bg1hofs;
+uint16_t io_bg1vofs;
+uint16_t io_bg2hofs;
+uint16_t io_bg2vofs;
+uint16_t io_bg3hofs;
+uint16_t io_bg3vofs;
+uint16_t io_bg2pa;
+uint16_t io_bg2pb;
+uint16_t io_bg2pc;
+uint16_t io_bg2pd;
+uint32_t io_bg2x;  // 32
+uint32_t io_bg2y;  // 32
+uint16_t io_bg3pa;
+uint16_t io_bg3pb;
+uint16_t io_bg3pc;
+uint16_t io_bg3pd;
+uint32_t io_bg3x;  // 32
+uint32_t io_bg3y;  // 32
 uint16_t io_win0h;
 uint16_t io_win1h;
 uint16_t io_win0v;
 uint16_t io_win1v;
 uint16_t io_winin;
 uint16_t io_winout;
+uint16_t io_mosaic;
+uint16_t io_bldcnt;
+uint16_t io_bldalpha;
+uint16_t io_bldy;
+uint16_t io_sound1cnt_l, io_sound1cnt_h, io_sound1cnt_x;
+uint16_t io_sound2cnt_l, io_sound2cnt_h;
+uint16_t io_sound3cnt_l, io_sound3cnt_h, io_sound3cnt_x;
+uint16_t io_sound4cnt_l, io_sound4cnt_h;
+uint16_t io_soundcnt_l, io_soundcnt_h, io_soundcnt_x;
 uint16_t io_soundbias;
 uint32_t io_dma0sad, io_dma0dad, io_dma0cnt;
 uint32_t io_dma1sad, io_dma1dad, io_dma1cnt;
@@ -184,7 +241,7 @@ uint16_t timer_2_counter, timer_2_reload, timer_2_control;
 uint16_t timer_3_counter, timer_3_reload, timer_3_control;
 uint16_t io_keyinput;
 uint16_t io_keycnt;
-//uint16_t io_rcnt;
+uint16_t io_rcnt;
 uint16_t io_ie;
 uint16_t io_if;
 uint16_t io_waitcnt;
@@ -193,7 +250,134 @@ uint8_t io_haltcnt;
 
 uint8_t io_read_byte(uint32_t address) {
     switch (address) {
-        case REG_VCOUNT: return (uint8_t) io_vcount;
+        case REG_DISPCNT + 0: return (uint8_t)(io_dispcnt >> 0);
+        case REG_DISPCNT + 1: return (uint8_t)(io_dispcnt >> 8);
+        case 0x2: return 0xad;
+        case 0x3: return 0xde;
+        case REG_DISPSTAT + 0: return (uint8_t)(io_dispstat >> 0);
+        case REG_DISPSTAT + 1: return (uint8_t)(io_dispstat >> 8);
+        case REG_VCOUNT + 0: return (uint8_t)(io_vcount >> 0);
+        case REG_VCOUNT + 1: return (uint8_t)(io_vcount >> 8);
+        case REG_BG0CNT + 0: return (uint8_t)(io_bg0cnt >> 0);
+        case REG_BG0CNT + 1: return (uint8_t)(io_bg0cnt >> 8);
+        case REG_BG1CNT + 0: return (uint8_t)(io_bg1cnt >> 0);
+        case REG_BG1CNT + 1: return (uint8_t)(io_bg1cnt >> 8);
+        case REG_BG2CNT + 0: return (uint8_t)(io_bg2cnt >> 0);
+        case REG_BG2CNT + 1: return (uint8_t)(io_bg2cnt >> 8);
+        case REG_BG3CNT + 0: return (uint8_t)(io_bg3cnt >> 0);
+        case REG_BG3CNT + 1: return (uint8_t)(io_bg3cnt >> 8);
+        case REG_BG0HOFS + 0: return 0xad;
+        case REG_BG0HOFS + 1: return 0xde;
+        case REG_BG0VOFS + 0: return 0xad;
+        case REG_BG0VOFS + 1: return 0xde;
+        case REG_BG1HOFS + 0: return 0xad;
+        case REG_BG1HOFS + 1: return 0xde;
+        case REG_BG1VOFS + 0: return 0xad;
+        case REG_BG1VOFS + 1: return 0xde;
+        case REG_BG2HOFS + 0: return 0xad;
+        case REG_BG2HOFS + 1: return 0xde;
+        case REG_BG2VOFS + 0: return 0xad;
+        case REG_BG2VOFS + 1: return 0xde;
+        case REG_BG3HOFS + 0: return 0xad;
+        case REG_BG3HOFS + 1: return 0xde;
+        case REG_BG3VOFS + 0: return 0xad;
+        case REG_BG3VOFS + 1: return 0xde;
+        case REG_BG2PA + 0: return 0xad;
+        case REG_BG2PA + 1: return 0xde;
+        case REG_BG2PB + 0: return 0xad;
+        case REG_BG2PB + 1: return 0xde;
+        case REG_BG2PC + 0: return 0xad;
+        case REG_BG2PC + 1: return 0xde;
+        case REG_BG2PD + 0: return 0xad;
+        case REG_BG2PD + 1: return 0xde;
+        case REG_BG2X_L + 0: return 0xad;
+        case REG_BG2X_L + 1: return 0xde;
+        case REG_BG2X_H + 0: return 0xad;
+        case REG_BG2X_H + 1: return 0xde;
+        case REG_BG2Y_L + 0: return 0xad;
+        case REG_BG2Y_L + 1: return 0xde;
+        case REG_BG2Y_H + 0: return 0xad;
+        case REG_BG2Y_H + 1: return 0xde;
+        case REG_BG3PA + 0: return 0xad;
+        case REG_BG3PA + 1: return 0xde;
+        case REG_BG3PB + 0: return 0xad;
+        case REG_BG3PB + 1: return 0xde;
+        case REG_BG3PC + 0: return 0xad;
+        case REG_BG3PC + 1: return 0xde;
+        case REG_BG3PD + 0: return 0xad;
+        case REG_BG3PD + 1: return 0xde;
+        case REG_BG3X_L + 0: return 0xad;
+        case REG_BG3X_L + 1: return 0xde;
+        case REG_BG3X_H + 0: return 0xad;
+        case REG_BG3X_H + 1: return 0xde;
+        case REG_BG3Y_L + 0: return 0xad;
+        case REG_BG3Y_L + 1: return 0xde;
+        case REG_BG3Y_H + 0: return 0xad;
+        case REG_BG3Y_H + 1: return 0xde;
+        case REG_WIN0H + 0: return 0xad;
+        case REG_WIN0H + 1: return 0xde;
+        case REG_WIN1H + 0: return 0xad;
+        case REG_WIN1H + 1: return 0xde;
+        case REG_WIN0V + 0: return 0xad;
+        case REG_WIN0V + 1: return 0xde;
+        case REG_WIN1V + 0: return 0xad;
+        case REG_WIN1V + 1: return 0xde;
+        case REG_WININ + 0: return (uint8_t)(io_winin >> 0);
+        case REG_WININ + 1: return (uint8_t)(io_winin >> 8);
+        case REG_WINOUT + 0: return (uint8_t)(io_winout >> 0);
+        case REG_WINOUT + 1: return (uint8_t)(io_winout >> 8);
+        case REG_MOSAIC + 0: return 0xad;
+        case REG_MOSAIC + 1: return 0xde;
+        case 0x4e: return 0xad;
+        case 0x4f: return 0xde;
+        case REG_BLDCNT + 0: return (uint8_t)(io_bldcnt >> 0);
+        case REG_BLDCNT + 1: return (uint8_t)(io_bldcnt >> 8);
+        case REG_BLDALPHA + 0: return (uint8_t)(io_bldalpha >> 0);
+        case REG_BLDALPHA + 1: return (uint8_t)(io_bldalpha >> 8);
+        case REG_BLDY + 0: return 0xad;
+        case REG_BLDY + 1: return 0xde;
+        case 0x56: return 0xad;
+        case 0x57: return 0xde;
+        case 0x58: return 0xad;
+        case 0x59: return 0xde;
+        case 0x5a: return 0xad;
+        case 0x5b: return 0xde;
+        case 0x5c: return 0xad;
+        case 0x5d: return 0xde;
+        case 0x5e: return 0xad;
+        case 0x5f: return 0xde;
+        case REG_SOUND1CNT_L + 0: return (uint8_t)(io_sound1cnt_l >> 0);
+        case REG_SOUND1CNT_L + 1: return (uint8_t)(io_sound1cnt_l >> 8);
+        case REG_SOUND1CNT_H + 0: return (uint8_t)(io_sound1cnt_h >> 0) & 0xc0;
+        case REG_SOUND1CNT_H + 1: return (uint8_t)(io_sound1cnt_h >> 8);
+        case REG_SOUND1CNT_X + 0: return (uint8_t)(io_sound1cnt_x >> 0) & 0x00;
+        case REG_SOUND1CNT_X + 1: return (uint8_t)(io_sound1cnt_x >> 8) & 0x78;
+        case 0x66: return 0;
+        case 0x67: return 0;
+        case REG_SOUND2CNT_L + 0: return (uint8_t)(io_sound2cnt_l >> 0) & 0xc0;
+        case REG_SOUND2CNT_L + 1: return (uint8_t)(io_sound2cnt_l >> 8);
+        case 0x6a: return 0;
+        case 0x6b: return 0;
+        case REG_SOUND2CNT_H + 0: return (uint8_t)(io_sound2cnt_h >> 0) & 0x00;
+        case REG_SOUND2CNT_H + 1: return (uint8_t)(io_sound2cnt_h >> 8) & 0x78;
+        case 0x6e: return 0;
+        case 0x6f: return 0;
+        case REG_SOUND3CNT_L + 0: return (uint8_t)(io_sound3cnt_l >> 0);
+        case REG_SOUND3CNT_L + 1: return (uint8_t)(io_sound3cnt_l >> 8);
+        case REG_SOUND3CNT_H + 0: return (uint8_t)(io_sound3cnt_h >> 0) & 0x00;
+        case REG_SOUND3CNT_H + 1: return (uint8_t)(io_sound3cnt_h >> 8);
+        case REG_SOUND3CNT_X + 0: return (uint8_t)(io_sound3cnt_x >> 0) & 0x00;
+        case REG_SOUND3CNT_X + 1: return (uint8_t)(io_sound3cnt_x >> 8) & 0x78;
+        case 0x76: return 0;
+        case 0x77: return 0;
+        case REG_SOUND4CNT_L + 0: return (uint8_t)(io_sound4cnt_l >> 0) & 0xc0;
+        case REG_SOUND4CNT_L + 1: return (uint8_t)(io_sound4cnt_l >> 8);
+        case 0x7a: return 0;
+        case 0x7b: return 0;
+        case REG_SOUND4CNT_H + 0: return (uint8_t)(io_sound4cnt_h >> 0);
+        case REG_SOUND4CNT_H + 1: return (uint8_t)(io_sound4cnt_h >> 8) & 0x7f;
+        case 0x7e: return 0;
+        case 0x7f: return 0;
 
         case REG_TM0CNT_L + 0: return (uint8_t) timer_0_counter;
         case REG_TM0CNT_L + 1: return (uint8_t)(timer_0_counter >> 8);
@@ -214,10 +398,134 @@ uint8_t io_read_byte(uint32_t address) {
 
 void io_write_byte(uint32_t address, uint8_t value) {
     switch (address) {
-        //case IO_DISPSTAT + 1:
-        //    io_dispstat = (io_dispstat & 0xff) | value << 8;
-        //    printf("DISPSTAT = 0x%04x\n", io_dispstat);
-        //    break;
+        case REG_DISPCNT + 0: io_dispcnt = (io_dispcnt & 0xff08) | ((value << 0) & 0x00f7); break;
+        case REG_DISPCNT + 1: io_dispcnt = (io_dispcnt & 0x00ff) | ((value << 8) & 0xff00); break;
+        case 0x2: break;
+        case 0x3: break;
+        case REG_DISPSTAT + 0: io_dispstat = (io_dispstat & 0xff07) | ((value << 0) & 0x0038); break;
+        case REG_DISPSTAT + 1: io_dispstat = (io_dispstat & 0x00ff) | ((value << 8) & 0xff00); break;
+        case REG_VCOUNT + 0: break;
+        case REG_VCOUNT + 1: break;
+        case REG_BG0CNT + 0: io_bg0cnt = (io_bg0cnt & 0xff00) | ((value << 0) & 0x00ff); break;
+        case REG_BG0CNT + 1: io_bg0cnt = (io_bg0cnt & 0x00ff) | ((value << 8) & 0xdf00); break;
+        case REG_BG1CNT + 0: io_bg1cnt = (io_bg1cnt & 0xff00) | ((value << 0) & 0x00ff); break;
+        case REG_BG1CNT + 1: io_bg1cnt = (io_bg1cnt & 0x00ff) | ((value << 8) & 0xdf00); break;
+        case REG_BG2CNT + 0: io_bg2cnt = (io_bg2cnt & 0xff00) | ((value << 0) & 0x00ff); break;
+        case REG_BG2CNT + 1: io_bg2cnt = (io_bg2cnt & 0x00ff) | ((value << 8) & 0xff00); break;
+        case REG_BG3CNT + 0: io_bg3cnt = (io_bg3cnt & 0xff00) | ((value << 0) & 0x00ff); break;
+        case REG_BG3CNT + 1: io_bg3cnt = (io_bg3cnt & 0x00ff) | ((value << 8) & 0xff00); break;
+        case REG_BG0HOFS + 0: io_bg0hofs = (io_bg0hofs & 0xff00) | ((value << 0) & 0x00ff); break;
+        case REG_BG0HOFS + 1: io_bg0hofs = (io_bg0hofs & 0x00ff) | ((value << 8) & 0x0000); break;
+        case REG_BG0VOFS + 0: io_bg0vofs = (io_bg0vofs & 0xff00) | ((value << 0) & 0x00ff); break;
+        case REG_BG0VOFS + 1: io_bg0vofs = (io_bg0vofs & 0x00ff) | ((value << 8) & 0x0000); break;
+        case REG_BG1HOFS + 0: io_bg1hofs = (io_bg1hofs & 0xff00) | ((value << 0) & 0x00ff); break;
+        case REG_BG1HOFS + 1: io_bg1hofs = (io_bg1hofs & 0x00ff) | ((value << 8) & 0x0000); break;
+        case REG_BG1VOFS + 0: io_bg1vofs = (io_bg1vofs & 0xff00) | ((value << 0) & 0x00ff); break;
+        case REG_BG1VOFS + 1: io_bg1vofs = (io_bg1vofs & 0x00ff) | ((value << 8) & 0x0000); break;
+        case REG_BG2HOFS + 0: io_bg2hofs = (io_bg2hofs & 0xff00) | ((value << 0) & 0x00ff); break;
+        case REG_BG2HOFS + 1: io_bg2hofs = (io_bg2hofs & 0x00ff) | ((value << 8) & 0x0000); break;
+        case REG_BG2VOFS + 0: io_bg2vofs = (io_bg2vofs & 0xff00) | ((value << 0) & 0x00ff); break;
+        case REG_BG2VOFS + 1: io_bg2vofs = (io_bg2vofs & 0x00ff) | ((value << 8) & 0x0000); break;
+        case REG_BG3HOFS + 0: io_bg3hofs = (io_bg3hofs & 0xff00) | ((value << 0) & 0x00ff); break;
+        case REG_BG3HOFS + 1: io_bg3hofs = (io_bg3hofs & 0x00ff) | ((value << 8) & 0x0000); break;
+        case REG_BG3VOFS + 0: io_bg3vofs = (io_bg3vofs & 0xff00) | ((value << 0) & 0x00ff); break;
+        case REG_BG3VOFS + 1: io_bg3vofs = (io_bg3vofs & 0x00ff) | ((value << 8) & 0x0000); break;
+        case REG_BG2PA + 0: io_bg2pa = (io_bg2pa & 0xff00) | ((value << 0) & 0x00ff); break;
+        case REG_BG2PA + 1: io_bg2pa = (io_bg2pa & 0x00ff) | ((value << 8) & 0xff00); break;
+        case REG_BG2PB + 0: io_bg2pb = (io_bg2pb & 0xff00) | ((value << 0) & 0x00ff); break;
+        case REG_BG2PB + 1: io_bg2pb = (io_bg2pb & 0x00ff) | ((value << 8) & 0xff00); break;
+        case REG_BG2PC + 0: io_bg2pc = (io_bg2pc & 0xff00) | ((value << 0) & 0x00ff); break;
+        case REG_BG2PC + 1: io_bg2pc = (io_bg2pc & 0x00ff) | ((value << 8) & 0xff00); break;
+        case REG_BG2PD + 0: io_bg2pd = (io_bg2pd & 0xff00) | ((value << 0) & 0x00ff); break;
+        case REG_BG2PD + 1: io_bg2pd = (io_bg2pd & 0x00ff) | ((value << 8) & 0xff00); break;
+        case REG_BG2X_L + 0: io_bg2x = (io_bg2x & 0xffffff00) | ((value << 0) & 0x000000ff); break;
+        case REG_BG2X_L + 1: io_bg2x = (io_bg2x & 0xffff00ff) | ((value << 8) & 0x0000ff00); break;
+        case REG_BG2X_H + 0: io_bg2x = (io_bg2x & 0xff00ffff) | ((value << 16) & 0x00ff0000); break;
+        case REG_BG2X_H + 1: io_bg2x = (io_bg2x & 0x00ffffff) | ((value << 24) & 0xff000000); break;
+        case REG_BG2Y_L + 0: io_bg2y = (io_bg2y & 0xffffff00) | ((value << 0) & 0x000000ff); break;
+        case REG_BG2Y_L + 1: io_bg2y = (io_bg2y & 0xffff00ff) | ((value << 8) & 0x0000ff00); break;
+        case REG_BG2Y_H + 0: io_bg2y = (io_bg2y & 0xff00ffff) | ((value << 16) & 0x00ff0000); break;
+        case REG_BG2Y_H + 1: io_bg2y = (io_bg2y & 0x00ffffff) | ((value << 24) & 0xff000000); break;
+        case REG_BG3PA + 0: io_bg3pa = (io_bg3pa & 0xff00) | ((value << 0) & 0x00ff); break;
+        case REG_BG3PA + 1: io_bg3pa = (io_bg3pa & 0x00ff) | ((value << 8) & 0xff00); break;
+        case REG_BG3PB + 0: io_bg3pb = (io_bg3pb & 0xff00) | ((value << 0) & 0x00ff); break;
+        case REG_BG3PB + 1: io_bg3pb = (io_bg3pb & 0x00ff) | ((value << 8) & 0xff00); break;
+        case REG_BG3PC + 0: io_bg3pc = (io_bg3pc & 0xff00) | ((value << 0) & 0x00ff); break;
+        case REG_BG3PC + 1: io_bg3pc = (io_bg3pc & 0x00ff) | ((value << 8) & 0xff00); break;
+        case REG_BG3PD + 0: io_bg3pd = (io_bg3pd & 0xff00) | ((value << 0) & 0x00ff); break;
+        case REG_BG3PD + 1: io_bg3pd = (io_bg3pd & 0x00ff) | ((value << 8) & 0xff00); break;
+        case REG_BG3X_L + 0: io_bg3x = (io_bg3x & 0xffffff00) | ((value << 0) & 0x000000ff); break;
+        case REG_BG3X_L + 1: io_bg3x = (io_bg3x & 0xffff00ff) | ((value << 8) & 0x0000ff00); break;
+        case REG_BG3X_H + 0: io_bg3x = (io_bg3x & 0xff00ffff) | ((value << 16) & 0x00ff0000); break;
+        case REG_BG3X_H + 1: io_bg3x = (io_bg3x & 0x00ffffff) | ((value << 24) & 0xff000000); break;
+        case REG_BG3Y_L + 0: io_bg3y = (io_bg3y & 0xffffff00) | ((value << 0) & 0x000000ff); break;
+        case REG_BG3Y_L + 1: io_bg3y = (io_bg3y & 0xffff00ff) | ((value << 8) & 0x0000ff00); break;
+        case REG_BG3Y_H + 0: io_bg3y = (io_bg3y & 0xff00ffff) | ((value << 16) & 0x00ff0000); break;
+        case REG_BG3Y_H + 1: io_bg3y = (io_bg3y & 0x00ffffff) | ((value << 24) & 0xff000000); break;
+        case REG_WIN0H + 0: io_win0h = (io_win0h & 0xff00) | ((value << 0) & 0x00ff); break;
+        case REG_WIN0H + 1: io_win0h = (io_win0h & 0x00ff) | ((value << 8) & 0xff00); break;
+        case REG_WIN1H + 0: io_win1h = (io_win1h & 0xff00) | ((value << 0) & 0x00ff); break;
+        case REG_WIN1H + 1: io_win1h = (io_win1h & 0x00ff) | ((value << 8) & 0xff00); break;
+        case REG_WIN0V + 0: io_win0v = (io_win0v & 0xff00) | ((value << 0) & 0x00ff); break;
+        case REG_WIN0V + 1: io_win0v = (io_win0v & 0x00ff) | ((value << 8) & 0xff00); break;
+        case REG_WIN1V + 0: io_win1v = (io_win1v & 0xff00) | ((value << 0) & 0x00ff); break;
+        case REG_WIN1V + 1: io_win1v = (io_win1v & 0x00ff) | ((value << 8) & 0xff00); break;
+        case REG_WININ + 0: io_winin = (io_winin & 0xff00) | ((value << 0) & 0x003f); break;
+        case REG_WININ + 1: io_winin = (io_winin & 0x00ff) | ((value << 8) & 0x3f00); break;
+        case REG_WINOUT + 0: io_winout = (io_winout & 0xff00) | ((value << 0) & 0x003f); break;
+        case REG_WINOUT + 1: io_winout = (io_winout & 0x00ff) | ((value << 8) & 0x3f00); break;
+        case REG_MOSAIC + 0: io_mosaic = (io_mosaic & 0xff00) | ((value << 0) & 0x00ff); break;
+        case REG_MOSAIC + 1: io_mosaic = (io_mosaic & 0x00ff) | ((value << 8) & 0xff00); break;
+        case 0x4e: break;
+        case 0x4f: break;
+        case REG_BLDCNT + 0: io_bldcnt = (io_bldcnt & 0xff00) | ((value << 0) & 0x00ff); break;
+        case REG_BLDCNT + 1: io_bldcnt = (io_bldcnt & 0x00ff) | ((value << 8) & 0x3f00); break;
+        case REG_BLDALPHA + 0: io_bldalpha = (io_bldalpha & 0xff00) | ((value << 0) & 0x001f); break;
+        case REG_BLDALPHA + 1: io_bldalpha = (io_bldalpha & 0x00ff) | ((value << 8) & 0x1f00); break;
+        case REG_BLDY + 0: io_bldy = (io_bldy & 0xff00) | ((value << 0) & 0x001f); break;
+        case REG_BLDY + 1: io_bldy = (io_bldy & 0x00ff) | ((value << 8) & 0x0000); break;
+        case 0x56: break;
+        case 0x57: break;
+        case 0x58: break;
+        case 0x59: break;
+        case 0x5a: break;
+        case 0x5b: break;
+        case 0x5c: break;
+        case 0x5d: break;
+        case 0x5e: break;
+        case 0x5f: break;
+        case REG_SOUND1CNT_L + 0: io_sound1cnt_l = (io_sound1cnt_l & 0xff00) | ((value << 0) & 0x007f); break;
+        case REG_SOUND1CNT_L + 1: io_sound1cnt_l = (io_sound1cnt_l & 0x00ff) | ((value << 8) & 0x0000); break;
+        case REG_SOUND1CNT_H + 0: io_sound1cnt_h = (io_sound1cnt_h & 0xff00) | ((value << 0) & 0x00ff); break;
+        case REG_SOUND1CNT_H + 1: io_sound1cnt_h = (io_sound1cnt_h & 0x00ff) | ((value << 8) & 0xff00); break;
+        case REG_SOUND1CNT_X + 0: io_sound1cnt_x = (io_sound1cnt_x & 0xff00) | ((value << 0) & 0x00ff); break;
+        case REG_SOUND1CNT_X + 1: io_sound1cnt_x = (io_sound1cnt_x & 0x00ff) | ((value << 8) & 0xc700); break;
+        case 0x66: break;
+        case 0x67: break;
+        case REG_SOUND2CNT_L + 0: io_sound2cnt_l = (io_sound2cnt_l & 0xff00) | ((value << 0) & 0x00ff); break;
+        case REG_SOUND2CNT_L + 1: io_sound2cnt_l = (io_sound2cnt_l & 0x00ff) | ((value << 8) & 0xff00); break;
+        case 0x6a: break;
+        case 0x6b: break;
+        case REG_SOUND2CNT_H + 0: io_sound2cnt_h = (io_sound2cnt_h & 0xff00) | ((value << 0) & 0x00ff); break;
+        case REG_SOUND2CNT_H + 1: io_sound2cnt_h = (io_sound2cnt_h & 0x00ff) | ((value << 8) & 0xc700); break;
+        case 0x6e: break;
+        case 0x6f: break;
+        case REG_SOUND3CNT_L + 0: io_sound3cnt_l = (io_sound3cnt_l & 0xff00) | ((value << 0) & 0x00e0); break;
+        case REG_SOUND3CNT_L + 1: io_sound3cnt_l = (io_sound3cnt_l & 0x00ff) | ((value << 8) & 0x0000); break;
+        case REG_SOUND3CNT_H + 0: io_sound3cnt_h = (io_sound3cnt_h & 0xff00) | ((value << 0) & 0x00ff); break;
+        case REG_SOUND3CNT_H + 1: io_sound3cnt_h = (io_sound3cnt_h & 0x00ff) | ((value << 8) & 0xe000); break;
+        case REG_SOUND3CNT_X + 0: io_sound3cnt_x = (io_sound3cnt_x & 0xff00) | ((value << 0) & 0x00ff); break;
+        case REG_SOUND3CNT_X + 1: io_sound3cnt_x = (io_sound3cnt_x & 0x00ff) | ((value << 8) & 0xc700); break;
+        case 0x76: break;
+        case 0x77: break;
+        case REG_SOUND4CNT_L + 0: io_sound4cnt_l = (io_sound4cnt_l & 0xff00) | ((value << 0) & 0x003f); break;
+        case REG_SOUND4CNT_L + 1: io_sound4cnt_l = (io_sound4cnt_l & 0x00ff) | ((value << 8) & 0xff00); break;
+        case 0x7a: break;
+        case 0x7b: break;
+        case REG_SOUND4CNT_H + 0: io_sound4cnt_h = (io_sound4cnt_h & 0xff00) | ((value << 0) & 0x00ff); break;
+        case REG_SOUND4CNT_H + 1: io_sound4cnt_h = (io_sound4cnt_h & 0x00ff) | ((value << 8) & 0xc000); break;
+        case 0x7e: break;
+        case 0x7f: break;
 
         case REG_TM0CNT_L + 0: assert(false); break;
         case REG_TM0CNT_L + 1: assert(false); break;
@@ -252,20 +560,71 @@ void io_write_byte(uint32_t address, uint8_t value) {
 uint16_t io_read_halfword(uint32_t address) {
     switch (address) {
         case REG_DISPCNT: return io_dispcnt;
+        case 0x2: return 0xdead;
         case REG_DISPSTAT: return io_dispstat;
         case REG_VCOUNT: return io_vcount;
         case REG_BG0CNT: return io_bg0cnt;
         case REG_BG1CNT: return io_bg1cnt;
         case REG_BG2CNT: return io_bg2cnt;
         case REG_BG3CNT: return io_bg3cnt;
-        case REG_BG0HOFS: return io_bg0hofs;
-        case REG_BG0VOFS: return io_bg0vofs;
-        case REG_BG1HOFS: return io_bg1hofs;
-        case REG_BG1VOFS: return io_bg1vofs;
-        case REG_BG2HOFS: return io_bg2hofs;
-        case REG_BG2VOFS: return io_bg2vofs;
+        case REG_BG0HOFS: return 0xdead;
+        case REG_BG0VOFS: return 0xdead;
+        case REG_BG1HOFS: return 0xdead;
+        case REG_BG1VOFS: return 0xdead;
+        case REG_BG2HOFS: return 0xdead;
+        case REG_BG2VOFS: return 0xdead;
+        case REG_BG3HOFS: return 0xdead;
+        case REG_BG3VOFS: return 0xdead;
+        case REG_BG2PA: return 0xdead;
+        case REG_BG2PB: return 0xdead;
+        case REG_BG2PC: return 0xdead;
+        case REG_BG2PD: return 0xdead;
+        case REG_BG2X_L: return 0xdead;
+        case REG_BG2X_H: return 0xdead;
+        case REG_BG2Y_L: return 0xdead;
+        case REG_BG2Y_H: return 0xdead;
+        case REG_BG3PA: return 0xdead;
+        case REG_BG3PB: return 0xdead;
+        case REG_BG3PC: return 0xdead;
+        case REG_BG3PD: return 0xdead;
+        case REG_BG3X_L: return 0xdead;
+        case REG_BG3X_H: return 0xdead;
+        case REG_BG3Y_L: return 0xdead;
+        case REG_BG3Y_H: return 0xdead;
+        case REG_WIN0H: return 0xdead;
+        case REG_WIN1H: return 0xdead;
+        case REG_WIN0V: return 0xdead;
+        case REG_WIN1V: return 0xdead;
+        case REG_WININ: return io_winin;
+        case REG_WINOUT: return io_winout;
+        case REG_MOSAIC: return 0xdead;
+        case 0x4e: return 0xdead;
+        case REG_BLDCNT: return io_bldcnt;
+        case REG_BLDALPHA: return io_bldalpha;
+        case REG_BLDY: return 0xdead;
+        case 0x56: return 0xdead;
+        case 0x58: return 0xdead;
+        case 0x5a: return 0xdead;
+        case 0x5c: return 0xdead;
+        case 0x5e: return 0xdead;
+        case REG_SOUND1CNT_L: return io_sound1cnt_l;
+        case REG_SOUND1CNT_H: return io_sound1cnt_h & 0xffc0;
+        case REG_SOUND1CNT_X: return io_sound1cnt_x & 0x7800;
+        case 0x66: return 0;
+        case REG_SOUND2CNT_L: return io_sound2cnt_l & 0xffc0;
+        case 0x6a: return 0;
+        case REG_SOUND2CNT_H: return io_sound2cnt_h & 0x7800;
+        case 0x6e: return 0;
+        case REG_SOUND3CNT_L: return io_sound3cnt_l;
+        case REG_SOUND3CNT_H: return io_sound3cnt_h & 0xff00;
+        case REG_SOUND3CNT_X: return io_sound3cnt_x & 0x7800;
+        case 0x76: return 0;
+        case REG_SOUND4CNT_L: return io_sound4cnt_l & 0xffc0;
+        case 0x7a: return 0;
+        case REG_SOUND4CNT_H: return io_sound4cnt_h & 0x7fff;
+        case 0x7e: return 0;
 
-        case IO_SOUNDBIAS:
+        case REG_SOUNDBIAS:
             return 0x200;  // FIXME
             //return io_soundbias;
 
@@ -317,54 +676,70 @@ uint16_t io_read_halfword(uint32_t address) {
 
 void io_write_halfword(uint32_t address, uint16_t value) {
     switch (address) {
-        case REG_DISPCNT:
-            io_dispcnt = (io_dispcnt & DCNT_GB) | (value & ~DCNT_GB);
-            break;
-
-        case REG_DISPSTAT:
-            io_dispstat = (io_dispstat & 7) | (value & ~7);
-            break;
-
-        case REG_BG0CNT: io_bg0cnt = value; break;
-        case REG_BG1CNT: io_bg1cnt = value; break;
-        case REG_BG2CNT: io_bg2cnt = value; break;
-        case REG_BG3CNT: io_bg3cnt = value; break;
-        case REG_BG0HOFS: io_bg0hofs = value; break;
-        case REG_BG0VOFS: io_bg0vofs = value; break;
-        case REG_BG1HOFS: io_bg1hofs = value; break;
-        case REG_BG1VOFS: io_bg1vofs = value; break;
-        case REG_BG2HOFS: io_bg2hofs = value; break;
-        case REG_BG2VOFS: io_bg2vofs = value; break;
-
-        case IO_WIN0H:
-            io_win0h = value;
-            //printf("WIN0H = 0x%04x\n", io_win0h);
-            break;
-
-        case IO_WIN1H:
-            io_win1h = value;
-            //printf("WIN1H = 0x%04x\n", io_win1h);
-            break;
-
-        case IO_WIN0V:
-            io_win0v = value;
-            //printf("WIN0V = 0x%04x\n", io_win0v);
-            break;
-
-        case IO_WIN1V:
-            io_win1v = value;
-            //printf("WIN1V = 0x%04x\n", io_win1v);
-            break;
-
-        case IO_WININ:
-            io_winin = value;
-            //printf("WININ = 0x%04x\n", io_winin);
-            break;
-
-        case IO_WINOUT:
-            io_winout = value;
-            //printf("WINOUT = 0x%04x\n", io_winout);
-            break;
+        case REG_DISPCNT: io_dispcnt = (io_dispcnt & 0x0008) | (value & 0xfff7); break;
+        case 0x2: break;
+        case REG_DISPSTAT: io_dispstat = (io_dispstat & 0x0007) | (value & 0xff38); break;
+        case REG_VCOUNT: break;
+        case REG_BG0CNT: io_bg0cnt = value & 0xdfff; break;
+        case REG_BG1CNT: io_bg1cnt = value & 0xdfff; break;
+        case REG_BG2CNT: io_bg2cnt = value & 0xffff; break;
+        case REG_BG3CNT: io_bg3cnt = value & 0xffff; break;
+        case REG_BG0HOFS: io_bg0hofs = value & 0x00ff; break;
+        case REG_BG0VOFS: io_bg0vofs = value & 0x00ff; break;
+        case REG_BG1HOFS: io_bg1hofs = value & 0x00ff; break;
+        case REG_BG1VOFS: io_bg1vofs = value & 0x00ff; break;
+        case REG_BG2HOFS: io_bg2hofs = value & 0x00ff; break;
+        case REG_BG2VOFS: io_bg2vofs = value & 0x00ff; break;
+        case REG_BG3HOFS: io_bg3hofs = value & 0x00ff; break;
+        case REG_BG3VOFS: io_bg3vofs = value & 0x00ff; break;
+        case REG_BG2PA: io_bg2pa = value & 0xffff; break;
+        case REG_BG2PB: io_bg2pb = value & 0xffff; break;
+        case REG_BG2PC: io_bg2pc = value & 0xffff; break;
+        case REG_BG2PD: io_bg2pd = value & 0xffff; break;
+        case REG_BG2X_L: io_bg2x = (io_bg2x & 0xffff0000) | ((value << 0) & 0x0000ffff); break;
+        case REG_BG2X_H: io_bg2x = (io_bg2x & 0x0000ffff) | ((value << 16) & 0xffff0000); break;
+        case REG_BG2Y_L: io_bg2y = (io_bg2y & 0xffff0000) | ((value << 0) & 0x0000ffff); break;
+        case REG_BG2Y_H: io_bg2y = (io_bg2y & 0x0000ffff) | ((value << 16) & 0xffff0000); break;
+        case REG_BG3PA: io_bg3pa = value & 0xffff; break;
+        case REG_BG3PB: io_bg3pb = value & 0xffff; break;
+        case REG_BG3PC: io_bg3pc = value & 0xffff; break;
+        case REG_BG3PD: io_bg3pd = value & 0xffff; break;
+        case REG_BG3X_L: io_bg3x = (io_bg3x & 0xffff0000) | ((value << 0) & 0x0000ffff); break;
+        case REG_BG3X_H: io_bg3x = (io_bg3x & 0x0000ffff) | ((value << 16) & 0xffff0000); break;
+        case REG_BG3Y_L: io_bg3y = (io_bg3y & 0xffff0000) | ((value << 0) & 0x0000ffff); break;
+        case REG_BG3Y_H: io_bg3y = (io_bg3y & 0x0000ffff) | ((value << 16) & 0xffff0000); break;
+        case REG_WIN0H: io_win0h = value & 0xffff; break;
+        case REG_WIN1H: io_win1h = value & 0xffff; break;
+        case REG_WIN0V: io_win0v = value & 0xffff; break;
+        case REG_WIN1V: io_win1v = value & 0xffff; break;
+        case REG_WININ: io_winin = value & 0x3f3f; break;
+        case REG_WINOUT: io_winout = value & 0x3f3f; break;
+        case REG_MOSAIC: io_mosaic = value & 0xffff; break;
+        case 0x4e: break;
+        case REG_BLDCNT: io_bldcnt = value & 0x3fff; break;
+        case REG_BLDALPHA: io_bldalpha = value & 0x1f1f; break;
+        case REG_BLDY: io_bldy = value & 0x001f; break;
+        case 0x56: break;
+        case 0x58: break;
+        case 0x5a: break;
+        case 0x5c: break;
+        case 0x5e: break;
+        case REG_SOUND1CNT_L: io_sound1cnt_l = value & 0x007f; break;
+        case REG_SOUND1CNT_H: io_sound1cnt_h = value & 0xffff; break;
+        case REG_SOUND1CNT_X: io_sound1cnt_x = value & 0xc7ff; break;
+        case 0x66: break;
+        case REG_SOUND2CNT_L: io_sound2cnt_l = value & 0xffff; break;
+        case 0x6a: break;
+        case REG_SOUND2CNT_H: io_sound2cnt_h = value & 0xc7ff; break;
+        case 0x6e: break;
+        case REG_SOUND3CNT_L: io_sound3cnt_l = value & 0x00e0; break;
+        case REG_SOUND3CNT_H: io_sound3cnt_h = value & 0xe0ff; break;
+        case REG_SOUND3CNT_X: io_sound3cnt_x = value & 0xc7ff; break;
+        case 0x76: break;
+        case REG_SOUND4CNT_L: io_sound4cnt_l = value & 0xff3f; break;
+        case 0x7a: break;
+        case REG_SOUND4CNT_H: io_sound4cnt_h = value & 0xc0ff; break;
+        case 0x7e: break;
 
         //case IO_SOUNDBIAS:
         //    io_soundbias = value;
@@ -443,11 +818,38 @@ void io_write_halfword(uint32_t address, uint16_t value) {
 
 uint32_t io_read_word(uint32_t address) {
     switch (address) {
-        case REG_DISPCNT:
-            return io_dispcnt;  // FIXME green swap
-
-        case REG_DISPSTAT:
-            return io_dispstat | io_vcount << 16;
+        case REG_DISPCNT: return io_dispcnt | 0xdead << 16;
+        case REG_DISPSTAT: return io_dispstat | io_vcount << 16;
+        case REG_BG0CNT: return io_bg0cnt | io_bg1cnt << 16;
+        case REG_BG2CNT: return io_bg2cnt | io_bg3cnt << 16;
+        case REG_BG0HOFS: return 0xdeaddead;
+        case REG_BG1HOFS: return 0xdeaddead;
+        case REG_BG2HOFS: return 0xdeaddead;
+        case REG_BG3HOFS: return 0xdeaddead;
+        case REG_BG2PA: return 0xdeaddead;
+        case REG_BG2PC: return 0xdeaddead;
+        case REG_BG2X_L: return 0xdeaddead;
+        case REG_BG2Y_L: return 0xdeaddead;
+        case REG_BG3PA: return 0xdeaddead;
+        case REG_BG3PC: return 0xdeaddead;
+        case REG_BG3X_L: return 0xdeaddead;
+        case REG_BG3Y_L: return 0xdeaddead;
+        case REG_WIN0H: return 0xdeaddead;
+        case REG_WIN0V: return 0xdeaddead;
+        case REG_WININ: return io_winin | io_winout << 16;
+        case REG_MOSAIC: return 0xdeaddead;
+        case REG_BLDCNT: return io_bldcnt | io_bldalpha << 16;
+        case REG_BLDY: return io_bldy | 0xdead;
+        case 0x58: return 0xdeaddead;
+        case 0x5c: return 0xdeaddead;
+        case REG_SOUND1CNT_L: return io_sound1cnt_l | (io_sound1cnt_h & 0xffc0) << 16;
+        case REG_SOUND1CNT_X: return io_sound1cnt_x & 0x7800;
+        case REG_SOUND2CNT_L: return io_sound2cnt_l & 0xffc0;
+        case REG_SOUND2CNT_H: return io_sound2cnt_h & 0x7800;
+        case REG_SOUND3CNT_L: return io_sound3cnt_l | (io_sound3cnt_h & 0xff00) << 16;
+        case REG_SOUND3CNT_X: return io_sound3cnt_x & 0x7800;
+        case REG_SOUND4CNT_L: return io_sound4cnt_l & 0xffc0;
+        case REG_SOUND4CNT_H: return io_sound4cnt_h & 0x7fff;
 
         case REG_DMA0SAD: return io_dma0sad;
         case REG_DMA0DAD: return io_dma0dad;
@@ -490,19 +892,38 @@ uint32_t io_read_word(uint32_t address) {
 
 void io_write_word(uint32_t address, uint32_t value) {
     switch (address) {
-        case REG_DISPCNT:
-            io_dispcnt = (io_dispcnt & DCNT_GB) | ((uint16_t) value & ~DCNT_GB);  // FIXME green swap
-            break;
-
-        case REG_BG0CNT:
-            io_bg0cnt = (uint16_t) value;
-            io_bg1cnt = (uint16_t)(value >> 16);
-            break;
-
-        case REG_BG0HOFS:
-            io_bg0hofs = (uint16_t) value;
-            io_bg0vofs = (uint16_t)(value >> 16);
-            break;
+        case REG_DISPCNT: io_dispcnt = (io_dispcnt & 0x0008) | (value & 0xfff7); break;
+        case REG_DISPSTAT: io_dispstat = (io_dispstat & 0x0007) | (value & 0xff38); break;
+        case REG_BG0CNT: io_bg0cnt = value & 0xdfff; io_bg1cnt = (value >> 16) & 0xdfff; break;
+        case REG_BG2CNT: io_bg2cnt = value & 0xffff; io_bg3cnt = (value >> 16) & 0xffff; break;
+        case REG_BG0HOFS: io_bg0hofs = value & 0x00ff; io_bg0vofs = (value >> 16) & 0x00ff; break;
+        case REG_BG1HOFS: io_bg1hofs = value & 0x00ff; io_bg1vofs = (value >> 16) & 0x00ff; break;
+        case REG_BG2HOFS: io_bg2hofs = value & 0x00ff; io_bg2vofs = (value >> 16) & 0x00ff; break;
+        case REG_BG3HOFS: io_bg3hofs = value & 0x00ff; io_bg3vofs = (value >> 16) & 0x00ff; break;
+        case REG_BG2PA: io_bg2pa = value & 0xffff; io_bg2pb = (value >> 16) & 0xffff; break;
+        case REG_BG2PC: io_bg2pc = value & 0xffff; io_bg2pd = (value >> 16) & 0xffff; break;
+        case REG_BG2X_L: io_bg2x = value & 0xffffffff; break;
+        case REG_BG2Y_L: io_bg2y = value & 0xffffffff; break;
+        case REG_BG3PA: io_bg3pa = value & 0xffff; io_bg3pb = (value >> 16) & 0xffff; break;
+        case REG_BG3PC: io_bg3pc = value & 0xffff; io_bg3pd = (value >> 16) & 0xffff; break;
+        case REG_BG3X_L: io_bg3x = value & 0xffffffff; break;
+        case REG_BG3Y_L: io_bg3y = value & 0xffffffff; break;
+        case REG_WIN0H: io_win0h = value & 0xffff; io_win1h = (value >> 16) & 0xffff; break;
+        case REG_WIN0V: io_win0v = value & 0xffff; io_win1v = (value >> 16) & 0xffff; break;
+        case REG_WININ: io_winin = value & 0x3f3f; io_winout = (value >> 16) & 0x3f3f; break;
+        case REG_MOSAIC: io_mosaic = value & 0xffff; break;
+        case REG_BLDCNT: io_bldcnt = value & 0x3fff; io_bldalpha = (value >> 16) & 0x1f1f; break;
+        case REG_BLDY: io_bldy = value & 0x001f; break;
+        case 0x58: break;
+        case 0x5c: break;
+        case REG_SOUND1CNT_L: io_sound1cnt_l = value & 0x007f; io_sound1cnt_h = (value >> 16) & 0xffff; break;
+        case REG_SOUND1CNT_X: io_sound1cnt_x = value & 0xc7ff; break;
+        case REG_SOUND2CNT_L: io_sound2cnt_l = value & 0xffff; break;
+        case REG_SOUND2CNT_H: io_sound2cnt_h = value & 0xc7ff; break;
+        case REG_SOUND3CNT_L: io_sound3cnt_l = value & 0x00e0; io_sound3cnt_h = (value >> 16) & 0xe0ff; break;
+        case REG_SOUND3CNT_X: io_sound3cnt_x = value & 0xc7ff; break;
+        case REG_SOUND4CNT_L: io_sound4cnt_l = value & 0xff3f; break;
+        case REG_SOUND4CNT_H: io_sound4cnt_h = value & 0xc0ff; break;
 
         case REG_DMA0SAD: io_dma0sad = value; break;
         case REG_DMA0DAD: io_dma0dad = value; break;
@@ -722,7 +1143,7 @@ uint8_t memory_read_byte(uint32_t address) {
         return cpu_iwram[address & 0x7fff];
     }
     if (address >= 0x04000000 && address < 0x05000000) {
-        return io_read_byte(address);
+        return io_read_byte(address - 0x4000000);
     }
     if (address >= 0x05000000 && address < 0x06000000) {
         return palette_ram[address & 0x3ff];
@@ -760,7 +1181,7 @@ void memory_write_byte(uint32_t address, uint8_t value) {
         return;
     }
     if (address >= 0x04000000 && address < 0x05000000) {
-        io_write_byte(address, value);
+        io_write_byte(address - 0x4000000, value);
         return;
     }
     if (address >= 0x05000000 && address < 0x06000000) {
@@ -801,7 +1222,7 @@ uint16_t memory_read_halfword(uint32_t address) {
         return *(uint16_t *)&cpu_iwram[address & 0x7ffe];
     }
     if (address >= 0x04000000 && address < 0x05000000) {
-        return io_read_halfword(address & ~1);
+        return io_read_halfword((address - 0x4000000) & ~1);
     }
     if (address >= 0x05000000 && address < 0x06000000) {
         return *(uint16_t *)&palette_ram[address & 0x3fe];
@@ -839,7 +1260,7 @@ void memory_write_halfword(uint32_t address, uint16_t value) {
         return;
     }
     if (address >= 0x04000000 && address < 0x05000000) {
-        io_write_halfword(address & ~1, value);
+        io_write_halfword((address - 0x4000000) & ~1, value);
         return;
     }
     if (address >= 0x05000000 && address < 0x06000000) {
@@ -882,7 +1303,7 @@ uint32_t memory_read_word(uint32_t address) {
         return *(uint32_t *)&cpu_iwram[address & 0x7ffc];
     }
     if (address >= 0x04000000 && address < 0x05000000) {
-        return io_read_word(address & ~3);
+        return io_read_word((address - 0x4000000) & ~3);
     }
     if (address >= 0x05000000 && address < 0x06000000) {
         return *(uint32_t*)&palette_ram[address & 0x3fc];
@@ -923,14 +1344,14 @@ void memory_write_word(uint32_t address, uint32_t value) {
         return;
     }
     if (address >= 0x04000000 && address < 0x05000000) {
-        io_write_word(address & ~3, value);
+        io_write_word((address - 0x4000000) & ~3, value);
         return;
     }
     if (address >= 0x05000000 && address < 0x06000000) {
         *(uint32_t *)&palette_ram[address & 0x3fc] = value;
         return;
     }
-    if (address >= MEM_VRAM && address < 0x07000000) {
+    if (address >= 0x06000000 && address < 0x07000000) {
         address &= 0x1fffc;
         if (address >= 0x18000) address -= 0x18000;
         *(uint32_t *)&video_ram[address] = value;
@@ -1141,8 +1562,14 @@ void gba_draw_tiled(uint32_t mode, int y) {
             uint16_t bgcnt = io_read_halfword(REG_BG0CNT + 2 * bg);
             uint16_t priority = bgcnt & 3;
             if (priority == pri) {
-                uint32_t hofs = io_read_halfword(REG_BG0HOFS + 4 * bg);
-                uint32_t vofs = io_read_halfword(REG_BG0VOFS + 4 * bg);
+                uint16_t hofs, vofs;
+                switch (bg) {
+                    case 0: hofs = io_bg0hofs; vofs = io_bg0vofs; break;
+                    case 1: hofs = io_bg1hofs; vofs = io_bg1vofs; break;
+                    case 2: hofs = io_bg2hofs; vofs = io_bg2vofs; break;
+                    case 3: hofs = io_bg3hofs; vofs = io_bg3vofs; break;
+                    default: abort();
+                }
                 //if (hofs & 0x8000) hofs |= ~0xffff;
                 //if (vofs & 0x8000) vofs |= ~0xffff;
                 gba_draw_tiled_bg(mode, y, bgcnt, hofs, vofs);
@@ -1290,8 +1717,15 @@ void gba_dma_update(void) {
 
         uint32_t dst_ctrl = (dmacnt >> 21) & 3;
         uint32_t src_ctrl = (dmacnt >> 23) & 3;
-        uint32_t dst_addr = io_read_word(REG_DMA0DAD + 12 * ch) & 0x0fffffff;
-        uint32_t src_addr = io_read_word(REG_DMA0SAD + 12 * ch) & 0x0fffffff;
+        uint32_t dst_addr = io_read_word(REG_DMA0DAD + 12 * ch);
+        uint32_t src_addr = io_read_word(REG_DMA0SAD + 12 * ch);
+        switch (ch) {  // FIXME
+            case 0: dst_addr &= 0x07ffffff; src_addr &= 0x07ffffff; break;
+            case 1: dst_addr &= 0x07ffffff; src_addr &= 0x0fffffff; break;
+            case 2: dst_addr &= 0x07ffffff; src_addr &= 0x0fffffff; break;
+            case 3: dst_addr &= 0x0fffffff; src_addr &= 0x0fffffff; break;
+            default: abort();
+        }
         uint32_t len = (ch == 3 ? dmacnt & 0xffff : dmacnt & 0x3fff);
         if (len == 0) len = (ch == 3 ? 0x10000 : 0x4000);
 
