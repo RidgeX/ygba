@@ -271,6 +271,7 @@ uint32_t io_dma3sad;  // 32
 uint32_t io_dma3dad;  // 32
 uint16_t io_dma3cnt_l, io_dma3cnt_h;
 
+bool fifo_a_refill, fifo_b_refill;
 uint16_t timer_0_counter, timer_0_reload, timer_0_control;
 uint16_t timer_1_counter, timer_1_reload, timer_1_control;
 uint16_t timer_2_counter, timer_2_reload, timer_2_control;
@@ -2154,19 +2155,33 @@ void gba_dma_update(void) {
         if ((dmacnt & DMA_ENABLE) == 0) continue;
 
         uint32_t start_timing = (dmacnt >> 28) & 3;
-        if (start_timing == DMA_AT_VBLANK && io_vcount != 160) continue;
-        if (start_timing == DMA_AT_HBLANK && ppu_cycles % 1232 != 960) continue;
-        if (start_timing == DMA_AT_REFRESH && ppu_cycles != 0) continue;
-
         uint32_t dst_ctrl = (dmacnt >> 21) & 3;
         uint32_t src_ctrl = (dmacnt >> 23) & 3;
-        uint32_t len = (ch == 3 ? dmacnt & 0xffff : dmacnt & 0x3fff);
+        bool transfer_word = (dmacnt & DMA_32) != 0;
+        uint32_t len = dmacnt & 0xffff;
         if (len == 0) len = (ch == 3 ? 0x10000 : 0x4000);
+
+        if (start_timing == DMA_AT_VBLANK && io_vcount != 160) continue;
+        if (start_timing == DMA_AT_HBLANK && ppu_cycles % 1232 != 960) continue;
+        if (start_timing == DMA_AT_REFRESH) {
+            if (ch == 1 || ch == 2) {
+                assert(dst_addr == 0x40000a0 || dst_addr == 0x40000a4);
+                assert((dmacnt & DMA_REPEAT) != 0);
+                if (dst_addr == 0x40000a0 && !fifo_a_refill) continue;
+                if (dst_addr == 0x40000a4 && !fifo_b_refill) continue;
+                dst_ctrl = DMA_FIXED;
+                transfer_word = true;
+                len = 4;
+            } else if (ch == 3) {
+                if (ppu_cycles % 1232 != 0) continue;
+            } else {
+                assert(false);
+            }
+        }
 
         assert(src_ctrl != DMA_RELOAD);
         assert((dmacnt & DMA_DRQ) == 0);
 
-        bool transfer_word = (dmacnt & DMA_32) != 0;
         if (transfer_word) {
             gba_dma_transfer_words(dst_ctrl, src_ctrl, dst_addr, src_addr, len);
         } else {
