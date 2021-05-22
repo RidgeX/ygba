@@ -1,4 +1,4 @@
-CFLAGS = -std=c99 -Wall -Wextra -Wpedantic -O2 -DDEBUG
+CFLAGS = -std=c99 -Wall -Wextra -Wpedantic -O2
 LIBS = -lmingw32 -lSDL2main -lSDL2
 
 gba: obj/algorithms.o obj/cpu.o obj/cpu-arm.o obj/cpu-thumb.o obj/main.o
