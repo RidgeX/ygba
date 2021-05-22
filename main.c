@@ -2105,40 +2105,36 @@ void gba_timer_update(void) {
     }
 }
 
-void gba_dma_transfer_halfwords(uint32_t dst_ctrl, uint32_t src_ctrl, uint32_t dst_addr, uint32_t src_addr, uint32_t len) {
-    uint32_t dst_off = 0;
-    uint32_t src_off = 0;
-    for (uint32_t i = 0; i < len; i++) {
-        uint16_t value = memory_read_halfword(src_addr + src_off);
-        memory_write_halfword(dst_addr + dst_off, value);
-        if (dst_ctrl == DMA_INC || dst_ctrl == DMA_RELOAD) dst_off += 2;
-        else if (dst_ctrl == DMA_DEC) dst_off -= 2;
-        if (src_ctrl == DMA_INC) src_off += 2;
-        else if (src_ctrl == DMA_DEC) src_off -= 2;
+void gba_dma_transfer_halfwords(uint32_t dst_ctrl, uint32_t src_ctrl, uint32_t *dst_addr, uint32_t *src_addr, uint32_t count) {
+    for (uint32_t i = 0; i < count; i++) {
+        uint16_t value = memory_read_halfword(*src_addr);
+        memory_write_halfword(*dst_addr, value);
+        if (dst_ctrl == DMA_INC || dst_ctrl == DMA_RELOAD) *dst_addr += 2;
+        else if (dst_ctrl == DMA_DEC) *dst_addr -= 2;
+        if (src_ctrl == DMA_INC) *src_addr += 2;
+        else if (src_ctrl == DMA_DEC) *src_addr -= 2;
     }
 }
 
-void gba_dma_transfer_words(uint32_t dst_ctrl, uint32_t src_ctrl, uint32_t dst_addr, uint32_t src_addr, uint32_t len) {
-    uint32_t dst_off = 0;
-    uint32_t src_off = 0;
-    for (uint32_t i = 0; i < len; i++) {
-        uint32_t value = memory_read_word(src_addr + src_off);
-        memory_write_word(dst_addr + dst_off, value);
-        if (dst_ctrl == DMA_INC || dst_ctrl == DMA_RELOAD) dst_off += 4;
-        else if (dst_ctrl == DMA_DEC) dst_off -= 4;
-        if (src_ctrl == DMA_INC) src_off += 4;
-        else if (src_ctrl == DMA_DEC) src_off -= 4;
+void gba_dma_transfer_words(uint32_t dst_ctrl, uint32_t src_ctrl, uint32_t *dst_addr, uint32_t *src_addr, uint32_t count) {
+    for (uint32_t i = 0; i < count; i++) {
+        uint32_t value = memory_read_word(*src_addr);
+        memory_write_word(*dst_addr, value);
+        if (dst_ctrl == DMA_INC || dst_ctrl == DMA_RELOAD) *dst_addr += 4;
+        else if (dst_ctrl == DMA_DEC) *dst_addr -= 4;
+        if (src_ctrl == DMA_INC) *src_addr += 4;
+        else if (src_ctrl == DMA_DEC) *src_addr -= 4;
     }
 }
 
 void gba_dma_update(void) {
     for (int ch = 0; ch < 4; ch++) {
-        uint32_t dmacnt, dst_addr, src_addr;
+        uint32_t dmacnt, *dst_addr, *src_addr;
         switch (ch) {
-            case 0: dmacnt = io_dma0cnt_l | io_dma0cnt_h << 16; dst_addr = io_dma0dad; src_addr = io_dma0sad; break;
-            case 1: dmacnt = io_dma1cnt_l | io_dma1cnt_h << 16; dst_addr = io_dma1dad; src_addr = io_dma1sad; break;
-            case 2: dmacnt = io_dma2cnt_l | io_dma2cnt_h << 16; dst_addr = io_dma2dad; src_addr = io_dma2sad; break;
-            case 3: dmacnt = io_dma3cnt_l | io_dma3cnt_h << 16; dst_addr = io_dma3dad; src_addr = io_dma3sad; break;
+            case 0: dmacnt = io_dma0cnt_l | io_dma0cnt_h << 16; dst_addr = &io_dma0dad; src_addr = &io_dma0sad; break;
+            case 1: dmacnt = io_dma1cnt_l | io_dma1cnt_h << 16; dst_addr = &io_dma1dad; src_addr = &io_dma1sad; break;
+            case 2: dmacnt = io_dma2cnt_l | io_dma2cnt_h << 16; dst_addr = &io_dma2dad; src_addr = &io_dma2sad; break;
+            case 3: dmacnt = io_dma3cnt_l | io_dma3cnt_h << 16; dst_addr = &io_dma3dad; src_addr = &io_dma3sad; break;
             default: abort();
         }
 
@@ -2148,20 +2144,20 @@ void gba_dma_update(void) {
         uint32_t dst_ctrl = (dmacnt >> 21) & 3;
         uint32_t src_ctrl = (dmacnt >> 23) & 3;
         bool transfer_word = (dmacnt & DMA_32) != 0;
-        uint32_t len = dmacnt & 0xffff;
-        if (len == 0) len = (ch == 3 ? 0x10000 : 0x4000);
+        uint32_t count = dmacnt & 0xffff;
+        if (count == 0) count = (ch == 3 ? 0x10000 : 0x4000);
 
         if (start_timing == DMA_AT_VBLANK && io_vcount != 160) continue;
         if (start_timing == DMA_AT_HBLANK && ppu_cycles % 1232 != 960) continue;
         if (start_timing == DMA_AT_REFRESH) {
             if (ch == 1 || ch == 2) {
-                assert(dst_addr == 0x40000a0 || dst_addr == 0x40000a4);
+                assert(*dst_addr == 0x40000a0 || *dst_addr == 0x40000a4);
                 assert((dmacnt & DMA_REPEAT) != 0);
-                if (dst_addr == 0x40000a0 && !fifo_a_refill) continue;
-                if (dst_addr == 0x40000a4 && !fifo_b_refill) continue;
+                if (*dst_addr == 0x40000a0 && !fifo_a_refill) continue;
+                if (*dst_addr == 0x40000a4 && !fifo_b_refill) continue;
                 dst_ctrl = DMA_FIXED;
                 transfer_word = true;
-                len = 4;
+                count = 4;
             } else if (ch == 3) {
                 if (ppu_cycles % 1232 != 0) continue;
             } else {
@@ -2172,19 +2168,17 @@ void gba_dma_update(void) {
         assert(src_ctrl != DMA_RELOAD);
         assert((dmacnt & DMA_DRQ) == 0);
 
+        uint32_t dst_addr_initial = *dst_addr;
+
         if (transfer_word) {
-            gba_dma_transfer_words(dst_ctrl, src_ctrl, dst_addr, src_addr, len);
+            gba_dma_transfer_words(dst_ctrl, src_ctrl, dst_addr, src_addr, count);
         } else {
-            gba_dma_transfer_halfwords(dst_ctrl, src_ctrl, dst_addr, src_addr, len);
+            gba_dma_transfer_halfwords(dst_ctrl, src_ctrl, dst_addr, src_addr, count);
         }
-        if (dst_ctrl != DMA_RELOAD) {
-            if (dst_ctrl == DMA_INC) dst_addr += (transfer_word ? 4 : 2) * len;
-            else if (dst_ctrl == DMA_DEC) dst_addr -= (transfer_word ? 4 : 2) * len;
-            io_write_word(REG_DMA0DAD_L + 12 * ch, dst_addr);
+
+        if (dst_ctrl == DMA_RELOAD) {
+            *dst_addr = dst_addr_initial;
         }
-        if (src_ctrl == DMA_INC) src_addr += (transfer_word ? 4 : 2) * len;
-        else if (src_ctrl == DMA_DEC) src_addr -= (transfer_word ? 4 : 2) * len;
-        io_write_word(REG_DMA0SAD_L + 12 * ch, src_addr);
 
         if ((dmacnt & DMA_IRQ) != 0 && io_ime == 1 && (io_ie & (1 << (8 + ch))) != 0) {
             io_if |= 1 << (8 + ch);
