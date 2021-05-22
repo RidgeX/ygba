@@ -2040,24 +2040,30 @@ void gba_ppu_update(void) {
         if (io_vcount == 0) {
             io_dispstat &= ~DSTAT_IN_VBL;
         } else if (io_vcount == 160) {
-            io_dispstat |= DSTAT_IN_VBL;
-            if ((io_dispstat & DSTAT_VBL_IRQ) != 0 && io_ime == 1 && (io_ie & INT_VBLANK) != 0) {
-                io_if |= INT_VBLANK;
+            if ((io_dispstat & DSTAT_IN_VBL) == 0) {
+                io_dispstat |= DSTAT_IN_VBL;
+                if ((io_dispstat & DSTAT_VBL_IRQ) != 0 && io_ime == 1 && (io_ie & INT_VBLANK) != 0) {
+                    io_if |= INT_VBLANK;
+                }
             }
         }
         if (io_vcount == (uint8_t)(io_dispstat >> 8)) {
-            io_dispstat |= DSTAT_IN_VCT;
-            if ((io_dispstat & DSTAT_VCT_IRQ) != 0 && io_ime == 1 && (io_ie & INT_VCOUNT) != 0) {
-                io_if |= INT_VCOUNT;
+            if ((io_dispstat & DSTAT_IN_VCT) == 0) {
+                io_dispstat |= DSTAT_IN_VCT;
+                if ((io_dispstat & DSTAT_VCT_IRQ) != 0 && io_ime == 1 && (io_ie & INT_VCOUNT) != 0) {
+                    io_if |= INT_VCOUNT;
+                }
             }
         } else {
             io_dispstat &= ~DSTAT_IN_VCT;
         }
     }
     if (ppu_cycles % 1232 == 960) {
-        io_dispstat |= DSTAT_IN_HBL;
-        if ((io_dispstat & DSTAT_HBL_IRQ) != 0 && io_ime == 1 && (io_ie & INT_HBLANK) != 0) {
-            io_if |= INT_HBLANK;
+        if ((io_dispstat & DSTAT_IN_HBL) == 0) {
+            io_dispstat |= DSTAT_IN_HBL;
+            if ((io_dispstat & DSTAT_HBL_IRQ) != 0 && io_ime == 1 && (io_ie & INT_HBLANK) != 0) {
+                io_if |= INT_HBLANK;
+            }
         }
     }
     ppu_cycles = (ppu_cycles + 1) % 280896;
