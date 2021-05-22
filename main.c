@@ -1878,6 +1878,8 @@ void gba_init(const char *filename) {
 
 SDL_Texture *g_texture;
 SDL_PixelFormat *g_format;
+Uint32 *g_pixels;
+int g_pitch;
 
 Uint32 rgb555(uint32_t pixel) {
     uint32_t r, g, b;
@@ -1893,21 +1895,14 @@ Uint32 rgb555(uint32_t pixel) {
 void gba_draw_blank(int y) {
     Uint32 clear_color = rgb555(0);
 
-    Uint32 *pixels;
-    int pitch;
-    SDL_LockTexture(g_texture, NULL, (void**) &pixels, &pitch);
     for (int x = 0; x < SCREEN_WIDTH; x++) {
-        pixels[y * (pitch / 4) + x] = clear_color;
+        g_pixels[y * (g_pitch / 4) + x] = clear_color;
     }
-    SDL_UnlockTexture(g_texture);
 }
 
 void gba_draw_bitmap(uint32_t mode, int y) {
     int width = (mode == 5 ? 160 : SCREEN_WIDTH);
 
-    Uint32 *pixels;
-    int pitch;
-    SDL_LockTexture(g_texture, NULL, (void**) &pixels, &pitch);
     for (int x = 0; x < SCREEN_WIDTH; x++) {
         uint16_t pixel = 0;
         if (mode == 3 || mode == 5) {
@@ -1921,15 +1916,14 @@ void gba_draw_bitmap(uint32_t mode, int y) {
             uint8_t pixel_index = video_ram[(pflip ? 0xa000 : 0) + y * SCREEN_WIDTH + x];
             pixel = *(uint16_t *)&palette_ram[pixel_index * 2];
         }
-        pixels[y * (pitch / 4) + x] = rgb555(pixel);
+        g_pixels[y * (g_pitch / 4) + x] = rgb555(pixel);
     }
-    SDL_UnlockTexture(g_texture);
 }
 
-void gba_draw_tiled_cull(Uint32 *pixels, int pitch, int x, int y, int h, uint32_t pixel) {
+void gba_draw_tiled_cull(int x, int y, int h, uint32_t pixel) {
     x -= h;
     if (x < 0 || x >= SCREEN_WIDTH) return;
-    pixels[y * (pitch / 4) + x] = rgb555(pixel);
+    g_pixels[y * (g_pitch / 4) + x] = rgb555(pixel);
 }
 
 void gba_draw_tiled_bg(uint32_t mode, int y, uint32_t bgcnt, uint32_t hofs, uint32_t vofs) {
@@ -1946,9 +1940,6 @@ void gba_draw_tiled_bg(uint32_t mode, int y, uint32_t bgcnt, uint32_t hofs, uint
     uint32_t vofs_rem_8 = vofs % 8;
     uint32_t yv = y + vofs_rem_8;
 
-    Uint32 *pixels;
-    int pitch;
-    SDL_LockTexture(g_texture, NULL, (void**) &pixels, &pitch);
     for (int x = 0; x < 256; x += 8) {
         uint32_t map_x = (x / 8 + hofs_div_8) % 32;
         uint32_t map_y = (yv / 8 + vofs_div_8) % 32;
@@ -1968,7 +1959,7 @@ void gba_draw_tiled_bg(uint32_t mode, int y, uint32_t bgcnt, uint32_t hofs, uint
                 uint8_t pixel_index = tile[offset];
                 if (pixel_index != 0) {
                     uint16_t pixel = *(uint16_t *)&palette_ram[pixel_index * 2];
-                    gba_draw_tiled_cull(pixels, pitch, (x / 8) * 8 + i, y, hofs_rem_8, pixel);
+                    gba_draw_tiled_cull((x / 8) * 8 + i, y, hofs_rem_8, pixel);
                 }
             }
         } else {
@@ -1979,16 +1970,15 @@ void gba_draw_tiled_bg(uint32_t mode, int y, uint32_t bgcnt, uint32_t hofs, uint
                 uint8_t pixel_index_1 = (pixel_indexes >> (hflip ? 0 : 4)) & 0xf;
                 if (pixel_index_0 != 0) {
                     uint16_t pixel_0 = *(uint16_t *)&palette_ram[palette_no * 32 + pixel_index_0 * 2];
-                    gba_draw_tiled_cull(pixels, pitch, (x / 8) * 8 + i, y, hofs_rem_8, pixel_0);
+                    gba_draw_tiled_cull((x / 8) * 8 + i, y, hofs_rem_8, pixel_0);
                 }
                 if (pixel_index_1 != 0) {
                     uint16_t pixel_1 = *(uint16_t *)&palette_ram[palette_no * 32 + pixel_index_1 * 2];
-                    gba_draw_tiled_cull(pixels, pitch, (x / 8) * 8 + i + 1, y, hofs_rem_8, pixel_1);
+                    gba_draw_tiled_cull((x / 8) * 8 + i + 1, y, hofs_rem_8, pixel_1);
                 }
             }
         }
     }
-    SDL_UnlockTexture(g_texture);
 }
 
 void gba_draw_tiled(uint32_t mode, int y) {
@@ -2304,7 +2294,9 @@ int main(int argc, char **argv) {
             keys[7] = false;
         }
 
+        SDL_LockTexture(g_texture, NULL, (void**) &g_pixels, &g_pitch);
         gba_emulate();
+        SDL_UnlockTexture(g_texture);
 
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
         SDL_RenderClear(renderer);
