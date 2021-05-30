@@ -1,9 +1,11 @@
+*.a
+*.exe
+*.gba
+*.o
 doc/
 games/
-obj/
 passed/
 roms/
 tonc/
-*.exe
-*.gba
+imgui.ini
 system_rom.bin
