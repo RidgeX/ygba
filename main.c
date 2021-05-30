@@ -47,11 +47,13 @@ bool has_sram = false;
 
 #define SCREEN_WIDTH  240
 #define SCREEN_HEIGHT 160
-#define RENDER_SCALE  3
-#define RENDER_WIDTH  (SCREEN_WIDTH * RENDER_SCALE)
-#define RENDER_HEIGHT (SCREEN_HEIGHT * RENDER_SCALE)
+
+uint32_t screen_texture;
+uint32_t screen_pixels[SCREEN_HEIGHT][SCREEN_WIDTH];
+int screen_scale = 3;
 
 #define NUM_KEYS 10
+
 bool keys[NUM_KEYS];
 
 uint8_t system_rom[0x4000];
@@ -1895,11 +1897,6 @@ void gba_init(const char *filename) {
     io_vcount = 227;
 }
 
-SDL_Texture *g_texture;
-SDL_PixelFormat *g_format;
-Uint32 *g_pixels;
-int g_pitch;
-
 Uint32 rgb555(uint32_t pixel) {
     uint32_t r, g, b;
     r = pixel & 0x1f;
@@ -1908,14 +1905,14 @@ Uint32 rgb555(uint32_t pixel) {
     r = (r << 3) | (r >> 2);
     g = (g << 3) | (g >> 2);
     b = (b << 3) | (b >> 2);
-    return SDL_MapRGB(g_format, r, g, b);
+    return 0xff << 24 | b << 16 | g << 8 | r;
 }
 
 void gba_draw_blank(int y) {
     Uint32 clear_color = rgb555(0);
 
     for (int x = 0; x < SCREEN_WIDTH; x++) {
-        g_pixels[y * (g_pitch / 4) + x] = clear_color;
+        screen_pixels[y][x] = clear_color;
     }
 }
 
@@ -1935,14 +1932,14 @@ void gba_draw_bitmap(uint32_t mode, int y) {
             uint8_t pixel_index = video_ram[(pflip ? 0xa000 : 0) + y * SCREEN_WIDTH + x];
             pixel = *(uint16_t *)&palette_ram[pixel_index * 2];
         }
-        g_pixels[y * (g_pitch / 4) + x] = rgb555(pixel);
+        screen_pixels[y][x] = rgb555(pixel);
     }
 }
 
 void gba_draw_tiled_cull(int x, int y, int h, uint32_t pixel) {
     x -= h;
     if (x < 0 || x >= SCREEN_WIDTH) return;
-    g_pixels[y * (g_pitch / 4) + x] = rgb555(pixel);
+    screen_pixels[y][x] = rgb555(pixel);
 }
 
 void gba_draw_tiled_bg(uint32_t mode, int y, uint32_t bgcnt, uint32_t hofs, uint32_t vofs) {
@@ -2263,21 +2260,14 @@ void gba_emulate(void) {
     }
 }
 
-uint32_t fps_ticks_last = 0;
-double fps_diff = 0;
-
 // Main code
 int main(int argc, char **argv) {
-    /*
     if (argc != 2) {
         fprintf(stderr, "Usage: %s filename.gba\n", argv[0]);
         exit(EXIT_FAILURE);
     }
 
     gba_init(argv[1]);
-    */
-
-    gba_init("games/ingame/Pokemon - Emerald Version (USA, Europe).gba");
 
     // Setup SDL
     // (Some versions of SDL before 2.0.10 appear to have performance/stalling issues on a minority of Windows systems,
@@ -2321,24 +2311,6 @@ int main(int argc, char **argv) {
         SDL_Log("Failed to create window: %s", SDL_GetError());
         exit(EXIT_FAILURE);
     }
-    /*
-    SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-    if (renderer == NULL) {
-        SDL_Log("Failed to create renderer: %s", SDL_GetError());
-        exit(EXIT_FAILURE);
-    }
-    Uint32 pixel_format = SDL_GetWindowPixelFormat(window);
-    g_texture = SDL_CreateTexture(renderer, pixel_format, SDL_TEXTUREACCESS_STREAMING, SCREEN_WIDTH, SCREEN_HEIGHT);
-    if (g_texture == NULL) {
-        SDL_Log("Failed to create texture: %s", SDL_GetError());
-        exit(EXIT_FAILURE);
-    }
-    g_format = SDL_AllocFormat(pixel_format);
-    if (g_format == NULL) {
-        SDL_Log("Failed to create pixel format: %s", SDL_GetError());
-        exit(EXIT_FAILURE);
-    }
-    */
     SDL_GLContext gl_context = SDL_GL_CreateContext(window);
     SDL_GL_MakeCurrent(window, gl_context);
     SDL_GL_SetSwapInterval(1);  // Enable vsync
@@ -2360,6 +2332,9 @@ int main(int argc, char **argv) {
         exit(EXIT_FAILURE);
     }
     SDL_Log("OpenGL version: %s", (char *) glGetString(GL_VERSION));
+
+    // Create textures
+    glGenTextures(1, &screen_texture);
 
     // Setup Dear ImGui context
     igCreateContext(NULL);
@@ -2391,13 +2366,9 @@ int main(int argc, char **argv) {
     //assert(font != NULL);
 
     // Our state
-    bool show_demo_window = true;
+    bool show_demo_window = false;
     bool show_another_window = false;
-    ImVec4 clear_color;
-    clear_color.x = 0.45f;
-    clear_color.y = 0.55f;
-    clear_color.z = 0.60f;
-    clear_color.w = 1.00f;
+    ImVec4 clear_color = {0.45f, 0.55f, 0.60f, 1.00f};
 
     // Main loop
     bool done = false;
@@ -2442,9 +2413,7 @@ int main(int argc, char **argv) {
             igSliderFloat("float", &f, 0.0f, 1.0f, "%.3f", 0);  // Edit 1 float using a slider from 0.0f to 1.0f
             igColorEdit3("clear color", (float *) &clear_color, 0);  // Edit 3 floats representing a color
 
-            ImVec2 buttonSize;
-            buttonSize.x = 0;
-            buttonSize.y = 0;
+            ImVec2 buttonSize = {0.0f, 0.0f};
             if (igButton("Button", buttonSize)) {  // Buttons return true when clicked (most widgets return true when edited/activated)
                 counter++;
             }
@@ -2459,16 +2428,13 @@ int main(int argc, char **argv) {
         if (show_another_window) {
             igBegin("Another Window", &show_another_window, 0);  // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
             igText("Hello from another window!");
-            ImVec2 buttonSize;
-            buttonSize.x = 0;
-            buttonSize.y = 0;
+            ImVec2 buttonSize = {0.0f, 0.0f};
             if (igButton("Close Me", buttonSize)) {
                 show_another_window = false;
             }
             igEnd();
         }
 
-        /*
         const Uint8 *state = SDL_GetKeyboardState(NULL);
         if (state[SDL_SCANCODE_ESCAPE]) {
             done = true;
@@ -2492,28 +2458,29 @@ int main(int argc, char **argv) {
             keys[7] = false;
         }
 
-        // Draw display to texture
-        SDL_LockTexture(g_texture, NULL, (void**) &g_pixels, &g_pitch);
         gba_emulate();
-        SDL_UnlockTexture(g_texture);
 
-        // Render texture to screen
-        SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
-        SDL_RenderClear(renderer);
-        SDL_Rect displayRect = {0, 0, SCREEN_WIDTH, SCREEN_HEIGHT};
-        SDL_Rect screenRect = {0, 0, RENDER_WIDTH, RENDER_HEIGHT};
-        SDL_RenderCopy(renderer, g_texture, &displayRect, &screenRect);
-        SDL_RenderPresent(renderer);
+        glBindTexture(GL_TEXTURE_2D, screen_texture);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, SCREEN_WIDTH, SCREEN_HEIGHT, 0, GL_RGBA, GL_UNSIGNED_BYTE, screen_pixels);
+        glBindTexture(GL_TEXTURE_2D, 0);
 
-        static char title[256];
-        uint32_t t0 = fps_ticks_last;
-        uint32_t t1 = SDL_GetTicks();
-        fps_diff = fps_diff * 0.975 + (t1 - t0) * 0.025;
-        double fps = 1 / (fps_diff / 1000.0);
-        sprintf(title, "ygba - %s (%.1f fps)", argv[1], fps);
-        SDL_SetWindowTitle(window, title);
-        fps_ticks_last = t1;
+        igBegin("Screen", NULL, 0);
+        igSliderInt("Scale", &screen_scale, 1, 5, "%d", 0);
+        ImVec2 screen_size = {SCREEN_WIDTH * screen_scale, SCREEN_HEIGHT * screen_scale};
+        /*
+        ImVec2 screen_window_size;
+        igGetWindowSize(&screen_window_size);
+        ImVec2 local_pos = {(screen_window_size.x - screen_size.x) / 2.0f, (screen_window_size.y - screen_size.y) / 2.0f};
+        igSetCursorPos(local_pos);
         */
+        ImVec2 uv0 = {0.0f, 0.0f};
+        ImVec2 uv1 = {1.0f, 1.0f};
+        ImVec4 tint_col = {1.0f, 1.0f, 1.0f, 1.0f};
+        ImVec4 border_col = {0.0f, 0.0f, 0.0f, 0.0f};
+        igImage((void *)(intptr_t) screen_texture, screen_size, uv0, uv1, tint_col, border_col);
+        igEnd();
 
         // Rendering
         igRender();
@@ -2529,12 +2496,9 @@ int main(int argc, char **argv) {
     ImGui_ImplSDL2_Shutdown();
     igDestroyContext(NULL);
 
+    glDeleteTextures(1, &screen_texture);
+
     SDL_GL_DeleteContext(gl_context);
-    /*
-    SDL_FreeFormat(g_format);
-    SDL_DestroyTexture(g_texture);
-    SDL_DestroyRenderer(renderer);
-    */
     SDL_DestroyWindow(window);
     SDL_Quit();
 
