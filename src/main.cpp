@@ -1,6 +1,6 @@
-#define CIMGUI_DEFINE_ENUMS_AND_STRUCTS
-#include <cimgui.h>
-#include <cimgui_impl.h>
+#include "imgui.h"
+#include "imgui_impl_sdl.h"
+#include "imgui_impl_opengl3.h"
 #include <stdio.h>
 #include <SDL.h>
 
@@ -18,6 +18,16 @@
 #include <glad/glad.h>  // Initialize with gladLoadGL()
 #elif defined(IMGUI_IMPL_OPENGL_LOADER_GLAD2)
 #include <glad/gl.h>  // Initialize with gladLoadGL(...) or gladLoaderLoadGL()
+#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLBINDING2)
+#define GLFW_INCLUDE_NONE  // GLFW including OpenGL headers causes ambiguity or multiple definition errors.
+#include <glbinding/Binding.h>  // Initialize with glbinding::Binding::initialize()
+#include <glbinding/gl/gl.h>
+using namespace gl;
+#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLBINDING3)
+#define GLFW_INCLUDE_NONE  // GLFW including OpenGL headers causes ambiguity or multiple definition errors.
+#include <glbinding/glbinding.h>  // Initialize with glbinding::initialize()
+#include <glbinding/gl/gl.h>
+using namespace gl;
 #else
 #include IMGUI_IMPL_OPENGL_LOADER_CUSTOM
 #endif
@@ -2338,10 +2348,12 @@ int main(int argc, char **argv) {
         SDL_Log("Failed to create window: %s", SDL_GetError());
         exit(EXIT_FAILURE);
     }
-    SDL_EventState(SDL_DROPFILE, SDL_ENABLE);
     SDL_GLContext gl_context = SDL_GL_CreateContext(window);
     SDL_GL_MakeCurrent(window, gl_context);
     SDL_GL_SetSwapInterval(1);  // Enable vsync
+
+    // Enable drag and drop
+    SDL_EventState(SDL_DROPFILE, SDL_ENABLE);
 
     // Initialize OpenGL loader
 #if defined(IMGUI_IMPL_OPENGL_LOADER_GL3W)
@@ -2352,6 +2364,12 @@ int main(int argc, char **argv) {
     bool err = gladLoadGL() == 0;
 #elif defined(IMGUI_IMPL_OPENGL_LOADER_GLAD2)
     bool err = gladLoadGL((GLADloadfunc) SDL_GL_GetProcAddress) == 0;  // glad2 recommend using the windowing library loader instead of the (optionally) bundled one.
+#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLBINDING2)
+    bool err = false;
+    glbinding::Binding::initialize();
+#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLBINDING3)
+    bool err = false;
+    glbinding::initialize([](const char *name) { return (glbinding::ProcAddress) SDL_GL_GetProcAddress(name); });
 #else
     bool err = false;  // If you use IMGUI_IMPL_OPENGL_LOADER_CUSTOM, your loader is likely to require some form of initialization.
 #endif
@@ -2365,46 +2383,47 @@ int main(int argc, char **argv) {
     glGenTextures(1, &screen_texture);
 
     // Setup Dear ImGui context
-    igCreateContext(NULL);
-    ImGuiIO *io = igGetIO();
-    //io->ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;  // Enable Keyboard Controls
-    //io->ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;  // Enable Gamepad Controls
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO &io = ImGui::GetIO();
+    //io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;  // Enable Keyboard Controls
+    //io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;  // Enable Gamepad Controls
 
     // Setup Dear ImGui style
-    igStyleColorsDark(NULL);
-    //igStyleColorsClassic(NULL);
+    ImGui::StyleColorsDark();
+    //ImGui::StyleColorsClassic();
 
     // Setup Platform/Renderer backends
     ImGui_ImplSDL2_InitForOpenGL(window, gl_context);
     ImGui_ImplOpenGL3_Init(glsl_version);
 
     // Load Fonts
-    // - If no fonts are loaded, dear imgui will use the default font. You can also load multiple fonts and use igPushFont()/PopFont() to select them.
+    // - If no fonts are loaded, dear imgui will use the default font. You can also load multiple fonts and use ImGui::PushFont()/PopFont() to select them.
     // - AddFontFromFileTTF() will return the ImFont* so you can store it if you need to select the font among multiple.
     // - If the file cannot be loaded, the function will return NULL. Please handle those errors in your application (e.g. use an assertion, or display an error and quit).
-    // - The fonts will be rasterized at a given size (w/ oversampling) and stored into a texture when calling ImFontAtlas_Build()/GetTexDataAsXXXX(), which ImGui_ImplXXXX_NewFrame below will call.
+    // - The fonts will be rasterized at a given size (w/ oversampling) and stored into a texture when calling ImFontAtlas::Build()/GetTexDataAsXXXX(), which ImGui_ImplXXXX_NewFrame below will call.
     // - Read 'docs/FONTS.md' for more instructions and details.
     // - Remember that in C/C++ if you want to include a backslash \ in a string literal you need to write a double backslash \\ !
-    //ImFontAtlas_AddFontDefault(io->Fonts, NULL);
-    //ImFontAtlas_AddFontFromFileTTF(io->Fonts, "cimgui/imgui/misc/fonts/Roboto-Medium.ttf", 16.0f, NULL, NULL);
-    //ImFontAtlas_AddFontFromFileTTF(io->Fonts, "cimgui/imgui/misc/fonts/Cousine-Regular.ttf", 15.0f, NULL, NULL);
-    //ImFontAtlas_AddFontFromFileTTF(io->Fonts, "cimgui/imgui/misc/fonts/DroidSans.ttf", 16.0f, NULL, NULL);
-    //ImFontAtlas_AddFontFromFileTTF(io->Fonts, "cimgui/imgui/misc/fonts/ProggyTiny.ttf", 10.0f, NULL, NULL);
-    //ImFont *font = ImFontAtlas_AddFontFromFileTTF(io->Fonts, "C:\\Windows\\Fonts\\ArialUni.ttf", 18.0f, NULL, ImFontAtlas_GetGlyphRangesJapanese(io->Fonts));
-    //assert(font != NULL);
+    //io.Fonts->AddFontDefault();
+    //io.Fonts->AddFontFromFileTTF("lib/imgui/misc/fonts/Roboto-Medium.ttf", 16.0f);
+    //io.Fonts->AddFontFromFileTTF("lib/imgui/misc/fonts/Cousine-Regular.ttf", 15.0f);
+    //io.Fonts->AddFontFromFileTTF("lib/imgui/misc/fonts/DroidSans.ttf", 16.0f);
+    //io.Fonts->AddFontFromFileTTF("lib/imgui/misc/fonts/ProggyTiny.ttf", 10.0f);
+    //ImFont *font = io.Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\ArialUni.ttf", 18.0f, NULL, io.Fonts->GetGlyphRangesJapanese());
+    //IM_ASSERT(font != NULL);
 
     // Our state
     bool show_demo_window = false;
     bool show_another_window = false;
-    ImVec4 clear_color = {0.45f, 0.55f, 0.60f, 1.00f};
+    ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
     // Main loop
     bool done = false;
     while (!done) {
         // Poll and handle events (inputs, window resize, etc.)
-        // You can read the io->WantCaptureMouse, io->WantCaptureKeyboard flags to tell if dear imgui wants to use your inputs.
-        // - When io->WantCaptureMouse is true, do not dispatch mouse input data to your main application.
-        // - When io->WantCaptureKeyboard is true, do not dispatch keyboard input data to your main application.
+        // You can read the io.WantCaptureMouse, io.WantCaptureKeyboard flags to tell if dear imgui wants to use your inputs.
+        // - When io.WantCaptureMouse is true, do not dispatch mouse input data to your main application.
+        // - When io.WantCaptureKeyboard is true, do not dispatch keyboard input data to your main application.
         // Generally you may always pass all inputs to dear imgui, and hide them from your application based on those two flags.
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
@@ -2423,11 +2442,11 @@ int main(int argc, char **argv) {
         // Start the Dear ImGui frame
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplSDL2_NewFrame(window);
-        igNewFrame();
+        ImGui::NewFrame();
 
-        // 1. Show the big demo window (Most of the sample code is in igShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
+        // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
         if (show_demo_window) {
-            igShowDemoWindow(&show_demo_window);
+            ImGui::ShowDemoWindow(&show_demo_window);
         }
 
         // 2. Show a simple window that we create ourselves. We use a Begin/End pair to create a named window.
@@ -2435,35 +2454,33 @@ int main(int argc, char **argv) {
             static float f = 0.0f;
             static int counter = 0;
 
-            igBegin("Hello, world!", NULL, 0);  // Create a window called "Hello, world!" and append into it.
+            ImGui::Begin("Hello, world!");  // Create a window called "Hello, world!" and append into it.
 
-            igText("This is some useful text.");  // Display some text (you can use format strings too)
-            igCheckbox("Demo Window", &show_demo_window);  // Edit bools storing our window open/close state
-            igCheckbox("Another Window", &show_another_window);
+            ImGui::Text("This is some useful text.");  // Display some text (you can use format strings too)
+            ImGui::Checkbox("Demo Window", &show_demo_window);  // Edit bools storing our window open/close state
+            ImGui::Checkbox("Another Window", &show_another_window);
 
-            igSliderFloat("float", &f, 0.0f, 1.0f, "%.3f", 0);  // Edit 1 float using a slider from 0.0f to 1.0f
-            igColorEdit3("clear color", (float *) &clear_color, 0);  // Edit 3 floats representing a color
+            ImGui::SliderFloat("float", &f, 0.0f, 1.0f);  // Edit 1 float using a slider from 0.0f to 1.0f
+            ImGui::ColorEdit3("clear color", (float *) &clear_color);  // Edit 3 floats representing a color
 
-            ImVec2 buttonSize = {0.0f, 0.0f};
-            if (igButton("Button", buttonSize)) {  // Buttons return true when clicked (most widgets return true when edited/activated)
+            if (ImGui::Button("Button")) {  // Buttons return true when clicked (most widgets return true when edited/activated)
                 counter++;
             }
-            igSameLine(0.0f, -1.0f);
-            igText("counter = %d", counter);
+            ImGui::SameLine();
+            ImGui::Text("counter = %d", counter);
 
-            igText("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io->Framerate, io->Framerate);
-            igEnd();
+            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+            ImGui::End();
         }
 
         // 3. Show another simple window.
         if (show_another_window) {
-            igBegin("Another Window", &show_another_window, 0);  // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
-            igText("Hello from another window!");
-            ImVec2 buttonSize = {0.0f, 0.0f};
-            if (igButton("Close Me", buttonSize)) {
+            ImGui::Begin("Another Window", &show_another_window);  // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
+            ImGui::Text("Hello from another window!");
+            if (ImGui::Button("Close Me")) {
                 show_another_window = false;
             }
-            igEnd();
+            ImGui::End();
         }
 
         const Uint8 *state = SDL_GetKeyboardState(NULL);
@@ -2498,41 +2515,40 @@ int main(int argc, char **argv) {
         glBindTexture(GL_TEXTURE_2D, 0);
 
         // Screen
-        igBegin("Screen", NULL, 0);
-        igSliderInt("Scale", &screen_scale, 1, 5, "%d", 0);
-        ImVec2 screen_size = {(float) SCREEN_WIDTH * screen_scale, (float) SCREEN_HEIGHT * screen_scale};
-        ImVec2 uv0 = {0.0f, 0.0f};
-        ImVec2 uv1 = {1.0f, 1.0f};
-        ImVec4 tint_col = {1.0f, 1.0f, 1.0f, 1.0f};
-        ImVec4 border_col = {0.0f, 0.0f, 0.0f, 0.0f};
-        igImage((void *)(intptr_t) screen_texture, screen_size, uv0, uv1, tint_col, border_col);
-        igEnd();
+        ImGui::Begin("Screen");
+        ImGui::SliderInt("Scale", &screen_scale, 1, 5);
+        ImVec2 screen_size = ImVec2((float) SCREEN_WIDTH * screen_scale, (float) SCREEN_HEIGHT * screen_scale);
+        ImVec2 uv0 = ImVec2(0.0f, 0.0f);
+        ImVec2 uv1 = ImVec2(1.0f, 1.0f);
+        ImVec4 tint_col = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
+        ImVec4 border_col = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
+        ImGui::Image((void *)(intptr_t) screen_texture, screen_size, uv0, uv1, tint_col, border_col);
+        ImGui::End();
 
         // Settings
-        igBegin("Settings", NULL, 0);
-        igCheckbox("Has EEPROM", &has_eeprom);
-        igCheckbox("Has Flash", &has_flash);
-        igCheckbox("Has SRAM", &has_sram);
-        igCheckbox("Skip BIOS", &skip_bios);
-        ImVec2 buttonSize = {0.0f, 0.0f};
-        if (igButton("Reset", buttonSize)) {
+        ImGui::Begin("Settings");
+        ImGui::Checkbox("Has EEPROM", &has_eeprom);
+        ImGui::Checkbox("Has Flash", &has_flash);
+        ImGui::Checkbox("Has SRAM", &has_sram);
+        ImGui::Checkbox("Skip BIOS", &skip_bios);
+        if (ImGui::Button("Reset")) {
             gba_reset();
         }
-        igEnd();
+        ImGui::End();
 
         // Rendering
-        igRender();
-        glViewport(0, 0, (int) io->DisplaySize.x, (int) io->DisplaySize.y);
+        ImGui::Render();
+        glViewport(0, 0, (int) io.DisplaySize.x, (int) io.DisplaySize.y);
         glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
         glClear(GL_COLOR_BUFFER_BIT);
-        ImGui_ImplOpenGL3_RenderDrawData(igGetDrawData());
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         SDL_GL_SwapWindow(window);
     }
 
     // Cleanup
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplSDL2_Shutdown();
-    igDestroyContext(NULL);
+    ImGui::DestroyContext();
 
     glDeleteTextures(1, &screen_texture);
 
