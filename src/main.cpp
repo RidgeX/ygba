@@ -1,6 +1,7 @@
 #include "imgui.h"
 #include "imgui_impl_sdl.h"
 #include "imgui_impl_opengl3.h"
+#include "imgui_memory_editor.h"
 #include <stdio.h>
 #include <SDL.h>
 
@@ -2513,6 +2514,12 @@ int main(int argc, char **argv) {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, SCREEN_WIDTH, SCREEN_HEIGHT, 0, GL_RGBA, GL_UNSIGNED_BYTE, screen_pixels);
         glBindTexture(GL_TEXTURE_2D, 0);
+
+        // Memory
+        static MemoryEditor mem_edit;
+        mem_edit.ReadFn = [](const uint8_t *data, size_t off) { UNUSED(data); return memory_read_byte(off); };
+        mem_edit.WriteFn = [](uint8_t *data, size_t off, uint8_t d) { UNUSED(data); memory_write_byte(off, d); };
+        mem_edit.DrawWindow("Memory Editor", NULL, 0x10000000);
 
         // Screen
         ImGui::Begin("Screen");
