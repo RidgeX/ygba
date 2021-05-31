@@ -2356,6 +2356,17 @@ int main(int argc, char **argv) {
     // Enable drag and drop
     SDL_EventState(SDL_DROPFILE, SDL_ENABLE);
 
+    // Initialize game controller
+    SDL_GameController *controller = NULL;
+    for (int i = 0; i < SDL_NumJoysticks(); i++) {
+        if (SDL_IsGameController(i)) {
+            controller = SDL_GameControllerOpen(i);
+            if (controller != NULL) break;
+            SDL_Log("Failed to open game controller %d: %s", i, SDL_GetError());
+        }
+    }
+    SDL_GameControllerAddMappingsFromFile("gamecontrollerdb.txt");
+
     // Initialize OpenGL loader
 #if defined(IMGUI_IMPL_OPENGL_LOADER_GL3W)
     bool err = gl3wInit() != 0;
@@ -2484,28 +2495,34 @@ int main(int argc, char **argv) {
             ImGui::End();
         }
 
-        const Uint8 *state = SDL_GetKeyboardState(NULL);
-        if (state[SDL_SCANCODE_ESCAPE]) {
-            done = true;
+        // Input
+        const Uint8 *key_state = SDL_GetKeyboardState(NULL);
+        done |= key_state[SDL_SCANCODE_ESCAPE];
+        memset(keys, 0, sizeof(bool) * NUM_KEYS);
+        keys[0] |= key_state[SDL_SCANCODE_X];          // Button A
+        keys[1] |= key_state[SDL_SCANCODE_Z];          // Button B
+        keys[2] |= key_state[SDL_SCANCODE_BACKSPACE];  // Select
+        keys[3] |= key_state[SDL_SCANCODE_RETURN];     // Start
+        keys[4] |= key_state[SDL_SCANCODE_RIGHT];      // Right
+        keys[5] |= key_state[SDL_SCANCODE_LEFT];       // Left
+        keys[6] |= key_state[SDL_SCANCODE_UP];         // Up
+        keys[7] |= key_state[SDL_SCANCODE_DOWN];       // Down
+        keys[8] |= key_state[SDL_SCANCODE_S];          // Button R
+        keys[9] |= key_state[SDL_SCANCODE_A];          // Button L
+        if (controller != NULL) {
+            keys[0] |= SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_B);              // Button A
+            keys[1] |= SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_A);              // Button B
+            keys[2] |= SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_BACK);           // Select
+            keys[3] |= SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_START);          // Start
+            keys[4] |= SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_DPAD_RIGHT);     // Right
+            keys[5] |= SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_DPAD_LEFT);      // Left
+            keys[6] |= SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_DPAD_UP);        // Up
+            keys[7] |= SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_DPAD_DOWN);      // Down
+            keys[8] |= SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER);  // Button R
+            keys[9] |= SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_LEFTSHOULDER);   // Button L
         }
-        keys[0] = state[SDL_SCANCODE_X];          // Button A
-        keys[1] = state[SDL_SCANCODE_Z];          // Button B
-        keys[2] = state[SDL_SCANCODE_BACKSPACE];  // Select
-        keys[3] = state[SDL_SCANCODE_RETURN];     // Start
-        keys[4] = state[SDL_SCANCODE_RIGHT];      // Right
-        keys[5] = state[SDL_SCANCODE_LEFT];       // Left
-        keys[6] = state[SDL_SCANCODE_UP];         // Up
-        keys[7] = state[SDL_SCANCODE_DOWN];       // Down
-        keys[8] = state[SDL_SCANCODE_S];          // Button R
-        keys[9] = state[SDL_SCANCODE_A];          // Button L
-        if (keys[4] && keys[5]) {  // Disallow opposing directions
-            keys[4] = false;
-            keys[5] = false;
-        }
-        if (keys[6] && keys[7]) {
-            keys[6] = false;
-            keys[7] = false;
-        }
+        if (keys[4] && keys[5]) { keys[4] = false; keys[5] = false; }  // Disallow opposing directions
+        if (keys[6] && keys[7]) { keys[6] = false; keys[7] = false; }
 
         gba_emulate();
 
@@ -2516,10 +2533,12 @@ int main(int argc, char **argv) {
         glBindTexture(GL_TEXTURE_2D, 0);
 
         // Memory
+        /*
         static MemoryEditor mem_edit;
         mem_edit.ReadFn = [](const uint8_t *data, size_t off) { UNUSED(data); return memory_read_byte(off); };
         mem_edit.WriteFn = [](uint8_t *data, size_t off, uint8_t d) { UNUSED(data); memory_write_byte(off, d); };
         mem_edit.DrawWindow("Memory Editor", NULL, 0x10000000);
+        */
 
         // Screen
         ImGui::Begin("Screen");
@@ -2559,6 +2578,9 @@ int main(int argc, char **argv) {
 
     glDeleteTextures(1, &screen_texture);
 
+    if (controller != NULL) {
+        SDL_GameControllerClose(controller);
+    }
     SDL_GL_DeleteContext(gl_context);
     SDL_DestroyWindow(window);
     SDL_Quit();
