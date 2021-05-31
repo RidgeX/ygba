@@ -291,8 +291,8 @@ struct {
     uint32_t io_wave_ram1;  // 32
     uint32_t io_wave_ram2;  // 32
     uint32_t io_wave_ram3;  // 32
-    uint32_t io_fifo_a;  // 32
-    uint32_t io_fifo_b;  // 32
+    //uint8_t fifo_a[32];
+    //uint8_t fifo_b[32];
     uint32_t io_dma0sad;  // 32
     uint32_t io_dma0dad;  // 32
     uint16_t io_dma0cnt_l, io_dma0cnt_h;
@@ -306,6 +306,8 @@ struct {
     uint32_t io_dma3dad;  // 32
     uint16_t io_dma3cnt_l, io_dma3cnt_h;
 
+    //int fifo_a_r, fifo_b_r;
+    //int fifo_a_w, fifo_b_w;
     bool fifo_a_refill, fifo_b_refill;
     uint16_t timer_0_counter, timer_0_reload, timer_0_control;
     uint16_t timer_1_counter, timer_1_reload, timer_1_control;
@@ -321,6 +323,77 @@ struct {
     uint16_t io_ime;
     uint8_t io_haltcnt;
 } ioreg;
+
+//int dma_active = -1;
+//bool dma_special = false;
+
+void gba_audio_callback(void *userdata, uint8_t *stream, int len) {
+    UNUSED(userdata);
+    UNUSED(stream);
+    UNUSED(len);
+
+    /*
+    assert(len == 32);
+    for (int i = 0; i < len; i += 2) {
+        stream[i] = ioreg.fifo_a[ioreg.fifo_a_r];
+        stream[i + 1] = ioreg.fifo_b[ioreg.fifo_b_r];
+        ioreg.fifo_a_r = (ioreg.fifo_a_r + 1) % 32;
+        ioreg.fifo_b_r = (ioreg.fifo_b_r + 1) % 32;
+    }
+    ioreg.fifo_a_refill = true;
+    ioreg.fifo_b_refill = true;
+    */
+}
+
+void gba_audio_fifo_a(uint32_t sample) {
+    UNUSED(sample);
+
+    /*
+    *(uint32_t*)&ioreg.fifo_a[ioreg.fifo_a_w] = sample;
+    ioreg.fifo_a_w = (ioreg.fifo_a_w + 4) % 32;
+    */
+    /*
+    printf("%d ", dma_active);
+    printf(dma_special ? "!" : " ");
+    printf("%08x", sample);
+    printf("\n");
+    */
+}
+
+void gba_audio_fifo_b(uint32_t sample) {
+    UNUSED(sample);
+
+    /*
+    *(uint32_t*)&ioreg.fifo_b[ioreg.fifo_b_w] = sample;
+    ioreg.fifo_b_w = (ioreg.fifo_b_w + 4) % 32;
+    */
+    /*
+    printf("%d ", dma_active);
+    printf(dma_special ? "!" : " ");
+    printf("%08x", sample);
+    printf("\n");
+    */
+}
+
+SDL_AudioDeviceID gba_audio_init(void) {
+    /*
+    SDL_AudioSpec want;
+    memset(&want, 0, sizeof(want));
+    want.freq = 48000;
+    want.format = AUDIO_S8;
+    want.channels = 2;
+    want.samples = 16;
+    want.callback = gba_audio_callback;
+    SDL_AudioDeviceID audio_device = SDL_OpenAudioDevice(NULL, 0, &want, NULL, 0);
+    if (audio_device == 0) {
+        SDL_Log("Failed to open audio device: %s", SDL_GetError());
+        exit(EXIT_FAILURE);
+    }
+    SDL_PauseAudioDevice(audio_device, 0);
+    return audio_device;
+    */
+    return 0;
+}
 
 uint8_t io_read_byte(uint32_t address) {
     switch (address) {
@@ -764,14 +837,14 @@ void io_write_byte(uint32_t address, uint8_t value) {
         case REG_WAVE_RAM3_L + 1: ioreg.io_wave_ram3 = (ioreg.io_wave_ram3 & 0xffff00ff) | ((value << 8) & 0x0000ff00); break;
         case REG_WAVE_RAM3_H + 0: ioreg.io_wave_ram3 = (ioreg.io_wave_ram3 & 0xff00ffff) | ((value << 16) & 0x00ff0000); break;
         case REG_WAVE_RAM3_H + 1: ioreg.io_wave_ram3 = (ioreg.io_wave_ram3 & 0x00ffffff) | ((value << 24) & 0xff000000); break;
-        case REG_FIFO_A_L + 0: ioreg.io_fifo_a = (ioreg.io_fifo_a & 0xffffff00) | ((value << 0) & 0x000000ff); break;  // FIXME
-        case REG_FIFO_A_L + 1: ioreg.io_fifo_a = (ioreg.io_fifo_a & 0xffff00ff) | ((value << 8) & 0x0000ff00); break;
-        case REG_FIFO_A_H + 0: ioreg.io_fifo_a = (ioreg.io_fifo_a & 0xff00ffff) | ((value << 16) & 0x00ff0000); break;
-        case REG_FIFO_A_H + 1: ioreg.io_fifo_a = (ioreg.io_fifo_a & 0x00ffffff) | ((value << 24) & 0xff000000); break;
-        case REG_FIFO_B_L + 0: ioreg.io_fifo_b = (ioreg.io_fifo_b & 0xffffff00) | ((value << 0) & 0x000000ff); break;
-        case REG_FIFO_B_L + 1: ioreg.io_fifo_b = (ioreg.io_fifo_b & 0xffff00ff) | ((value << 8) & 0x0000ff00); break;
-        case REG_FIFO_B_H + 0: ioreg.io_fifo_b = (ioreg.io_fifo_b & 0xff00ffff) | ((value << 16) & 0x00ff0000); break;
-        case REG_FIFO_B_H + 1: ioreg.io_fifo_b = (ioreg.io_fifo_b & 0x00ffffff) | ((value << 24) & 0xff000000); break;
+        case REG_FIFO_A_L + 0: gba_audio_fifo_a(value); break;
+        case REG_FIFO_A_L + 1: gba_audio_fifo_a(value << 8); break;
+        case REG_FIFO_A_H + 0: gba_audio_fifo_a(value << 16); break;
+        case REG_FIFO_A_H + 1: gba_audio_fifo_a(value << 24); break;
+        case REG_FIFO_B_L + 0: gba_audio_fifo_b(value); break;
+        case REG_FIFO_B_L + 1: gba_audio_fifo_b(value << 8); break;
+        case REG_FIFO_B_H + 0: gba_audio_fifo_b(value << 16); break;
+        case REG_FIFO_B_H + 1: gba_audio_fifo_b(value << 24); break;
         case 0xa8: break;
         case 0xa9: break;
         case 0xaa: break;
@@ -1144,10 +1217,10 @@ void io_write_halfword(uint32_t address, uint16_t value) {
         case REG_WAVE_RAM2_H: ioreg.io_wave_ram2 = (ioreg.io_wave_ram2 & 0x0000ffff) | ((value << 16) & 0xffff0000); break;
         case REG_WAVE_RAM3_L: ioreg.io_wave_ram3 = (ioreg.io_wave_ram3 & 0xffff0000) | ((value << 0) & 0x0000ffff); break;
         case REG_WAVE_RAM3_H: ioreg.io_wave_ram3 = (ioreg.io_wave_ram3 & 0x0000ffff) | ((value << 16) & 0xffff0000); break;
-        case REG_FIFO_A_L: ioreg.io_fifo_a = (ioreg.io_fifo_a & 0xffff0000) | ((value << 0) & 0x0000ffff); break;
-        case REG_FIFO_A_H: ioreg.io_fifo_a = (ioreg.io_fifo_a & 0x0000ffff) | ((value << 16) & 0xffff0000); break;
-        case REG_FIFO_B_L: ioreg.io_fifo_b = (ioreg.io_fifo_b & 0xffff0000) | ((value << 0) & 0x0000ffff); break;
-        case REG_FIFO_B_H: ioreg.io_fifo_b = (ioreg.io_fifo_b & 0x0000ffff) | ((value << 16) & 0xffff0000); break;
+        case REG_FIFO_A_L: gba_audio_fifo_a(value); break;
+        case REG_FIFO_A_H: gba_audio_fifo_a(value << 16); break;
+        case REG_FIFO_B_L: gba_audio_fifo_b(value); break;
+        case REG_FIFO_B_H: gba_audio_fifo_b(value << 16); break;
         case 0xa8: break;
         case 0xaa: break;
         case 0xac: break;
@@ -1385,8 +1458,8 @@ void io_write_word(uint32_t address, uint32_t value) {
         case REG_WAVE_RAM1_L: ioreg.io_wave_ram1 = value; break;
         case REG_WAVE_RAM2_L: ioreg.io_wave_ram2 = value; break;
         case REG_WAVE_RAM3_L: ioreg.io_wave_ram3 = value; break;
-        case REG_FIFO_A_L: ioreg.io_fifo_a = value; break;
-        case REG_FIFO_B_L: ioreg.io_fifo_b = value; break;
+        case REG_FIFO_A_L: gba_audio_fifo_a(value); break;
+        case REG_FIFO_B_L: gba_audio_fifo_b(value); break;
         case 0xa8: break;
         case 0xac: break;
         case REG_DMA0SAD_L: ioreg.io_dma0sad = value & 0x07ffffff; break;
@@ -1901,6 +1974,8 @@ void gba_reset(void) {
     timer_cycles = 0;
     halted = false;
     last_bios_access = 0xe4;
+    //dma_active = -1;
+    //dma_special = false;
 
     if (skip_bios) {
         ioreg.io_dispcnt = 0x80;
@@ -2203,12 +2278,17 @@ void gba_dma_update(void) {
 
         if (start_timing == DMA_AT_VBLANK && ioreg.io_vcount != 160) continue;
         if (start_timing == DMA_AT_HBLANK && ppu_cycles % 1232 != 960) continue;
+        //dma_active = ch;
+        //dma_special = false;
         if (start_timing == DMA_AT_REFRESH) {
             if (ch == 1 || ch == 2) {
+                //dma_special = true;
                 assert(*dst_addr == 0x40000a0 || *dst_addr == 0x40000a4);
                 assert((dmacnt & DMA_REPEAT) != 0);
                 if (*dst_addr == 0x40000a0 && !ioreg.fifo_a_refill) continue;
                 if (*dst_addr == 0x40000a4 && !ioreg.fifo_b_refill) continue;
+                if (*dst_addr == 0x40000a0) ioreg.fifo_a_refill = false;
+                if (*dst_addr == 0x40000a4) ioreg.fifo_b_refill = false;
                 dst_ctrl = DMA_FIXED;
                 transfer_word = true;
                 count = 4;
@@ -2229,6 +2309,8 @@ void gba_dma_update(void) {
         } else {
             gba_dma_transfer_halfwords(dst_ctrl, src_ctrl, dst_addr, src_addr, count);
         }
+        //dma_active = -1;
+        //dma_special = false;
 
         if (dst_ctrl == DMA_RELOAD) {
             *dst_addr = dst_addr_initial;
@@ -2294,9 +2376,6 @@ void gba_emulate(void) {
 
 // Main code
 int main(int argc, char **argv) {
-    UNUSED(argc);
-    UNUSED(argv);
-
     arm_init_lookup();
     thumb_init_lookup();
 
@@ -2305,12 +2384,17 @@ int main(int argc, char **argv) {
     fread(system_rom, sizeof(uint8_t), 0x4000, fp);
     fclose(fp);
 
-    gba_reset();
+    if (argc == 2) {
+        skip_bios = true;
+        gba_load(argv[1]);
+    } else {
+        gba_reset();
+    }
 
     // Setup SDL
     // (Some versions of SDL before 2.0.10 appear to have performance/stalling issues on a minority of Windows systems,
     // depending on whether SDL_INIT_GAMECONTROLLER is enabled or disabled... updating to latest version of SDL is recommended!)
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER) != 0) {
+    if (SDL_Init(SDL_INIT_EVERYTHING) != 0) {
         SDL_Log("Failed to initialize SDL: %s", SDL_GetError());
         exit(EXIT_FAILURE);
     }
@@ -2356,13 +2440,16 @@ int main(int argc, char **argv) {
     // Enable drag and drop
     SDL_EventState(SDL_DROPFILE, SDL_ENABLE);
 
+    // Initalize audio
+    SDL_AudioDeviceID audio_device = gba_audio_init();
+
     // Initialize gamepad
     SDL_GameControllerAddMappingsFromFile("gamecontrollerdb.txt");
-    SDL_GameController *controller = NULL;
+    SDL_GameController *game_controller = NULL;
     for (int i = 0; i < SDL_NumJoysticks(); i++) {
         if (SDL_IsGameController(i)) {
-            controller = SDL_GameControllerOpen(i);
-            if (controller != NULL) break;
+            game_controller = SDL_GameControllerOpen(i);
+            if (game_controller != NULL) break;
             SDL_Log("Failed to open game controller %d: %s", i, SDL_GetError());
         }
     }
@@ -2509,17 +2596,17 @@ int main(int argc, char **argv) {
         keys[7] |= key_state[SDL_SCANCODE_DOWN];       // Down
         keys[8] |= key_state[SDL_SCANCODE_S];          // Button R
         keys[9] |= key_state[SDL_SCANCODE_A];          // Button L
-        if (controller != NULL) {
-            keys[0] |= SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_B);              // Button A
-            keys[1] |= SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_A);              // Button B
-            keys[2] |= SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_BACK);           // Select
-            keys[3] |= SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_START);          // Start
-            keys[4] |= SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_DPAD_RIGHT);     // Right
-            keys[5] |= SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_DPAD_LEFT);      // Left
-            keys[6] |= SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_DPAD_UP);        // Up
-            keys[7] |= SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_DPAD_DOWN);      // Down
-            keys[8] |= SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER);  // Button R
-            keys[9] |= SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_LEFTSHOULDER);   // Button L
+        if (game_controller != NULL) {
+            keys[0] |= SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_B);              // Button A
+            keys[1] |= SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_A);              // Button B
+            keys[2] |= SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_BACK);           // Select
+            keys[3] |= SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_START);          // Start
+            keys[4] |= SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_DPAD_RIGHT);     // Right
+            keys[5] |= SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_DPAD_LEFT);      // Left
+            keys[6] |= SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_DPAD_UP);        // Up
+            keys[7] |= SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_DPAD_DOWN);      // Down
+            keys[8] |= SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER);  // Button R
+            keys[9] |= SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_LEFTSHOULDER);   // Button L
         }
         if (keys[4] && keys[5]) { keys[4] = false; keys[5] = false; }  // Disallow opposing directions
         if (keys[6] && keys[7]) { keys[6] = false; keys[7] = false; }
@@ -2578,8 +2665,11 @@ int main(int argc, char **argv) {
 
     glDeleteTextures(1, &screen_texture);
 
-    if (controller != NULL) {
-        SDL_GameControllerClose(controller);
+    if (game_controller != NULL) {
+        SDL_GameControllerClose(game_controller);
+    }
+    if (audio_device != 0) {
+        SDL_CloseAudioDevice(audio_device);
     }
     SDL_GL_DeleteContext(gl_context);
     SDL_DestroyWindow(window);
