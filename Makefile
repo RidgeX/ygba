@@ -13,7 +13,7 @@ CPPFLAGS += -DIMGUI_IMPL_OPENGL_LOADER_GL3W
 
 LIBS := -lfreetype
 LIBS += -limm32 -lopengl32
-LIBS += -lmingw32 -lSDL2main -lSDL2
+LIBS += -lmingw32 -lSDL2main -lSDL2 -mwindows
 
 TARGET := gba.exe
 

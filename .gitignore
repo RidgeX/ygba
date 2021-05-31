@@ -1,10 +1,8 @@
-*.a
 *.exe
 *.gba
 *.o
 doc/
 games/
-passed/
 roms/
 tonc/
 imgui.ini

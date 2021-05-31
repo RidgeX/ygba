@@ -79,7 +79,7 @@
     [x] 1 cycle per instruction
     [ ] Accurate timings based on instruction, type of memory accessed, WAITCNT register
     [ ] Cartridge prefetch
-[ ] Drag and drop ROM file
+[x] Drag and drop ROM file
 [ ] Debugging user interface
     [ ] Registers
     [ ] Disassembly

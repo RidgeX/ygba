@@ -2356,7 +2356,8 @@ int main(int argc, char **argv) {
     // Enable drag and drop
     SDL_EventState(SDL_DROPFILE, SDL_ENABLE);
 
-    // Initialize game controller
+    // Initialize gamepad
+    SDL_GameControllerAddMappingsFromFile("gamecontrollerdb.txt");
     SDL_GameController *controller = NULL;
     for (int i = 0; i < SDL_NumJoysticks(); i++) {
         if (SDL_IsGameController(i)) {
@@ -2365,7 +2366,6 @@ int main(int argc, char **argv) {
             SDL_Log("Failed to open game controller %d: %s", i, SDL_GetError());
         }
     }
-    SDL_GameControllerAddMappingsFromFile("gamecontrollerdb.txt");
 
     // Initialize OpenGL loader
 #if defined(IMGUI_IMPL_OPENGL_LOADER_GL3W)
