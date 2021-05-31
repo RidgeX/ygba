@@ -2500,7 +2500,7 @@ int main(int argc, char **argv) {
         // Screen
         igBegin("Screen", NULL, 0);
         igSliderInt("Scale", &screen_scale, 1, 5, "%d", 0);
-        ImVec2 screen_size = {SCREEN_WIDTH * screen_scale, SCREEN_HEIGHT * screen_scale};
+        ImVec2 screen_size = {(float) SCREEN_WIDTH * screen_scale, (float) SCREEN_HEIGHT * screen_scale};
         ImVec2 uv0 = {0.0f, 0.0f};
         ImVec2 uv1 = {1.0f, 1.0f};
         ImVec4 tint_col = {1.0f, 1.0f, 1.0f, 1.0f};

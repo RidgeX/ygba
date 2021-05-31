@@ -1,13 +1,13 @@
-CC := gcc
+CXX := g++
 RM := rm -f
 
-CFLAGS := -g -O2 -std=c11 -Wall -Wextra
-CFLAGS += -Icimgui -Igl3w
-CFLAGS += `pkg-config --cflags freetype2 SDL2`
-CFLAGS += -DCIMGUI_FREETYPE
-CFLAGS += -DIMGUI_DISABLE_OBSOLETE_FUNCTIONS
-CFLAGS += -DIMGUI_IMPL_API="extern \"C\""
-CFLAGS += -DIMGUI_IMPL_OPENGL_LOADER_GL3W
+CXXFLAGS := -g -O2 -std=c++11 -Wall -Wextra
+CXXFLAGS += -Icimgui -Igl3w
+CXXFLAGS += `pkg-config --cflags freetype2 SDL2`
+CXXFLAGS += -DCIMGUI_FREETYPE
+CXXFLAGS += -DIMGUI_DISABLE_OBSOLETE_FUNCTIONS
+CXXFLAGS += -DIMGUI_IMPL_API="extern \"C\""
+CXXFLAGS += -DIMGUI_IMPL_OPENGL_LOADER_GL3W
 
 LIBS := -Lcimgui -lcimgui -lstdc++ -limm32
 LIBS += -lopengl32
@@ -21,10 +21,13 @@ OBJS += gl3w/GL/gl3w.o
 all: $(TARGET)
 
 $(TARGET): $(OBJS)
-	$(CC) -o $@ $^ $(LIBS)
+	$(CXX) -o $@ $^ $(LIBS)
 
 %.o: %.c
-	$(CC) $(CFLAGS) -c -o $@ $<
+	$(CXX) $(CXXFLAGS) -x c -c -o $@ $<
+
+%.o: %.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
 clean:
 	$(RM) $(TARGET) $(OBJS)

@@ -162,7 +162,7 @@ uint16_t cond_lookup[16] = {
     0x6655   // NZCV
 };
 
-inline bool condition_passed(uint32_t cond) {
+bool condition_passed(uint32_t cond) {
     return BIT(cond_lookup[BITS(cpsr, 28, 31)], cond);
 }
 
@@ -316,10 +316,10 @@ int thumb_step(void) {
     return cycles;
 }
 
-void lookup_bind(int (**lookup)(void), char *mask, int (*f)(void)) {
+void lookup_bind(int (**lookup)(void), const char *mask, int (*f)(void)) {
     uint32_t n = 0;
     uint32_t m = 0;
-    for (char *p = mask; *p != '\0'; p++) {
+    for (const char *p = mask; *p != '\0'; p++) {
         n <<= 1;
         m <<= 1;
         switch (*p) {
@@ -336,11 +336,11 @@ void lookup_bind(int (**lookup)(void), char *mask, int (*f)(void)) {
     }
 }
 
-void arm_bind(char *mask, int (*f)(void)) {
+void arm_bind(const char *mask, int (*f)(void)) {
     lookup_bind(arm_lookup, mask, f);
 }
 
-void thumb_bind(char *mask, int (*f)(void)) {
+void thumb_bind(const char *mask, int (*f)(void)) {
     lookup_bind(thumb_lookup, mask, f);
 }
 
@@ -453,13 +453,13 @@ static void arm_print_condition(void) {
     }
 }
 
-void print_mnemonic(char *s) {
+void print_mnemonic(const char *s) {
     printf("%s", s);
     if (!FLAG_T()) arm_print_condition();
     printf(" ");
 }
 
-void print_mnemonic_d(char *s, char *t) {
+void print_mnemonic_d(const char *s, char *t) {
     printf("%s", s);
     if (!FLAG_T()) arm_print_condition();
     printf("%s", t);
