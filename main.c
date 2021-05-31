@@ -30,7 +30,7 @@
 #include "algorithms.h"
 #include "cpu.h"
 
-//#define LOG_BAD_MEMORY_ACCESS
+#define UNUSED(x) (void)(x)
 
 bool single_step = false;
 uint64_t start_logging_at = 0;
@@ -39,11 +39,13 @@ int ppu_cycles = 0;
 int timer_cycles = 0;
 bool halted = false;
 uint32_t last_bios_access = 0xe4;
-bool skip_bios = true;
+bool skip_bios = false;
 bool has_eeprom = false;
 bool has_flash = false;
 //bool has_rtc = false;
 bool has_sram = false;
+
+//#define LOG_BAD_MEMORY_ACCESS
 
 #define SCREEN_WIDTH  240
 #define SCREEN_HEIGHT 160
@@ -1861,23 +1863,49 @@ void gba_detect_cartridge_features(void) {
 
     uint8_t *sram_f_v = (uint8_t *) "SRAM_F_V";
     match = boyer_moore_matcher(game_rom, game_rom_size, sram_f_v, 8);
-    if (match) { has_sram = true; }  // FIXME?
+    if (match) { has_sram = true; }
 
+    /*
     printf("has_eeprom = %s\n", (has_eeprom ? "true" : "false"));
     printf("has_flash = %s\n", (has_flash ? "true" : "false"));
     printf("has_sram = %s\n", (has_sram ? "true" : "false"));
+    */
 }
 
-void gba_init(const char *filename) {
-    arm_init_lookup();
-    thumb_init_lookup();
+void gba_reset(void) {
+    memset(cpu_ewram, 0, sizeof(uint8_t) * sizeof(cpu_ewram));
+    memset(cpu_iwram, 0, sizeof(uint8_t) * sizeof(cpu_iwram));
+    memset(&ioreg, 0, sizeof(uint8_t) * sizeof(ioreg));
+    memset(palette_ram, 0, sizeof(uint8_t) * sizeof(palette_ram));
+    memset(video_ram, 0, sizeof(uint8_t) * sizeof(video_ram));
+    memset(object_ram, 0, sizeof(uint8_t) * sizeof(object_ram));
+    memset(backup_flash, 0xff, sizeof(uint8_t) * sizeof(backup_flash));
+    memset(backup_sram, 0xff, sizeof(uint8_t) * sizeof(backup_sram));
 
-    FILE *fp = fopen("system_rom.bin", "rb");
-    assert(fp != NULL);
-    fread(system_rom, sizeof(uint8_t), 0x4000, fp);
-    fclose(fp);
+    memset(r, 0, sizeof(uint32_t) * 16);
+    arm_init_registers(skip_bios);
+    branch_taken = true;
 
-    fp = fopen(filename, "rb");
+    ppu_cycles = 0;
+    timer_cycles = 0;
+    halted = false;
+    last_bios_access = 0xe4;
+
+    if (skip_bios) {
+        ioreg.io_dispcnt = 0x80;
+        ioreg.io_bg2pa = 0x100;
+        ioreg.io_bg2pd = 0x100;
+        ioreg.io_bg3pa = 0x100;
+        ioreg.io_bg3pd = 0x100;
+    }
+}
+
+void gba_load(const char *filename) {
+    gba_reset();
+
+    memset(game_rom, 0, sizeof(uint8_t) * sizeof(game_rom));
+
+    FILE *fp = fopen(filename, "rb");
     assert(fp != NULL);
     fseek(fp, 0, SEEK_END);
     game_rom_size = ftell(fp);
@@ -1887,21 +1915,7 @@ void gba_init(const char *filename) {
     fread(game_rom, sizeof(uint8_t), game_rom_size, fp);
     fclose(fp);
 
-    memset(r, 0, sizeof(uint32_t) * 16);
-
     gba_detect_cartridge_features();
-    memset(backup_flash, 0xff, sizeof(uint8_t) * sizeof(backup_flash));
-    memset(backup_sram, 0xff, sizeof(uint8_t) * sizeof(backup_sram));
-
-    arm_init_registers(skip_bios);
-
-    branch_taken = true;
-    ioreg.io_vcount = 227;
-    ioreg.io_dispcnt = 0x80;
-    ioreg.io_bg2pa = 0x100;
-    ioreg.io_bg2pd = 0x100;
-    ioreg.io_bg3pa = 0x100;
-    ioreg.io_bg3pd = 0x100;
 }
 
 Uint32 rgb555(uint32_t pixel) {
@@ -2269,12 +2283,18 @@ void gba_emulate(void) {
 
 // Main code
 int main(int argc, char **argv) {
-    if (argc != 2) {
-        fprintf(stderr, "Usage: %s filename.gba\n", argv[0]);
-        exit(EXIT_FAILURE);
-    }
+    UNUSED(argc);
+    UNUSED(argv);
 
-    gba_init(argv[1]);
+    arm_init_lookup();
+    thumb_init_lookup();
+
+    FILE *fp = fopen("system_rom.bin", "rb");
+    assert(fp != NULL);
+    fread(system_rom, sizeof(uint8_t), 0x4000, fp);
+    fclose(fp);
+
+    gba_reset();
 
     // Setup SDL
     // (Some versions of SDL before 2.0.10 appear to have performance/stalling issues on a minority of Windows systems,
@@ -2318,6 +2338,7 @@ int main(int argc, char **argv) {
         SDL_Log("Failed to create window: %s", SDL_GetError());
         exit(EXIT_FAILURE);
     }
+    SDL_EventState(SDL_DROPFILE, SDL_ENABLE);
     SDL_GLContext gl_context = SDL_GL_CreateContext(window);
     SDL_GL_MakeCurrent(window, gl_context);
     SDL_GL_SetSwapInterval(1);  // Enable vsync
@@ -2390,9 +2411,12 @@ int main(int argc, char **argv) {
             ImGui_ImplSDL2_ProcessEvent(&event);
             if (event.type == SDL_QUIT) {
                 done = true;
-            }
-            if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE && event.window.windowID == SDL_GetWindowID(window)) {
+            } else if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE && event.window.windowID == SDL_GetWindowID(window)) {
                 done = true;
+            } else if (event.type == SDL_DROPFILE) {
+                char *dropped_file = event.drop.file;
+                gba_load(dropped_file);
+                SDL_free(dropped_file);
             }
         }
 
@@ -2482,6 +2506,18 @@ int main(int argc, char **argv) {
         ImVec4 tint_col = {1.0f, 1.0f, 1.0f, 1.0f};
         ImVec4 border_col = {0.0f, 0.0f, 0.0f, 0.0f};
         igImage((void *)(intptr_t) screen_texture, screen_size, uv0, uv1, tint_col, border_col);
+        igEnd();
+
+        // Settings
+        igBegin("Settings", NULL, 0);
+        igCheckbox("Has EEPROM", &has_eeprom);
+        igCheckbox("Has Flash", &has_flash);
+        igCheckbox("Has SRAM", &has_sram);
+        igCheckbox("Skip BIOS", &skip_bios);
+        ImVec2 buttonSize = {0.0f, 0.0f};
+        if (igButton("Reset", buttonSize)) {
+            gba_reset();
+        }
         igEnd();
 
         // Rendering
