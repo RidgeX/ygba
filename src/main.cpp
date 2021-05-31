@@ -2004,7 +2004,7 @@ void gba_load(const char *filename) {
     gba_detect_cartridge_features();
 }
 
-Uint32 rgb555(uint32_t pixel) {
+uint32_t rgb555(uint32_t pixel) {
     uint32_t r, g, b;
     r = pixel & 0x1f;
     g = (pixel >> 5) & 0x1f;
@@ -2016,7 +2016,8 @@ Uint32 rgb555(uint32_t pixel) {
 }
 
 void gba_draw_blank(int y) {
-    Uint32 clear_color = rgb555(0);
+    uint16_t pixel = *(uint16_t *)&palette_ram[0 * 2];
+    uint32_t clear_color = rgb555(pixel);
 
     for (int x = 0; x < SCREEN_WIDTH; x++) {
         screen_pixels[y][x] = clear_color;
