@@ -2051,7 +2051,7 @@ void gba_draw_tiled_cull(int x, int y, int h, uint32_t pixel) {
 }
 
 void gba_draw_tiled_bg(uint32_t mode, int y, uint32_t bgcnt, uint32_t hofs, uint32_t vofs) {
-    //assert(mode == 0);  // FIXME
+    UNUSED(mode);  // FIXME
 
     uint32_t tile_base = ((bgcnt >> 2) & 3) * 16384;
     uint32_t map_base = ((bgcnt >> 8) & 0x1f) * 2048;
@@ -2106,7 +2106,7 @@ void gba_draw_tiled_bg(uint32_t mode, int y, uint32_t bgcnt, uint32_t hofs, uint
 }
 
 void gba_draw_tiled(uint32_t mode, int y) {
-    for (int pri = 3; pri >= 0; pri--) {  // FIXME? reverse order
+    for (int pri = 3; pri >= 0; pri--) {
         for (int bg = 0; bg < 4; bg++) {
             bool visible = (ioreg.io_dispcnt & (1 << (8 + bg))) != 0;
             if (!visible) continue;
@@ -2285,6 +2285,7 @@ void gba_dma_update(void) {
             if (ch == 1 || ch == 2) {
                 //dma_special = true;
                 assert(*dst_addr == 0x40000a0 || *dst_addr == 0x40000a4);
+                //if (!(*dst_addr == 0x40000a0 || *dst_addr == 0x40000a4)) continue;  // FIXME
                 assert((dmacnt & DMA_REPEAT) != 0);
                 if (*dst_addr == 0x40000a0 && !ioreg.fifo_a_refill) continue;
                 if (*dst_addr == 0x40000a4 && !ioreg.fifo_b_refill) continue;
@@ -2297,6 +2298,7 @@ void gba_dma_update(void) {
                 if (ppu_cycles % 1232 != 0) continue;
             } else {
                 assert(false);
+                //continue;  // FIXME
             }
         }
 
