@@ -667,6 +667,8 @@ uint8_t io_read_byte(uint32_t address) {
         case REG_TM3CNT_L + 0: return (uint8_t) ioreg.timer_3_counter;
         case REG_TM3CNT_L + 1: return (uint8_t)(ioreg.timer_3_counter >> 8);
 
+        case REG_KEYINPUT: return (uint8_t) ioreg.io_keyinput;
+
         default:
 #ifdef LOG_BAD_MEMORY_ACCESS
             printf("io_read_byte(0x%08x);\n", address);
@@ -1113,12 +1115,7 @@ uint16_t io_read_halfword(uint32_t address) {
         case REG_SIODATA32: return 0;  // FIXME
         case REG_SIOCNT: return 0;  // FIXME
 
-        case REG_KEYINPUT:
-            ioreg.io_keyinput = 0x3ff;
-            for (int i = 0; i < NUM_KEYS; i++) {
-                if (keys[i]) ioreg.io_keyinput &= ~(1 << i);
-            }
-            return ioreg.io_keyinput;
+        case REG_KEYINPUT: return ioreg.io_keyinput;
 
         //case IO_RCNT:
         //    return ioreg.io_rcnt;
@@ -1395,12 +1392,8 @@ uint32_t io_read_word(uint32_t address) {
         case REG_TM2CNT_L: return ioreg.timer_2_counter | ioreg.timer_2_control << 16;
         case REG_TM3CNT_L: return ioreg.timer_3_counter | ioreg.timer_3_control << 16;
 
-        //case IO_KEYINPUT:
-        //    ioreg.io_keyinput = 0x3ff;
-        //    for (int i = 0; i < NUM_KEYS; i++) {
-        //        if (keys[i]) ioreg.io_keyinput &= ~(1 << i);
-        //    }
-        //    return ioreg.io_keyinput | ioreg.io_keycnt << 16;
+        case REG_KEYINPUT:
+            return ioreg.io_keyinput | ioreg.io_keycnt << 16;
 
         case REG_IE:
             return ioreg.io_ie | ioreg.io_if << 16;
@@ -2613,6 +2606,12 @@ int main(int argc, char **argv) {
         }
         if (keys[4] && keys[5]) { keys[4] = false; keys[5] = false; }  // Disallow opposing directions
         if (keys[6] && keys[7]) { keys[6] = false; keys[7] = false; }
+        ioreg.io_keyinput = 0x3ff;
+        for (int i = 0; i < NUM_KEYS; i++) {
+            if (keys[i]) {
+                ioreg.io_keyinput &= ~(1 << i);
+            }
+        }
 
         gba_emulate();
 
