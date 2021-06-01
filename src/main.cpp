@@ -2043,8 +2043,9 @@ void gba_draw_tiled_cull(int x, int y, int h, uint32_t pixel) {
     screen_pixels[y][x] = rgb555(pixel);
 }
 
-void gba_draw_tiled_bg(uint32_t mode, int y, uint32_t bgcnt, uint32_t hofs, uint32_t vofs) {
+void gba_draw_tiled_bg(uint32_t mode, uint32_t bg, int y, uint32_t bgcnt, uint32_t hofs, uint32_t vofs) {
     UNUSED(mode);  // FIXME
+    UNUSED(bg);  // FIXME
 
     uint32_t tile_base = ((bgcnt >> 2) & 3) * 16384;
     uint32_t map_base = ((bgcnt >> 8) & 0x1f) * 2048;
@@ -2100,7 +2101,7 @@ void gba_draw_tiled_bg(uint32_t mode, int y, uint32_t bgcnt, uint32_t hofs, uint
 
 void gba_draw_tiled(uint32_t mode, int y) {
     for (int pri = 3; pri >= 0; pri--) {
-        for (int bg = 0; bg < 4; bg++) {
+        for (uint32_t bg = 0; bg < 4; bg++) {
             bool visible = (ioreg.io_dispcnt & (1 << (8 + bg))) != 0;
             if (!visible) continue;
             uint16_t bgcnt = io_read_halfword(REG_BG0CNT + 2 * bg);
@@ -2116,7 +2117,7 @@ void gba_draw_tiled(uint32_t mode, int y) {
                 }
                 //if (hofs & 0x8000) hofs |= ~0xffff;
                 //if (vofs & 0x8000) vofs |= ~0xffff;
-                gba_draw_tiled_bg(mode, y, bgcnt, hofs, vofs);
+                gba_draw_tiled_bg(mode, bg, y, bgcnt, hofs, vofs);
             }
         }
     }
