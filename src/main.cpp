@@ -2009,11 +2009,122 @@ uint32_t rgb555(uint32_t pixel) {
 }
 
 void gba_draw_blank(int y) {
-    uint16_t pixel = *(uint16_t *)&palette_ram[0 * 2];
+    uint16_t pixel = *(uint16_t *)&palette_ram[0];
     uint32_t clear_color = rgb555(pixel);
 
     for (int x = 0; x < SCREEN_WIDTH; x++) {
         screen_pixels[y][x] = clear_color;
+    }
+}
+
+void gba_draw_pixel_culled(int x, int y, uint32_t pixel) {
+    if (x < 0 || x >= SCREEN_WIDTH) return;
+    screen_pixels[y][x] = rgb555(pixel);
+}
+
+void gba_draw_tile(uint32_t tile_address, int x, int y, uint32_t hofs, uint32_t vofs, bool hflip, bool vflip, uint16_t palette_no, bool colors_256, bool is_obj) {
+    uint32_t xh = (is_obj ? x : x - (hofs % 8));
+    uint32_t yv = (is_obj ? vofs : y + (vofs % 8));
+    uint32_t palette_offset = (is_obj ? 0x200 : 0);
+
+    uint8_t *tile = &video_ram[tile_address];
+    if (colors_256) {
+        for (int i = 0; i < 8; i++) {
+            uint32_t tile_offset = (vflip ? 7 - (yv % 8) : (yv % 8)) * 8 + (hflip ? 7 - i : i);
+            uint8_t pixel_index = tile[tile_offset];
+            if (pixel_index != 0) {
+                uint16_t pixel = *(uint16_t *)&palette_ram[palette_offset + pixel_index * 2];
+                gba_draw_pixel_culled(xh + i, y, pixel);
+            }
+        }
+    } else {
+        for (int i = 0; i < 8; i += 2) {
+            uint32_t tile_offset = (vflip ? 7 - (yv % 8) : (yv % 8)) * 4 + (hflip ? 7 - i : i) / 2;
+            uint8_t pixel_indexes = tile[tile_offset];
+            uint8_t pixel_index_0 = (pixel_indexes >> (hflip ? 4 : 0)) & 0xf;
+            uint8_t pixel_index_1 = (pixel_indexes >> (hflip ? 0 : 4)) & 0xf;
+            if (pixel_index_0 != 0) {
+                uint16_t pixel_0 = *(uint16_t *)&palette_ram[palette_offset + palette_no * 32 + pixel_index_0 * 2];
+                gba_draw_pixel_culled(xh + i, y, pixel_0);
+            }
+            if (pixel_index_1 != 0) {
+                uint16_t pixel_1 = *(uint16_t *)&palette_ram[palette_offset + palette_no * 32 + pixel_index_1 * 2];
+                gba_draw_pixel_culled(xh + i + 1, y, pixel_1);
+            }
+        }
+    }
+}
+
+void gba_draw_obj(uint32_t mode, int pri, int y) {
+    for (int n = 127; n >= 0; n--) {
+        uint16_t attr0 = *(uint16_t *)&object_ram[(n * 4 + 0) * 2];
+        uint16_t attr1 = *(uint16_t *)&object_ram[(n * 4 + 1) * 2];
+        uint16_t attr2 = *(uint16_t *)&object_ram[(n * 4 + 2) * 2];
+
+        int oy = attr0 & 0xff;
+        int obj_mode = (attr0 >> 8) & 3;
+        //int gfx_mode = (attr0 >> 10) & 3;
+        //bool mosaic = (attr0 & (1 << 12)) != 0;
+        bool colors_256 = (attr0 & (1 << 13)) != 0;
+        int shape = (attr0 >> 14) & 3;
+
+        int ox = attr1 & 0x1ff;
+        //int aff_index = (attr1 >> 9) & 0x1f;
+        bool hflip = (attr1 & (1 << 12)) != 0;
+        bool vflip = (attr1 & (1 << 13)) != 0;
+        int size = (attr1 >> 14) & 3;
+
+        int tile_no = attr2 & 0x3ff;
+        int priority = (attr2 >> 10) & 3;
+        int palette_no = (attr2 >> 12) & 0xf;
+
+        int ow = 0;
+        int oh = 0;
+        if (shape == 0) {
+            if (size == 0) { ow = 8; oh = 8; }
+            else if (size == 1) { ow = 16; oh = 16; }
+            else if (size == 2) { ow = 32; oh = 32; }
+            else if (size == 3) { ow = 64; oh = 64; }
+        } else if (shape == 1) {
+            if (size == 0) { ow = 16; oh = 8; }
+            else if (size == 1) { ow = 32; oh = 8; }
+            else if (size == 2) { ow = 32; oh = 16; }
+            else if (size == 3) { ow = 64; oh = 32; }
+        } else if (shape == 2) {
+            if (size == 0) { ow = 8; oh = 16; }
+            else if (size == 1) { ow = 8; oh = 32; }
+            else if (size == 2) { ow = 16; oh = 32; }
+            else if (size == 3) { ow = 32; oh = 64; }
+        }
+
+        bool mode_bitmap = (mode == 3 || mode == 4 || mode == 5);
+        bool obj_1d = (ioreg.io_dispcnt & DCNT_OBJ_1D) != 0;
+
+        if (obj_mode == 2 || priority != pri) continue;
+        if (y < oy || y >= oy + oh) continue;
+
+        int row = y - oy;
+        if (obj_1d) {
+            int tile_ptr;
+            if (!vflip) tile_ptr = tile_no + (row / 8) * (ow / 8);
+            else tile_ptr = tile_no + ((oh - 1 - row) / 8) * (ow / 8);
+            if (hflip) tile_ptr += (ow / 8) - 1;
+            for (int x = ox; x < ox + ow; x += 8) {
+                uint32_t tile_address = 0x10000 + tile_ptr * (colors_256 ? 64 : 32);
+                if (!mode_bitmap || tile_ptr >= 512) {
+                    gba_draw_tile(tile_address, x, y, 0, row, hflip, vflip, palette_no, colors_256, true);
+                }
+                if (!hflip) tile_ptr++;
+                else tile_ptr--;
+            }
+        } else {
+            for (int x = ox; x < ox + ow; x += 8) {
+                uint32_t tile_address = 0x10000 + tile_no * (colors_256 ? 64 : 32);
+                if (!mode_bitmap || tile_no >= 512) {
+                    gba_draw_tile(tile_address, x, y, 0, row, hflip, vflip, palette_no, colors_256, true);
+                }
+            }
+        }
     }
 }
 
@@ -2035,12 +2146,10 @@ void gba_draw_bitmap(uint32_t mode, int y) {
         }
         screen_pixels[y][x] = rgb555(pixel);
     }
-}
 
-void gba_draw_tiled_cull(int x, int y, int h, uint32_t pixel) {
-    x -= h;
-    if (x < 0 || x >= SCREEN_WIDTH) return;
-    screen_pixels[y][x] = rgb555(pixel);
+    for (int pri = 3; pri >= 0; pri--) {
+        gba_draw_obj(mode, pri, y);
+    }
 }
 
 void gba_draw_tiled_bg(uint32_t mode, uint32_t bg, int y, uint32_t bgcnt, uint32_t hofs, uint32_t vofs) {
@@ -2052,15 +2161,11 @@ void gba_draw_tiled_bg(uint32_t mode, uint32_t bg, int y, uint32_t bgcnt, uint32
     uint32_t screen_size = (bgcnt >> 14) & 3;
     bool colors_256 = (bgcnt & (1 << 7)) != 0;
 
-    uint32_t hofs_div_8 = hofs / 8;
-    uint32_t vofs_div_8 = vofs / 8;
-    uint32_t hofs_rem_8 = hofs % 8;
-    uint32_t vofs_rem_8 = vofs % 8;
-    uint32_t yv = y + vofs_rem_8;
+    uint32_t yv = y + (vofs % 8);
 
     for (int x = 0; x < 31 * 8; x += 8) {
-        uint32_t map_x = (x / 8 + hofs_div_8) % (screen_size & 1 ? 64 : 32);
-        uint32_t map_y = (yv / 8 + vofs_div_8) % (screen_size & 2 ? 64 : 32);
+        uint32_t map_x = (x / 8 + hofs / 8) % (screen_size & 1 ? 64 : 32);
+        uint32_t map_y = (yv / 8 + vofs / 8) % (screen_size & 2 ? 64 : 32);
         uint32_t map_index = (map_y / 32) * (32*32*2) + (map_x / 32) * (32*32) + (map_y % 32) * 32 + (map_x % 32);
         uint16_t info = *(uint16_t *)&video_ram[map_base + map_index * 2];
         uint16_t tile_no = info & 0x3ff;
@@ -2070,32 +2175,7 @@ void gba_draw_tiled_bg(uint32_t mode, uint32_t bg, int y, uint32_t bgcnt, uint32
 
         uint32_t tile_address = tile_base + tile_no * (colors_256 ? 64 : 32);
         if (tile_address >= 0x10000) continue;
-        uint8_t *tile = &video_ram[tile_address];
-        if (colors_256) {
-            for (int i = 0; i < 8; i++) {
-                uint32_t offset = (vflip ? 7 - (yv % 8) : (yv % 8)) * 8 + (hflip ? 7 - i : i);
-                uint8_t pixel_index = tile[offset];
-                if (pixel_index != 0) {
-                    uint16_t pixel = *(uint16_t *)&palette_ram[pixel_index * 2];
-                    gba_draw_tiled_cull((x / 8) * 8 + i, y, hofs_rem_8, pixel);
-                }
-            }
-        } else {
-            for (int i = 0; i < 8; i += 2) {
-                uint32_t offset = (vflip ? 7 - (yv % 8) : (yv % 8)) * 4 + (hflip ? 7 - i : i) / 2;
-                uint8_t pixel_indexes = tile[offset];
-                uint8_t pixel_index_0 = (pixel_indexes >> (hflip ? 4 : 0)) & 0xf;
-                uint8_t pixel_index_1 = (pixel_indexes >> (hflip ? 0 : 4)) & 0xf;
-                if (pixel_index_0 != 0) {
-                    uint16_t pixel_0 = *(uint16_t *)&palette_ram[palette_no * 32 + pixel_index_0 * 2];
-                    gba_draw_tiled_cull((x / 8) * 8 + i, y, hofs_rem_8, pixel_0);
-                }
-                if (pixel_index_1 != 0) {
-                    uint16_t pixel_1 = *(uint16_t *)&palette_ram[palette_no * 32 + pixel_index_1 * 2];
-                    gba_draw_tiled_cull((x / 8) * 8 + i + 1, y, hofs_rem_8, pixel_1);
-                }
-            }
-        }
+        gba_draw_tile(tile_address, x, y, hofs, vofs, hflip, vflip, palette_no, colors_256, false);
     }
 }
 
@@ -2106,18 +2186,21 @@ void gba_draw_tiled(uint32_t mode, int y) {
             if (!visible) continue;
             uint16_t bgcnt = io_read_halfword(REG_BG0CNT + 2 * bg);
             uint16_t priority = bgcnt & 3;
-            if (priority == pri) {
-                uint16_t hofs, vofs;
-                switch (bg) {
-                    case 0: hofs = ioreg.io_bg0hofs; vofs = ioreg.io_bg0vofs; break;
-                    case 1: hofs = ioreg.io_bg1hofs; vofs = ioreg.io_bg1vofs; break;
-                    case 2: hofs = ioreg.io_bg2hofs; vofs = ioreg.io_bg2vofs; break;
-                    case 3: hofs = ioreg.io_bg3hofs; vofs = ioreg.io_bg3vofs; break;
-                    default: abort();
-                }
-                gba_draw_tiled_bg(mode, bg, y, bgcnt, hofs, vofs);
+            if (priority != pri) continue;
+            uint16_t hofs, vofs;
+            switch (bg) {
+                case 0: hofs = ioreg.io_bg0hofs; vofs = ioreg.io_bg0vofs; break;
+                case 1: hofs = ioreg.io_bg1hofs; vofs = ioreg.io_bg1vofs; break;
+                case 2: hofs = ioreg.io_bg2hofs; vofs = ioreg.io_bg2vofs; break;
+                case 3: hofs = ioreg.io_bg3hofs; vofs = ioreg.io_bg3vofs; break;
+                default: abort();
             }
+            gba_draw_tiled_bg(mode, bg, y, bgcnt, hofs, vofs);
         }
+    }
+
+    for (int pri = 3; pri >= 0; pri--) {
+        gba_draw_obj(mode, pri, y);
     }
 }
 
