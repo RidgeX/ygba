@@ -696,21 +696,21 @@ void io_write_byte(uint32_t address, uint8_t value) {
         case REG_BG3CNT + 0: ioreg.io_bg3cnt = (ioreg.io_bg3cnt & 0xff00) | ((value << 0) & 0x00ff); break;
         case REG_BG3CNT + 1: ioreg.io_bg3cnt = (ioreg.io_bg3cnt & 0x00ff) | ((value << 8) & 0xff00); break;
         case REG_BG0HOFS + 0: ioreg.io_bg0hofs = (ioreg.io_bg0hofs & 0xff00) | ((value << 0) & 0x00ff); break;
-        case REG_BG0HOFS + 1: ioreg.io_bg0hofs = (ioreg.io_bg0hofs & 0x00ff) | ((value << 8) & 0x0000); break;
+        case REG_BG0HOFS + 1: ioreg.io_bg0hofs = (ioreg.io_bg0hofs & 0x00ff) | ((value << 8) & 0x0100); break;
         case REG_BG0VOFS + 0: ioreg.io_bg0vofs = (ioreg.io_bg0vofs & 0xff00) | ((value << 0) & 0x00ff); break;
-        case REG_BG0VOFS + 1: ioreg.io_bg0vofs = (ioreg.io_bg0vofs & 0x00ff) | ((value << 8) & 0x0000); break;
+        case REG_BG0VOFS + 1: ioreg.io_bg0vofs = (ioreg.io_bg0vofs & 0x00ff) | ((value << 8) & 0x0100); break;
         case REG_BG1HOFS + 0: ioreg.io_bg1hofs = (ioreg.io_bg1hofs & 0xff00) | ((value << 0) & 0x00ff); break;
-        case REG_BG1HOFS + 1: ioreg.io_bg1hofs = (ioreg.io_bg1hofs & 0x00ff) | ((value << 8) & 0x0000); break;
+        case REG_BG1HOFS + 1: ioreg.io_bg1hofs = (ioreg.io_bg1hofs & 0x00ff) | ((value << 8) & 0x0100); break;
         case REG_BG1VOFS + 0: ioreg.io_bg1vofs = (ioreg.io_bg1vofs & 0xff00) | ((value << 0) & 0x00ff); break;
-        case REG_BG1VOFS + 1: ioreg.io_bg1vofs = (ioreg.io_bg1vofs & 0x00ff) | ((value << 8) & 0x0000); break;
+        case REG_BG1VOFS + 1: ioreg.io_bg1vofs = (ioreg.io_bg1vofs & 0x00ff) | ((value << 8) & 0x0100); break;
         case REG_BG2HOFS + 0: ioreg.io_bg2hofs = (ioreg.io_bg2hofs & 0xff00) | ((value << 0) & 0x00ff); break;
-        case REG_BG2HOFS + 1: ioreg.io_bg2hofs = (ioreg.io_bg2hofs & 0x00ff) | ((value << 8) & 0x0000); break;
+        case REG_BG2HOFS + 1: ioreg.io_bg2hofs = (ioreg.io_bg2hofs & 0x00ff) | ((value << 8) & 0x0100); break;
         case REG_BG2VOFS + 0: ioreg.io_bg2vofs = (ioreg.io_bg2vofs & 0xff00) | ((value << 0) & 0x00ff); break;
-        case REG_BG2VOFS + 1: ioreg.io_bg2vofs = (ioreg.io_bg2vofs & 0x00ff) | ((value << 8) & 0x0000); break;
+        case REG_BG2VOFS + 1: ioreg.io_bg2vofs = (ioreg.io_bg2vofs & 0x00ff) | ((value << 8) & 0x0100); break;
         case REG_BG3HOFS + 0: ioreg.io_bg3hofs = (ioreg.io_bg3hofs & 0xff00) | ((value << 0) & 0x00ff); break;
-        case REG_BG3HOFS + 1: ioreg.io_bg3hofs = (ioreg.io_bg3hofs & 0x00ff) | ((value << 8) & 0x0000); break;
+        case REG_BG3HOFS + 1: ioreg.io_bg3hofs = (ioreg.io_bg3hofs & 0x00ff) | ((value << 8) & 0x0100); break;
         case REG_BG3VOFS + 0: ioreg.io_bg3vofs = (ioreg.io_bg3vofs & 0xff00) | ((value << 0) & 0x00ff); break;
-        case REG_BG3VOFS + 1: ioreg.io_bg3vofs = (ioreg.io_bg3vofs & 0x00ff) | ((value << 8) & 0x0000); break;
+        case REG_BG3VOFS + 1: ioreg.io_bg3vofs = (ioreg.io_bg3vofs & 0x00ff) | ((value << 8) & 0x0100); break;
         case REG_BG2PA + 0: ioreg.io_bg2pa = (ioreg.io_bg2pa & 0xff00) | ((value << 0) & 0x00ff); break;
         case REG_BG2PA + 1: ioreg.io_bg2pa = (ioreg.io_bg2pa & 0x00ff) | ((value << 8) & 0xff00); break;
         case REG_BG2PB + 0: ioreg.io_bg2pb = (ioreg.io_bg2pb & 0xff00) | ((value << 0) & 0x00ff); break;
@@ -1142,14 +1142,14 @@ void io_write_halfword(uint32_t address, uint16_t value) {
         case REG_BG1CNT: ioreg.io_bg1cnt = value & 0xdfff; break;
         case REG_BG2CNT: ioreg.io_bg2cnt = value & 0xffff; break;
         case REG_BG3CNT: ioreg.io_bg3cnt = value & 0xffff; break;
-        case REG_BG0HOFS: ioreg.io_bg0hofs = value & 0x00ff; break;
-        case REG_BG0VOFS: ioreg.io_bg0vofs = value & 0x00ff; break;
-        case REG_BG1HOFS: ioreg.io_bg1hofs = value & 0x00ff; break;
-        case REG_BG1VOFS: ioreg.io_bg1vofs = value & 0x00ff; break;
-        case REG_BG2HOFS: ioreg.io_bg2hofs = value & 0x00ff; break;
-        case REG_BG2VOFS: ioreg.io_bg2vofs = value & 0x00ff; break;
-        case REG_BG3HOFS: ioreg.io_bg3hofs = value & 0x00ff; break;
-        case REG_BG3VOFS: ioreg.io_bg3vofs = value & 0x00ff; break;
+        case REG_BG0HOFS: ioreg.io_bg0hofs = value & 0x01ff; break;
+        case REG_BG0VOFS: ioreg.io_bg0vofs = value & 0x01ff; break;
+        case REG_BG1HOFS: ioreg.io_bg1hofs = value & 0x01ff; break;
+        case REG_BG1VOFS: ioreg.io_bg1vofs = value & 0x01ff; break;
+        case REG_BG2HOFS: ioreg.io_bg2hofs = value & 0x01ff; break;
+        case REG_BG2VOFS: ioreg.io_bg2vofs = value & 0x01ff; break;
+        case REG_BG3HOFS: ioreg.io_bg3hofs = value & 0x01ff; break;
+        case REG_BG3VOFS: ioreg.io_bg3vofs = value & 0x01ff; break;
         case REG_BG2PA: ioreg.io_bg2pa = value & 0xffff; break;
         case REG_BG2PB: ioreg.io_bg2pb = value & 0xffff; break;
         case REG_BG2PC: ioreg.io_bg2pc = value & 0xffff; break;
@@ -1415,10 +1415,10 @@ void io_write_word(uint32_t address, uint32_t value) {
         case REG_DISPSTAT: ioreg.io_dispstat = (ioreg.io_dispstat & 0x0007) | (value & 0xff38); break;
         case REG_BG0CNT: ioreg.io_bg0cnt = value & 0xdfff; ioreg.io_bg1cnt = (value >> 16) & 0xdfff; break;
         case REG_BG2CNT: ioreg.io_bg2cnt = value & 0xffff; ioreg.io_bg3cnt = (value >> 16) & 0xffff; break;
-        case REG_BG0HOFS: ioreg.io_bg0hofs = value & 0x00ff; ioreg.io_bg0vofs = (value >> 16) & 0x00ff; break;
-        case REG_BG1HOFS: ioreg.io_bg1hofs = value & 0x00ff; ioreg.io_bg1vofs = (value >> 16) & 0x00ff; break;
-        case REG_BG2HOFS: ioreg.io_bg2hofs = value & 0x00ff; ioreg.io_bg2vofs = (value >> 16) & 0x00ff; break;
-        case REG_BG3HOFS: ioreg.io_bg3hofs = value & 0x00ff; ioreg.io_bg3vofs = (value >> 16) & 0x00ff; break;
+        case REG_BG0HOFS: ioreg.io_bg0hofs = value & 0x01ff; ioreg.io_bg0vofs = (value >> 16) & 0x01ff; break;
+        case REG_BG1HOFS: ioreg.io_bg1hofs = value & 0x01ff; ioreg.io_bg1vofs = (value >> 16) & 0x01ff; break;
+        case REG_BG2HOFS: ioreg.io_bg2hofs = value & 0x01ff; ioreg.io_bg2vofs = (value >> 16) & 0x01ff; break;
+        case REG_BG3HOFS: ioreg.io_bg3hofs = value & 0x01ff; ioreg.io_bg3vofs = (value >> 16) & 0x01ff; break;
         case REG_BG2PA: ioreg.io_bg2pa = value & 0xffff; ioreg.io_bg2pb = (value >> 16) & 0xffff; break;
         case REG_BG2PC: ioreg.io_bg2pc = value & 0xffff; ioreg.io_bg2pd = (value >> 16) & 0xffff; break;
         case REG_BG2X_L: ioreg.io_bg2x = value & 0xffffffff; break;
@@ -2049,7 +2049,7 @@ void gba_draw_tiled_bg(uint32_t mode, uint32_t bg, int y, uint32_t bgcnt, uint32
 
     uint32_t tile_base = ((bgcnt >> 2) & 3) * 16384;
     uint32_t map_base = ((bgcnt >> 8) & 0x1f) * 2048;
-    //uint32_t screen_size = (bgcnt >> 14) & 3;
+    uint32_t screen_size = (bgcnt >> 14) & 3;
     bool colors_256 = (bgcnt & (1 << 7)) != 0;
 
     uint32_t hofs_div_8 = hofs / 8;
@@ -2058,11 +2058,11 @@ void gba_draw_tiled_bg(uint32_t mode, uint32_t bg, int y, uint32_t bgcnt, uint32
     uint32_t vofs_rem_8 = vofs % 8;
     uint32_t yv = y + vofs_rem_8;
 
-    for (int x = 0; x < 256; x += 8) {
-        uint32_t map_x = (x / 8 + hofs_div_8) % 32;
-        uint32_t map_y = (yv / 8 + vofs_div_8) % 32;
-        uint32_t map_address = map_base + (map_y * 32 + map_x) * 2;
-        uint16_t info = *(uint16_t *)&video_ram[map_address];
+    for (int x = 0; x < 31 * 8; x += 8) {
+        uint32_t map_x = (x / 8 + hofs_div_8) % (screen_size & 1 ? 64 : 32);
+        uint32_t map_y = (yv / 8 + vofs_div_8) % (screen_size & 2 ? 64 : 32);
+        uint32_t map_index = (map_y / 32) * (32*32*2) + (map_x / 32) * (32*32) + (map_y % 32) * 32 + (map_x % 32);
+        uint16_t info = *(uint16_t *)&video_ram[map_base + map_index * 2];
         uint16_t tile_no = info & 0x3ff;
         bool hflip = (info & (1 << 10)) != 0;
         bool vflip = (info & (1 << 11)) != 0;
@@ -2115,8 +2115,6 @@ void gba_draw_tiled(uint32_t mode, int y) {
                     case 3: hofs = ioreg.io_bg3hofs; vofs = ioreg.io_bg3vofs; break;
                     default: abort();
                 }
-                //if (hofs & 0x8000) hofs |= ~0xffff;
-                //if (vofs & 0x8000) vofs |= ~0xffff;
                 gba_draw_tiled_bg(mode, bg, y, bgcnt, hofs, vofs);
             }
         }
