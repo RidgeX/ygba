@@ -1949,15 +1949,17 @@ void gba_detect_cartridge_features(void) {
     */
 }
 
-void gba_reset(void) {
+void gba_reset(bool keep_backup) {
     memset(cpu_ewram, 0, sizeof(uint8_t) * sizeof(cpu_ewram));
     memset(cpu_iwram, 0, sizeof(uint8_t) * sizeof(cpu_iwram));
     memset(&ioreg, 0, sizeof(uint8_t) * sizeof(ioreg));
     memset(palette_ram, 0, sizeof(uint8_t) * sizeof(palette_ram));
     memset(video_ram, 0, sizeof(uint8_t) * sizeof(video_ram));
     memset(object_ram, 0, sizeof(uint8_t) * sizeof(object_ram));
-    memset(backup_flash, 0xff, sizeof(uint8_t) * sizeof(backup_flash));
-    memset(backup_sram, 0xff, sizeof(uint8_t) * sizeof(backup_sram));
+    if (!keep_backup) {
+        memset(backup_flash, 0xff, sizeof(uint8_t) * sizeof(backup_flash));
+        memset(backup_sram, 0xff, sizeof(uint8_t) * sizeof(backup_sram));
+    }
 
     memset(r, 0, sizeof(uint32_t) * 16);
     arm_init_registers(skip_bios);
@@ -1980,7 +1982,7 @@ void gba_reset(void) {
 }
 
 void gba_load(const char *filename) {
-    gba_reset();
+    gba_reset(false);
 
     memset(game_rom, 0, sizeof(uint8_t) * sizeof(game_rom));
 
@@ -2465,7 +2467,7 @@ int main(int argc, char **argv) {
         skip_bios = true;
         gba_load(argv[1]);
     } else {
-        gba_reset();
+        gba_reset(false);
     }
 
     // Setup SDL
@@ -2728,7 +2730,30 @@ int main(int argc, char **argv) {
         ImGui::Checkbox("Has SRAM", &has_sram);
         ImGui::Checkbox("Skip BIOS", &skip_bios);
         if (ImGui::Button("Reset")) {
-            gba_reset();
+            gba_reset(true);
+        }
+        if (ImGui::Button("Load")) {
+            FILE *fp = fopen("save.bin", "rb");
+            assert(fp != NULL);
+            if (has_flash) {
+                fread(backup_flash, sizeof(uint8_t), sizeof(backup_flash), fp);
+            }
+            if (has_sram) {
+                fread(backup_sram, sizeof(uint8_t), sizeof(backup_sram), fp);
+            }
+            fclose(fp);
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Save")) {
+            FILE *fp = fopen("save.bin", "wb");
+            assert(fp != NULL);
+            if (has_flash) {
+                fwrite(backup_flash, sizeof(uint8_t), sizeof(backup_flash), fp);
+            }
+            if (has_sram) {
+                fwrite(backup_sram, sizeof(uint8_t), sizeof(backup_sram), fp);
+            }
+            fclose(fp);
         }
         ImGui::End();
 

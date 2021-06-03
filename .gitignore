@@ -1,3 +1,4 @@
+*.bin
 *.exe
 *.gba
 *.o
@@ -6,4 +7,3 @@ games/
 roms/
 tonc/
 imgui.ini
-system_rom.bin
