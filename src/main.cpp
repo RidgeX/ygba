@@ -2152,7 +2152,7 @@ void gba_draw_bitmap(uint32_t mode, int y) {
     }
 }
 
-void gba_draw_tiled_bg(uint32_t mode, uint32_t bg, int y, uint32_t bgcnt, uint32_t hofs, uint32_t vofs) {
+void gba_draw_tiled_bg(uint32_t mode, int bg, int y, uint32_t bgcnt, uint32_t hofs, uint32_t vofs) {
     UNUSED(mode);  // FIXME
     UNUSED(bg);  // FIXME
 
@@ -2181,7 +2181,7 @@ void gba_draw_tiled_bg(uint32_t mode, uint32_t bg, int y, uint32_t bgcnt, uint32
 
 void gba_draw_tiled(uint32_t mode, int y) {
     for (int pri = 3; pri >= 0; pri--) {
-        for (uint32_t bg = 0; bg < 4; bg++) {
+        for (int bg = 3; bg >= 0; bg--) {
             bool visible = (ioreg.io_dispcnt & (1 << (8 + bg))) != 0;
             if (!visible) continue;
             uint16_t bgcnt = io_read_halfword(REG_BG0CNT + 2 * bg);
@@ -2197,9 +2197,6 @@ void gba_draw_tiled(uint32_t mode, int y) {
             }
             gba_draw_tiled_bg(mode, bg, y, bgcnt, hofs, vofs);
         }
-    }
-
-    for (int pri = 3; pri >= 0; pri--) {
         gba_draw_obj(mode, pri, y);
     }
 }
