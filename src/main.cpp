@@ -2078,6 +2078,11 @@ void gba_draw_obj(uint32_t mode, int pri, int y) {
         int priority = (attr2 >> 10) & 3;
         int palette_no = (attr2 >> 12) & 0xf;
 
+        if (obj_mode == 1 || obj_mode == 3) {
+            hflip = false;
+            vflip = false;
+        }
+
         int ow = 0;
         int oh = 0;
         if (shape == 0) {
@@ -2095,7 +2100,12 @@ void gba_draw_obj(uint32_t mode, int pri, int y) {
             else if (size == 1) { ow = 8; oh = 32; }
             else if (size == 2) { ow = 16; oh = 32; }
             else if (size == 3) { ow = 32; oh = 64; }
+        } else if (shape == 3) {
+            assert(false);
         }
+
+        if (ox + ow > 511) ox -= 512;
+        if (oy + oh > 255) oy -= 256;
 
         bool mode_bitmap = (mode == 3 || mode == 4 || mode == 5);
         bool obj_1d = (ioreg.io_dispcnt & DCNT_OBJ_1D) != 0;
@@ -2104,26 +2114,18 @@ void gba_draw_obj(uint32_t mode, int pri, int y) {
         if (y < oy || y >= oy + oh) continue;
 
         int row = y - oy;
-        if (obj_1d) {
-            int tile_ptr;
-            if (!vflip) tile_ptr = tile_no + (row / 8) * (ow / 8);
-            else tile_ptr = tile_no + ((oh - 1 - row) / 8) * (ow / 8);
-            if (hflip) tile_ptr += (ow / 8) - 1;
-            for (int x = ox; x < ox + ow; x += 8) {
-                uint32_t tile_address = 0x10000 + tile_ptr * (colors_256 ? 64 : 32);
-                if (!mode_bitmap || tile_ptr >= 512) {
-                    gba_draw_tile(tile_address, x, y, 0, row, hflip, vflip, palette_no, colors_256, true);
-                }
-                if (!hflip) tile_ptr++;
-                else tile_ptr--;
+        int row_vflip = oh - 1 - row;
+        int tile_ptr = tile_no + ((vflip ? row_vflip : row) / 8) * (obj_1d ? (ow / 8) : 32);
+        if (hflip) tile_ptr += (ow / 8) - 1;
+        tile_ptr &= 0x3ff;
+        for (int x = ox; x < ox + ow; x += 8) {
+            uint32_t tile_address = 0x10000 + tile_ptr * (colors_256 ? 64 : 32);
+            if (!mode_bitmap || tile_ptr >= 512) {
+                gba_draw_tile(tile_address, x, y, 0, row, hflip, vflip, palette_no, colors_256, true);
             }
-        } else {
-            for (int x = ox; x < ox + ow; x += 8) {
-                uint32_t tile_address = 0x10000 + tile_no * (colors_256 ? 64 : 32);
-                if (!mode_bitmap || tile_no >= 512) {
-                    gba_draw_tile(tile_address, x, y, 0, row, hflip, vflip, palette_no, colors_256, true);
-                }
-            }
+            if (!hflip) tile_ptr++;
+            else tile_ptr--;
+            tile_ptr &= 0x3ff;
         }
     }
 }
