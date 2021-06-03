@@ -65,6 +65,21 @@ uint32_t screen_texture;
 uint32_t screen_pixels[SCREEN_HEIGHT][SCREEN_WIDTH];
 int screen_scale = 3;
 
+typedef struct {
+    int left;
+    int top;
+    int right;
+    int bottom;
+} window_t;
+
+window_t win0, win1;
+
+bool is_point_in_window(int x, int y, window_t win) {
+    bool x_ok = ((win.left < win.right) ? (x >= win.left && x < win.right) : (x >= win.left || x < win.right));
+    bool y_ok = ((win.top < win.bottom) ? (y >= win.top && y < win.bottom) : (y >= win.top || y < win.bottom));
+    return (x_ok && y_ok);
+}
+
 #define NUM_KEYS 10
 
 bool keys[NUM_KEYS];
@@ -2019,12 +2034,32 @@ void gba_draw_blank(int y) {
     }
 }
 
-void gba_draw_pixel_culled(int x, int y, uint32_t pixel) {
+void gba_draw_pixel_culled(int bg, int x, int y, uint32_t pixel) {
     if (x < 0 || x >= SCREEN_WIDTH) return;
+
+    bool enable_win0 = (ioreg.io_dispcnt & DCNT_WIN0) != 0;
+    bool enable_win1 = (ioreg.io_dispcnt & DCNT_WIN1) != 0;
+    bool enable_winobj = (ioreg.io_dispcnt & DCNT_WINOBJ) != 0;
+    bool enable_winout = (enable_win0 || enable_win1 || enable_winobj);
+
+    bool inside_win0 = (enable_win0 && is_point_in_window(x, y, win0));
+    bool inside_win1 = (enable_win1 && is_point_in_window(x, y, win1));
+    bool inside_winobj = false;
+
+    if (inside_win0) {
+        if ((ioreg.io_winin & (1 << bg)) == 0) return;
+    } else if (inside_win1) {
+        if ((ioreg.io_winin & (1 << (8 + bg))) == 0) return;
+    } else if (inside_winobj) {
+        // FIXME
+    } else if (enable_winout) {
+        if ((ioreg.io_winout & (1 << bg)) == 0) return;
+    }
+
     screen_pixels[y][x] = rgb555(pixel);
 }
 
-void gba_draw_tile(uint32_t tile_address, int x, int y, uint32_t hofs, uint32_t vofs, bool hflip, bool vflip, uint16_t palette_no, bool colors_256, bool is_obj) {
+void gba_draw_tile(int bg, uint32_t tile_address, int x, int y, uint32_t hofs, uint32_t vofs, bool hflip, bool vflip, uint16_t palette_no, bool colors_256, bool is_obj) {
     uint32_t xh = (is_obj ? x : x - (hofs % 8));
     uint32_t yv = (is_obj ? vofs : y + (vofs % 8));
     uint32_t palette_offset = (is_obj ? 0x200 : 0);
@@ -2036,7 +2071,7 @@ void gba_draw_tile(uint32_t tile_address, int x, int y, uint32_t hofs, uint32_t 
             uint8_t pixel_index = tile[tile_offset];
             if (pixel_index != 0) {
                 uint16_t pixel = *(uint16_t *)&palette_ram[palette_offset + pixel_index * 2];
-                gba_draw_pixel_culled(xh + i, y, pixel);
+                gba_draw_pixel_culled(bg, xh + i, y, pixel);
             }
         }
     } else {
@@ -2047,11 +2082,11 @@ void gba_draw_tile(uint32_t tile_address, int x, int y, uint32_t hofs, uint32_t 
             uint8_t pixel_index_1 = (pixel_indexes >> (hflip ? 0 : 4)) & 0xf;
             if (pixel_index_0 != 0) {
                 uint16_t pixel_0 = *(uint16_t *)&palette_ram[palette_offset + palette_no * 32 + pixel_index_0 * 2];
-                gba_draw_pixel_culled(xh + i, y, pixel_0);
+                gba_draw_pixel_culled(bg, xh + i, y, pixel_0);
             }
             if (pixel_index_1 != 0) {
                 uint16_t pixel_1 = *(uint16_t *)&palette_ram[palette_offset + palette_no * 32 + pixel_index_1 * 2];
-                gba_draw_pixel_culled(xh + i + 1, y, pixel_1);
+                gba_draw_pixel_culled(bg, xh + i + 1, y, pixel_1);
             }
         }
     }
@@ -2124,7 +2159,7 @@ void gba_draw_obj(uint32_t mode, int pri, int y) {
         for (int x = ox; x < ox + ow; x += 8) {
             uint32_t tile_address = 0x10000 + tile_ptr * (colors_256 ? 64 : 32);
             if (!mode_bitmap || tile_ptr >= 512) {
-                gba_draw_tile(tile_address, x, y, 0, row, hflip, vflip, palette_no, colors_256, true);
+                gba_draw_tile(4, tile_address, x, y, 0, row, hflip, vflip, palette_no, colors_256, true);
             }
             if (!hflip) tile_ptr++;
             else tile_ptr--;
@@ -2159,7 +2194,6 @@ void gba_draw_bitmap(uint32_t mode, int y) {
 
 void gba_draw_tiled_bg(uint32_t mode, int bg, int y, uint32_t bgcnt, uint32_t hofs, uint32_t vofs) {
     UNUSED(mode);  // FIXME
-    UNUSED(bg);  // FIXME
 
     uint32_t tile_base = ((bgcnt >> 2) & 3) * 16384;
     uint32_t map_base = ((bgcnt >> 8) & 0x1f) * 2048;
@@ -2182,15 +2216,15 @@ void gba_draw_tiled_bg(uint32_t mode, int bg, int y, uint32_t bgcnt, uint32_t ho
 
         uint32_t tile_address = tile_base + tile_no * (colors_256 ? 64 : 32);
         if (tile_address >= 0x10000) continue;
-        gba_draw_tile(tile_address, x, y, hofs, vofs, hflip, vflip, palette_no, colors_256, false);
+        gba_draw_tile(bg, tile_address, x, y, hofs, vofs, hflip, vflip, palette_no, colors_256, false);
     }
 }
 
 void gba_draw_tiled(uint32_t mode, int y) {
     for (int pri = 3; pri >= 0; pri--) {
         for (int bg = 3; bg >= 0; bg--) {
-            bool visible = (ioreg.io_dispcnt & (1 << (8 + bg))) != 0;
-            if (!visible) continue;
+            bool bg_visible = (ioreg.io_dispcnt & (1 << (8 + bg))) != 0;
+            if (!bg_visible) continue;
             uint16_t bgcnt = io_read_halfword(REG_BG0CNT + 2 * bg);
             uint16_t priority = bgcnt & 3;
             if (priority != pri) continue;
@@ -2204,11 +2238,22 @@ void gba_draw_tiled(uint32_t mode, int y) {
             }
             gba_draw_tiled_bg(mode, bg, y, bgcnt, hofs, vofs);
         }
+        bool obj_visible = (ioreg.io_dispcnt & DCNT_OBJ) != 0;
+        if (!obj_visible) continue;
         gba_draw_obj(mode, pri, y);
     }
 }
 
 void gba_draw_scanline(void) {
+    win0.right = (uint8_t) ioreg.io_win0h;
+    win0.left = (uint8_t)(ioreg.io_win0h >> 8);
+    win0.bottom = (uint8_t) ioreg.io_win0v;
+    win0.top = (uint8_t)(ioreg.io_win0v >> 8);
+    win1.right = (uint8_t) ioreg.io_win1h;
+    win1.left = (uint8_t)(ioreg.io_win1h >> 8);
+    win1.bottom = (uint8_t) ioreg.io_win1v;
+    win1.top = (uint8_t)(ioreg.io_win1v >> 8);
+
     gba_draw_blank(ioreg.io_vcount);  // FIXME forced blank
 
     uint32_t mode = ioreg.io_dispcnt & 7;
