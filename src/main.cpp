@@ -2167,11 +2167,13 @@ void gba_draw_tiled_bg(uint32_t mode, int bg, int y, uint32_t bgcnt, uint32_t ho
     bool colors_256 = (bgcnt & (1 << 7)) != 0;
 
     uint32_t yv = y + (vofs % 8);
+    uint32_t x_quad = 32 * 32;
+    uint32_t y_quad = 32 * 32 * (screen_size == 3 ? 2 : 1);
 
     for (int x = 0; x < 31 * 8; x += 8) {
         uint32_t map_x = (x / 8 + hofs / 8) % (screen_size & 1 ? 64 : 32);
         uint32_t map_y = (yv / 8 + vofs / 8) % (screen_size & 2 ? 64 : 32);
-        uint32_t map_index = (map_y / 32) * (32*32*2) + (map_x / 32) * (32*32) + (map_y % 32) * 32 + (map_x % 32);
+        uint32_t map_index = (map_y / 32) * y_quad + (map_x / 32) * x_quad + (map_y % 32) * 32 + (map_x % 32);
         uint16_t info = *(uint16_t *)&video_ram[map_base + map_index * 2];
         uint16_t tile_no = info & 0x3ff;
         bool hflip = (info & (1 << 10)) != 0;
@@ -2734,6 +2736,10 @@ int main(int argc, char **argv) {
         ImGui::Checkbox("Has SRAM", &has_sram);
         ImGui::Checkbox("Skip BIOS", &skip_bios);
         ImGui::Checkbox("Paused", &paused);
+        ImGui::Text("R13: %08X", r[13]);
+        ImGui::Text("R14: %08X", r[14]);
+        ImGui::Text("R15: %08X", r[15] - 2 * SIZEOF_INSTR);
+        ImGui::Text("T: %d", FLAG_T());
         if (ImGui::Button("Reset")) {
             gba_reset(true);
         }
