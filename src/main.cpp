@@ -2318,7 +2318,7 @@ void gba_ppu_update(void) {
             ioreg.io_dispstat &= ~DSTAT_IN_VCT;
         }
     }
-    if (ppu_cycles % 1232 == 960) {
+    if (ioreg.io_vcount < 160 && ppu_cycles % 1232 == 960) {
         if ((ioreg.io_dispstat & DSTAT_IN_HBL) == 0) {
             ioreg.io_dispstat |= DSTAT_IN_HBL;
             if ((ioreg.io_dispstat & DSTAT_HBL_IRQ) != 0 && ioreg.io_ime == 1 && (ioreg.io_ie & INT_HBLANK) != 0) {
@@ -2414,7 +2414,7 @@ void gba_dma_update(void) {
         if (count == 0) count = (ch == 3 ? 0x10000 : 0x4000);
 
         if (start_timing == DMA_AT_VBLANK && ioreg.io_vcount != 160) continue;
-        if (start_timing == DMA_AT_HBLANK && ppu_cycles % 1232 != 960) continue;
+        if (start_timing == DMA_AT_HBLANK && (ioreg.io_vcount >= 160 || ppu_cycles % 1232 != 960)) continue;
         //dma_active = ch;
         //dma_special = false;
         if (start_timing == DMA_AT_REFRESH) {
