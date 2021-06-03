@@ -75,8 +75,20 @@ typedef struct {
 window_t win0, win1;
 
 bool is_point_in_window(int x, int y, window_t win) {
-    bool x_ok = ((win.left < win.right) ? (x >= win.left && x < win.right) : (x >= win.left || x < win.right));
-    bool y_ok = ((win.top < win.bottom) ? (y >= win.top && y < win.bottom) : (y >= win.top || y < win.bottom));
+    bool x_ok = false;
+    bool y_ok = false;
+
+    if (win.left < win.right) {
+        x_ok = (x >= win.left && x < win.right);
+    } else if (win.left > win.right) {
+        x_ok = (x >= win.left || x < win.right);
+    }
+    if (win.top < win.bottom) {
+        y_ok = (y >= win.top && y < win.bottom);
+    } else if (win.top > win.bottom) {
+        y_ok = (y >= win.top || y < win.bottom);
+    }
+
     return (x_ok && y_ok);
 }
 
@@ -2044,14 +2056,14 @@ void gba_draw_pixel_culled(int bg, int x, int y, uint32_t pixel) {
 
     bool inside_win0 = (enable_win0 && is_point_in_window(x, y, win0));
     bool inside_win1 = (enable_win1 && is_point_in_window(x, y, win1));
-    bool inside_winobj = false;
+    bool inside_winobj = false;  // FIXME
 
     if (inside_win0) {
         if ((ioreg.io_winin & (1 << bg)) == 0) return;
     } else if (inside_win1) {
         if ((ioreg.io_winin & (1 << (8 + bg))) == 0) return;
     } else if (inside_winobj) {
-        // FIXME
+        if ((ioreg.io_winout & (1 << (8 + bg))) == 0) return;
     } else if (enable_winout) {
         if ((ioreg.io_winout & (1 << bg)) == 0) return;
     }
