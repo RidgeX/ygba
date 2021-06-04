@@ -105,6 +105,7 @@ uint8_t object_ram[0x400];
 uint8_t game_rom[0x2000000];
 uint32_t game_rom_size;
 uint32_t game_rom_mask;
+uint8_t backup_eeprom[0x2000];
 uint8_t backup_flash[0x20000];
 uint8_t backup_sram[0x10000];
 
@@ -1572,6 +1573,14 @@ void io_write_word(uint32_t address, uint32_t value) {
 #define DEVICE_MX29L512        0x1c  // 512 Kbit
 #define DEVICE_MX29L010        0x09  // 1 Mbit
 
+uint32_t eeprom_addr = 0;
+uint64_t eeprom_rbits = 0;
+uint32_t eeprom_num_rbits = 0;
+uint64_t eeprom_wbits = 0;
+uint32_t eeprom_num_wbits = 0;
+uint32_t eeprom_state = 0;
+uint32_t eeprom_width = 0;
+
 uint32_t flash_bank = 0;
 uint32_t flash_state = 0;
 bool flash_id = false;
@@ -1579,10 +1588,7 @@ uint8_t flash_manufacturer = 0;
 uint8_t flash_device = 0;
 
 uint8_t backup_read_byte(uint32_t address) {
-    //printf("backup_read_byte(0x%08x);\n", address);  // FIXME
-    if (has_eeprom) {
-        assert(false);
-    } else if (has_flash) {
+    if (has_flash) {
         flash_state &= ~7;
         if (flash_id) {
             if (address == 0) return flash_manufacturer;
@@ -1597,14 +1603,11 @@ uint8_t backup_read_byte(uint32_t address) {
 #ifdef LOG_BAD_MEMORY_ACCESS
     printf("backup_read_byte(0x%08x);\n", address);
 #endif
-    return 0xff;  // FIXME? 0
+    return 0xff;
 }
 
 void backup_write_byte(uint32_t address, uint8_t value) {
-    //printf("backup_write_byte(%08X, %02X);\n", address, value);  // FIXME
-    if (has_eeprom) {
-        assert(false);
-    } else if (has_flash) {
+    if (has_flash) {
         switch (flash_state) {
             case 0:
             case 4:
@@ -1667,7 +1670,7 @@ void backup_write_byte(uint32_t address, uint8_t value) {
                 break;
 
             default:
-                abort();
+                assert(false);
         }
         return;
     } else if (has_sram) {
@@ -1695,6 +1698,85 @@ uint32_t backup_read_word(uint32_t address) {
 
 void backup_write_word(uint32_t address, uint32_t value) {
     backup_write_byte(address, (uint8_t)(value >> 8 * (address & 3)));
+}
+
+uint16_t eeprom_read_bit(void) {
+    if (eeprom_num_rbits > 64) {
+        eeprom_num_rbits--;
+        return 1;
+    }
+    if (eeprom_num_rbits > 0) {
+        eeprom_num_rbits--;
+        return (eeprom_rbits >> eeprom_num_rbits) & 1;
+    }
+    return 1;
+}
+
+void eeprom_write_bit(uint16_t value) {
+    assert(eeprom_width != 0);
+    eeprom_wbits <<= 1;
+    eeprom_wbits |= value & 1;
+    eeprom_num_wbits++;
+    switch (eeprom_state) {
+        case 0:  // Start of stream
+            if (eeprom_num_wbits < 2) break;
+            eeprom_state = eeprom_wbits;
+            assert(eeprom_state == 2 || eeprom_state == 3);
+            eeprom_wbits = 0;
+            eeprom_num_wbits = 0;
+            break;
+
+        case 1:  // End of stream
+            eeprom_state = 0;
+            eeprom_wbits = 0;
+            eeprom_num_wbits = 0;
+            break;
+
+        case 2:  // Write request
+            if (eeprom_num_wbits < eeprom_width) break;
+            eeprom_addr = eeprom_wbits * 8;
+            eeprom_rbits = 0;
+            eeprom_num_rbits = 0;
+            eeprom_state = 4;
+            eeprom_wbits = 0;
+            eeprom_num_wbits = 0;
+            break;
+
+        case 3:  // Read request
+            if (eeprom_num_wbits < eeprom_width) break;
+            eeprom_addr = eeprom_wbits * 8;
+            eeprom_rbits = 0;
+            eeprom_num_rbits = 68;
+            for (int i = 0; i < 8; i++) {
+                uint8_t b = backup_eeprom[eeprom_addr + i];
+                for (int j = 7; j >= 0; j--) {
+                    eeprom_rbits <<= 1;
+                    eeprom_rbits |= (b >> j) & 1;
+                }
+            }
+            eeprom_state = 1;
+            eeprom_wbits = 0;
+            eeprom_num_wbits = 0;
+            break;
+
+        case 4:  // Data
+            if (eeprom_num_wbits < 64) break;
+            for (int i = 0; i < 8; i++) {
+                uint8_t b = 0;
+                for (int j = 7; j >= 0; j--) {
+                    b <<= 1;
+                    b |= (eeprom_wbits >> ((7 - i) * 8 + j)) & 1;
+                }
+                backup_eeprom[eeprom_addr + i] = b;
+            }
+            eeprom_state = 1;
+            eeprom_wbits = 0;
+            eeprom_num_wbits = 0;
+            break;
+
+        default:
+            assert(false);
+    }
 }
 
 uint8_t memory_read_byte(uint32_t address) {
@@ -1802,6 +1884,9 @@ uint16_t memory_read_halfword(uint32_t address) {
         return *(uint16_t *)&object_ram[address & 0x3fe];
     }
     if (address >= 0x08000000 && address < 0x0e000000) {
+        if (has_eeprom && game_rom_size <= 0x1000000 && address >= 0x0d000000) {
+            return eeprom_read_bit();
+        }
         return *(uint16_t *)&game_rom[address & (game_rom_mask & ~1)];
     }
     if (address >= 0x0e000000 && address < 0x10000000) {
@@ -1844,6 +1929,9 @@ void memory_write_halfword(uint32_t address, uint16_t value) {
         return;
     }
     if (address >= 0x08000000 && address < 0x0e000000) {
+        if (has_eeprom && game_rom_size <= 0x1000000 && address >= 0x0d000000) {
+            eeprom_write_bit(value);
+        }
         //return;  // Read only
     }
     if (address >= 0x0e000000 && address < 0x10000000) {
@@ -1968,12 +2056,6 @@ void gba_detect_cartridge_features(void) {
     uint8_t *sram_f_v = (uint8_t *) "SRAM_F_V";
     match = boyer_moore_matcher(game_rom, game_rom_size, sram_f_v, 8);
     if (match) { has_sram = true; }
-
-    /*
-    printf("has_eeprom = %s\n", (has_eeprom ? "true" : "false"));
-    printf("has_flash = %s\n", (has_flash ? "true" : "false"));
-    printf("has_sram = %s\n", (has_sram ? "true" : "false"));
-    */
 }
 
 void gba_reset(bool keep_backup) {
@@ -1984,6 +2066,7 @@ void gba_reset(bool keep_backup) {
     memset(video_ram, 0, sizeof(uint8_t) * sizeof(video_ram));
     memset(object_ram, 0, sizeof(uint8_t) * sizeof(object_ram));
     if (!keep_backup) {
+        memset(backup_eeprom, 0xff, sizeof(uint8_t) * sizeof(backup_eeprom));
         memset(backup_flash, 0xff, sizeof(uint8_t) * sizeof(backup_flash));
         memset(backup_sram, 0xff, sizeof(uint8_t) * sizeof(backup_sram));
     }
@@ -2441,6 +2524,15 @@ void gba_dma_update(void) {
         assert(src_ctrl != DMA_RELOAD);
         assert((dmacnt & DMA_DRQ) == 0);
 
+        // EEPROM size autodetect
+        if (game_rom_size <= 0x1000000 && *dst_addr >= 0x0d000000 && *dst_addr < 0x0e000000) {
+            if (count == 9 || count == 73) {
+                eeprom_width = 6;
+            } else if (count == 17 || count == 81) {
+                eeprom_width = 14;
+            }
+        }
+
         uint32_t dst_addr_initial = *dst_addr;
 
         if (transfer_word) {
@@ -2803,6 +2895,9 @@ int main(int argc, char **argv) {
         if (ImGui::Button("Load")) {
             FILE *fp = fopen("save.bin", "rb");
             assert(fp != NULL);
+            if (has_eeprom) {
+                fread(backup_eeprom, sizeof(uint8_t), sizeof(backup_eeprom), fp);
+            }
             if (has_flash) {
                 fread(backup_flash, sizeof(uint8_t), sizeof(backup_flash), fp);
             }
@@ -2815,6 +2910,9 @@ int main(int argc, char **argv) {
         if (ImGui::Button("Save")) {
             FILE *fp = fopen("save.bin", "wb");
             assert(fp != NULL);
+            if (has_eeprom) {
+                fwrite(backup_eeprom, sizeof(uint8_t), sizeof(backup_eeprom), fp);
+            }
             if (has_flash) {
                 fwrite(backup_flash, sizeof(uint8_t), sizeof(backup_flash), fp);
             }
