@@ -92,6 +92,12 @@ bool is_point_in_window(int x, int y, window_t win) {
     return (x_ok && y_ok);
 }
 
+double fixed24p8_to_double(uint32_t x) {
+    double result = (x >> 8) + ((x & 0xff) / 256.0);
+    if (result > 524288.0) result -= 1048576.0;
+    return result;
+}
+
 uint8_t system_rom[0x4000];
 uint8_t cpu_ewram[0x40000];
 uint8_t cpu_iwram[0x8000];
@@ -746,11 +752,11 @@ void io_write_byte(uint32_t address, uint8_t value) {
         case REG_BG2X_L + 0: ioreg.io_bg2x = (ioreg.io_bg2x & 0xffffff00) | ((value << 0) & 0x000000ff); break;
         case REG_BG2X_L + 1: ioreg.io_bg2x = (ioreg.io_bg2x & 0xffff00ff) | ((value << 8) & 0x0000ff00); break;
         case REG_BG2X_H + 0: ioreg.io_bg2x = (ioreg.io_bg2x & 0xff00ffff) | ((value << 16) & 0x00ff0000); break;
-        case REG_BG2X_H + 1: ioreg.io_bg2x = (ioreg.io_bg2x & 0x00ffffff) | ((value << 24) & 0xff000000); break;
+        case REG_BG2X_H + 1: ioreg.io_bg2x = (ioreg.io_bg2x & 0x00ffffff) | ((value << 24) & 0x0f000000); break;
         case REG_BG2Y_L + 0: ioreg.io_bg2y = (ioreg.io_bg2y & 0xffffff00) | ((value << 0) & 0x000000ff); break;
         case REG_BG2Y_L + 1: ioreg.io_bg2y = (ioreg.io_bg2y & 0xffff00ff) | ((value << 8) & 0x0000ff00); break;
         case REG_BG2Y_H + 0: ioreg.io_bg2y = (ioreg.io_bg2y & 0xff00ffff) | ((value << 16) & 0x00ff0000); break;
-        case REG_BG2Y_H + 1: ioreg.io_bg2y = (ioreg.io_bg2y & 0x00ffffff) | ((value << 24) & 0xff000000); break;
+        case REG_BG2Y_H + 1: ioreg.io_bg2y = (ioreg.io_bg2y & 0x00ffffff) | ((value << 24) & 0x0f000000); break;
         case REG_BG3PA + 0: ioreg.io_bg3pa = (ioreg.io_bg3pa & 0xff00) | ((value << 0) & 0x00ff); break;
         case REG_BG3PA + 1: ioreg.io_bg3pa = (ioreg.io_bg3pa & 0x00ff) | ((value << 8) & 0xff00); break;
         case REG_BG3PB + 0: ioreg.io_bg3pb = (ioreg.io_bg3pb & 0xff00) | ((value << 0) & 0x00ff); break;
@@ -762,11 +768,11 @@ void io_write_byte(uint32_t address, uint8_t value) {
         case REG_BG3X_L + 0: ioreg.io_bg3x = (ioreg.io_bg3x & 0xffffff00) | ((value << 0) & 0x000000ff); break;
         case REG_BG3X_L + 1: ioreg.io_bg3x = (ioreg.io_bg3x & 0xffff00ff) | ((value << 8) & 0x0000ff00); break;
         case REG_BG3X_H + 0: ioreg.io_bg3x = (ioreg.io_bg3x & 0xff00ffff) | ((value << 16) & 0x00ff0000); break;
-        case REG_BG3X_H + 1: ioreg.io_bg3x = (ioreg.io_bg3x & 0x00ffffff) | ((value << 24) & 0xff000000); break;
+        case REG_BG3X_H + 1: ioreg.io_bg3x = (ioreg.io_bg3x & 0x00ffffff) | ((value << 24) & 0x0f000000); break;
         case REG_BG3Y_L + 0: ioreg.io_bg3y = (ioreg.io_bg3y & 0xffffff00) | ((value << 0) & 0x000000ff); break;
         case REG_BG3Y_L + 1: ioreg.io_bg3y = (ioreg.io_bg3y & 0xffff00ff) | ((value << 8) & 0x0000ff00); break;
         case REG_BG3Y_H + 0: ioreg.io_bg3y = (ioreg.io_bg3y & 0xff00ffff) | ((value << 16) & 0x00ff0000); break;
-        case REG_BG3Y_H + 1: ioreg.io_bg3y = (ioreg.io_bg3y & 0x00ffffff) | ((value << 24) & 0xff000000); break;
+        case REG_BG3Y_H + 1: ioreg.io_bg3y = (ioreg.io_bg3y & 0x00ffffff) | ((value << 24) & 0x0f000000); break;
         case REG_WIN0H + 0: ioreg.io_win0h = (ioreg.io_win0h & 0xff00) | ((value << 0) & 0x00ff); break;
         case REG_WIN0H + 1: ioreg.io_win0h = (ioreg.io_win0h & 0x00ff) | ((value << 8) & 0xff00); break;
         case REG_WIN1H + 0: ioreg.io_win1h = (ioreg.io_win1h & 0xff00) | ((value << 0) & 0x00ff); break;
@@ -1179,17 +1185,17 @@ void io_write_halfword(uint32_t address, uint16_t value) {
         case REG_BG2PC: ioreg.io_bg2pc = value & 0xffff; break;
         case REG_BG2PD: ioreg.io_bg2pd = value & 0xffff; break;
         case REG_BG2X_L: ioreg.io_bg2x = (ioreg.io_bg2x & 0xffff0000) | ((value << 0) & 0x0000ffff); break;
-        case REG_BG2X_H: ioreg.io_bg2x = (ioreg.io_bg2x & 0x0000ffff) | ((value << 16) & 0xffff0000); break;
+        case REG_BG2X_H: ioreg.io_bg2x = (ioreg.io_bg2x & 0x0000ffff) | ((value << 16) & 0x0fff0000); break;
         case REG_BG2Y_L: ioreg.io_bg2y = (ioreg.io_bg2y & 0xffff0000) | ((value << 0) & 0x0000ffff); break;
-        case REG_BG2Y_H: ioreg.io_bg2y = (ioreg.io_bg2y & 0x0000ffff) | ((value << 16) & 0xffff0000); break;
+        case REG_BG2Y_H: ioreg.io_bg2y = (ioreg.io_bg2y & 0x0000ffff) | ((value << 16) & 0x0fff0000); break;
         case REG_BG3PA: ioreg.io_bg3pa = value & 0xffff; break;
         case REG_BG3PB: ioreg.io_bg3pb = value & 0xffff; break;
         case REG_BG3PC: ioreg.io_bg3pc = value & 0xffff; break;
         case REG_BG3PD: ioreg.io_bg3pd = value & 0xffff; break;
         case REG_BG3X_L: ioreg.io_bg3x = (ioreg.io_bg3x & 0xffff0000) | ((value << 0) & 0x0000ffff); break;
-        case REG_BG3X_H: ioreg.io_bg3x = (ioreg.io_bg3x & 0x0000ffff) | ((value << 16) & 0xffff0000); break;
+        case REG_BG3X_H: ioreg.io_bg3x = (ioreg.io_bg3x & 0x0000ffff) | ((value << 16) & 0x0fff0000); break;
         case REG_BG3Y_L: ioreg.io_bg3y = (ioreg.io_bg3y & 0xffff0000) | ((value << 0) & 0x0000ffff); break;
-        case REG_BG3Y_H: ioreg.io_bg3y = (ioreg.io_bg3y & 0x0000ffff) | ((value << 16) & 0xffff0000); break;
+        case REG_BG3Y_H: ioreg.io_bg3y = (ioreg.io_bg3y & 0x0000ffff) | ((value << 16) & 0x0fff0000); break;
         case REG_WIN0H: ioreg.io_win0h = value & 0xffff; break;
         case REG_WIN1H: ioreg.io_win1h = value & 0xffff; break;
         case REG_WIN0V: ioreg.io_win0v = value & 0xffff; break;
@@ -1445,12 +1451,12 @@ void io_write_word(uint32_t address, uint32_t value) {
         case REG_BG3HOFS: ioreg.io_bg3hofs = value & 0x01ff; ioreg.io_bg3vofs = (value >> 16) & 0x01ff; break;
         case REG_BG2PA: ioreg.io_bg2pa = value & 0xffff; ioreg.io_bg2pb = (value >> 16) & 0xffff; break;
         case REG_BG2PC: ioreg.io_bg2pc = value & 0xffff; ioreg.io_bg2pd = (value >> 16) & 0xffff; break;
-        case REG_BG2X_L: ioreg.io_bg2x = value & 0xffffffff; break;
-        case REG_BG2Y_L: ioreg.io_bg2y = value & 0xffffffff; break;
+        case REG_BG2X_L: ioreg.io_bg2x = value & 0x0fffffff; break;
+        case REG_BG2Y_L: ioreg.io_bg2y = value & 0x0fffffff; break;
         case REG_BG3PA: ioreg.io_bg3pa = value & 0xffff; ioreg.io_bg3pb = (value >> 16) & 0xffff; break;
         case REG_BG3PC: ioreg.io_bg3pc = value & 0xffff; ioreg.io_bg3pd = (value >> 16) & 0xffff; break;
-        case REG_BG3X_L: ioreg.io_bg3x = value & 0xffffffff; break;
-        case REG_BG3Y_L: ioreg.io_bg3y = value & 0xffffffff; break;
+        case REG_BG3X_L: ioreg.io_bg3x = value & 0x0fffffff; break;
+        case REG_BG3Y_L: ioreg.io_bg3y = value & 0x0fffffff; break;
         case REG_WIN0H: ioreg.io_win0h = value & 0xffff; ioreg.io_win1h = (value >> 16) & 0xffff; break;
         case REG_WIN0V: ioreg.io_win0v = value & 0xffff; ioreg.io_win1v = (value >> 16) & 0xffff; break;
         case REG_WININ: ioreg.io_winin = value & 0x3f3f; ioreg.io_winout = (value >> 16) & 0x3f3f; break;
@@ -2150,7 +2156,7 @@ void gba_draw_pixel_culled(int bg, int x, int y, uint32_t pixel) {
     screen_pixels[y][x] = rgb555(pixel);
 }
 
-void gba_draw_tile(int bg, uint32_t tile_address, int x, int y, uint32_t hofs, uint32_t vofs, bool hflip, bool vflip, int palette_no, bool colors_256, bool is_obj) {
+void gba_draw_tile(int bg, uint32_t tile_address, int x, int y, int hofs, int vofs, bool hflip, bool vflip, int palette_no, bool colors_256, bool is_obj) {
     uint32_t xh = (is_obj ? x : x - (hofs % 8));
     uint32_t yv = (is_obj ? vofs : y + (vofs % 8));
     uint32_t palette_offset = (is_obj ? 0x200 : 0);
@@ -2283,7 +2289,10 @@ void gba_draw_bitmap(uint32_t mode, int y) {
     }
 }
 
-void gba_draw_tiled_bg(uint32_t mode, int bg, int y, uint32_t bgcnt, uint32_t hofs, uint32_t vofs) {
+void gba_draw_tiled_bg(uint32_t mode, int bg, int y, uint32_t bgcnt, int hofs, int vofs) {
+    if (mode == 1 && bg == 3) return;
+    if (mode == 2 && (bg == 0 || bg == 1)) return;
+
     uint32_t tile_base = ((bgcnt >> 2) & 3) * 16384;
     uint32_t map_base = ((bgcnt >> 8) & 0x1f) * 2048;
     bool overflow_wraps = (bgcnt & (1 << 13)) != 0;
@@ -2293,7 +2302,7 @@ void gba_draw_tiled_bg(uint32_t mode, int bg, int y, uint32_t bgcnt, uint32_t ho
     bool is_affine = ((mode == 1 && bg == 2) || (mode == 2 && (bg == 2 || bg == 3)));
     if (is_affine) colors_256 = true;
 
-    uint32_t width_in_tiles, height_in_tiles;
+    int width_in_tiles, height_in_tiles;
     if (is_affine) {
         switch (screen_size) {
             case 0: width_in_tiles = 16; height_in_tiles = 16; break;
@@ -2310,24 +2319,22 @@ void gba_draw_tiled_bg(uint32_t mode, int bg, int y, uint32_t bgcnt, uint32_t ho
         }
     }
 
-    uint32_t x_quad = 32 * 32;
-    uint32_t y_quad = 32 * 32 * (screen_size == 3 ? 2 : 1);
-
     for (int x = 0; x < 31 * 8; x += 8) {
         int tile_no;
         bool hflip, vflip;
         int palette_no;
 
         if (is_affine) {
-            hofs = 0;
-            vofs = 0;
-            uint32_t map_x = (x / 8 + hofs / 8);
-            uint32_t map_y = ((y + (vofs % 8)) / 8 + vofs / 8);
-            if (overflow_wraps) {
-                map_x %= width_in_tiles;
-                map_y %= height_in_tiles;
-            }
-            if (map_x < width_in_tiles && map_y < height_in_tiles) {
+            int aff_x = (int) fixed24p8_to_double(bg == 2 ? ioreg.io_bg2x : ioreg.io_bg3x);
+            int aff_y = (int) fixed24p8_to_double(bg == 2 ? ioreg.io_bg2y : ioreg.io_bg3y);
+            hofs = aff_x;
+            vofs = aff_y;
+            if (hofs < 0) hofs += width_in_tiles * 8;
+            if (vofs < 0) vofs += height_in_tiles * 8;
+            int map_x = ((x + hofs) / 8) % width_in_tiles;
+            int map_y = ((y + vofs) / 8) % height_in_tiles;
+            bool in_range = ((x + aff_x) >= 0 && (y + aff_y) >= 0 && (x + aff_x) < (width_in_tiles * 8) && (y + aff_y) < (height_in_tiles * 8));
+            if (overflow_wraps || in_range) {
                 uint32_t map_index = map_y * width_in_tiles + map_x;
                 uint8_t info = video_ram[map_base + map_index];
                 tile_no = info;
@@ -2338,9 +2345,11 @@ void gba_draw_tiled_bg(uint32_t mode, int bg, int y, uint32_t bgcnt, uint32_t ho
             vflip = false;
             palette_no = 0;
         } else {
-            uint32_t map_x = (x / 8 + hofs / 8) % width_in_tiles;
-            uint32_t map_y = ((y + (vofs % 8)) / 8 + vofs / 8) % height_in_tiles;
-            uint32_t map_index = (map_y / 32) * y_quad + (map_x / 32) * x_quad + (map_y % 32) * 32 + (map_x % 32);
+            int map_x = ((x + hofs) / 8) % width_in_tiles;
+            int map_y = ((y + vofs) / 8) % height_in_tiles;
+            int quad_x = 32 * 32;
+            int quad_y = 32 * 32 * (screen_size == 3 ? 2 : 1);
+            uint32_t map_index = (map_y / 32) * quad_y + (map_x / 32) * quad_x + (map_y % 32) * 32 + (map_x % 32);
             uint16_t info = *(uint16_t *)&video_ram[map_base + map_index * 2];
             tile_no = info & 0x3ff;
             hflip = (info & (1 << 10)) != 0;
@@ -2930,6 +2939,8 @@ int main(int argc, char **argv) {
         ImGui::Text("R14: %08X", r[14]);
         ImGui::Text("R15: %08X", r[15] - 2 * SIZEOF_INSTR);
         ImGui::Text("T: %d", FLAG_T());
+        ImGui::Text("BG2X: %.2lf", fixed24p8_to_double(ioreg.io_bg2x));
+        ImGui::Text("BG2Y: %.2lf", fixed24p8_to_double(ioreg.io_bg2y));
         if (ImGui::Button("Reset")) {
             gba_reset(true);
         }
