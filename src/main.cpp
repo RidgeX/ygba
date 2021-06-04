@@ -2154,7 +2154,7 @@ void gba_draw_pixel_culled(int bg, int x, int y, uint32_t pixel) {
     screen_pixels[y][x] = rgb555(pixel);
 }
 
-void gba_draw_tile(int bg, uint32_t tile_address, int x, int y, uint32_t hofs, uint32_t vofs, bool hflip, bool vflip, uint16_t palette_no, bool colors_256, bool is_obj) {
+void gba_draw_tile(int bg, uint32_t tile_address, int x, int y, uint32_t hofs, uint32_t vofs, bool hflip, bool vflip, int palette_no, bool colors_256, bool is_obj) {
     uint32_t xh = (is_obj ? x : x - (hofs % 8));
     uint32_t yv = (is_obj ? vofs : y + (vofs % 8));
     uint32_t palette_offset = (is_obj ? 0x200 : 0);
@@ -2288,27 +2288,71 @@ void gba_draw_bitmap(uint32_t mode, int y) {
 }
 
 void gba_draw_tiled_bg(uint32_t mode, int bg, int y, uint32_t bgcnt, uint32_t hofs, uint32_t vofs) {
-    UNUSED(mode);  // FIXME
-
     uint32_t tile_base = ((bgcnt >> 2) & 3) * 16384;
     uint32_t map_base = ((bgcnt >> 8) & 0x1f) * 2048;
+    bool overflow_wraps = (bgcnt & (1 << 13)) != 0;
     uint32_t screen_size = (bgcnt >> 14) & 3;
     bool colors_256 = (bgcnt & (1 << 7)) != 0;
 
-    uint32_t yv = y + (vofs % 8);
+    bool is_affine = ((mode == 1 && bg == 2) || (mode == 2 && (bg == 2 || bg == 3)));
+    if (is_affine) colors_256 = true;
+
+    uint32_t width_in_tiles, height_in_tiles;
+    if (is_affine) {
+        switch (screen_size) {
+            case 0: width_in_tiles = 16; height_in_tiles = 16; break;
+            case 1: width_in_tiles = 32; height_in_tiles = 32; break;
+            case 2: width_in_tiles = 64; height_in_tiles = 64; break;
+            case 3: width_in_tiles = 128; height_in_tiles = 128; break;
+        }
+    } else {
+        switch (screen_size) {
+            case 0: width_in_tiles = 32; height_in_tiles = 32; break;
+            case 1: width_in_tiles = 64; height_in_tiles = 32; break;
+            case 2: width_in_tiles = 32; height_in_tiles = 64; break;
+            case 3: width_in_tiles = 64; height_in_tiles = 64; break;
+        }
+    }
+
     uint32_t x_quad = 32 * 32;
     uint32_t y_quad = 32 * 32 * (screen_size == 3 ? 2 : 1);
 
     for (int x = 0; x < 31 * 8; x += 8) {
-        uint32_t map_x = (x / 8 + hofs / 8) % (screen_size & 1 ? 64 : 32);
-        uint32_t map_y = (yv / 8 + vofs / 8) % (screen_size & 2 ? 64 : 32);
-        uint32_t map_index = (map_y / 32) * y_quad + (map_x / 32) * x_quad + (map_y % 32) * 32 + (map_x % 32);
-        uint16_t info = *(uint16_t *)&video_ram[map_base + map_index * 2];
-        uint16_t tile_no = info & 0x3ff;
-        bool hflip = (info & (1 << 10)) != 0;
-        bool vflip = (info & (1 << 11)) != 0;
-        uint16_t palette_no = (info >> 12) & 0xf;
+        int tile_no;
+        bool hflip, vflip;
+        int palette_no;
 
+        if (is_affine) {
+            hofs = 0;
+            vofs = 0;
+            uint32_t map_x = (x / 8 + hofs / 8);
+            uint32_t map_y = ((y + (vofs % 8)) / 8 + vofs / 8);
+            if (overflow_wraps) {
+                map_x %= width_in_tiles;
+                map_y %= height_in_tiles;
+            }
+            if (map_x < width_in_tiles && map_y < height_in_tiles) {
+                uint32_t map_index = map_y * width_in_tiles + map_x;
+                uint8_t info = video_ram[map_base + map_index];
+                tile_no = info;
+            } else {
+                tile_no = -1;
+            }
+            hflip = false;
+            vflip = false;
+            palette_no = 0;
+        } else {
+            uint32_t map_x = (x / 8 + hofs / 8) % width_in_tiles;
+            uint32_t map_y = ((y + (vofs % 8)) / 8 + vofs / 8) % height_in_tiles;
+            uint32_t map_index = (map_y / 32) * y_quad + (map_x / 32) * x_quad + (map_y % 32) * 32 + (map_x % 32);
+            uint16_t info = *(uint16_t *)&video_ram[map_base + map_index * 2];
+            tile_no = info & 0x3ff;
+            hflip = (info & (1 << 10)) != 0;
+            vflip = (info & (1 << 11)) != 0;
+            palette_no = (info >> 12) & 0xf;
+        }
+
+        if (tile_no == -1) continue;
         uint32_t tile_address = tile_base + tile_no * (colors_256 ? 64 : 32);
         if (tile_address >= 0x10000) continue;
         gba_draw_tile(bg, tile_address, x, y, hofs, vofs, hflip, vflip, palette_no, colors_256, false);
