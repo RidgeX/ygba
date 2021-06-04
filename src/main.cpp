@@ -92,10 +92,6 @@ bool is_point_in_window(int x, int y, window_t win) {
     return (x_ok && y_ok);
 }
 
-#define NUM_KEYS 10
-
-bool keys[NUM_KEYS];
-
 uint8_t system_rom[0x4000];
 uint8_t cpu_ewram[0x40000];
 uint8_t cpu_iwram[0x8000];
@@ -2860,7 +2856,8 @@ int main(int argc, char **argv) {
         // Input
         const Uint8 *key_state = SDL_GetKeyboardState(NULL);
         done |= key_state[SDL_SCANCODE_ESCAPE];
-        memset(keys, 0, sizeof(bool) * NUM_KEYS);
+        static bool keys[10];
+        memset(keys, 0, sizeof(bool) * sizeof(keys));
         keys[0] |= key_state[SDL_SCANCODE_X];          // Button A
         keys[1] |= key_state[SDL_SCANCODE_Z];          // Button B
         keys[2] |= key_state[SDL_SCANCODE_BACKSPACE];  // Select
@@ -2886,7 +2883,7 @@ int main(int argc, char **argv) {
         if (keys[4] && keys[5]) { keys[4] = false; keys[5] = false; }  // Disallow opposing directions
         if (keys[6] && keys[7]) { keys[6] = false; keys[7] = false; }
         ioreg.io_keyinput = 0x3ff;
-        for (int i = 0; i < NUM_KEYS; i++) {
+        for (int i = 0; i < 10; i++) {
             if (keys[i]) {
                 ioreg.io_keyinput &= ~(1 << i);
             }
