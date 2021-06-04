@@ -37,14 +37,14 @@
     [x] Game ROM
     [x] I/O registers
     [ ] Open bus
-[ ] Save memory
+[x] Save memory
     [x] SRAM
     [x] Flash
-    [ ] EEPROM
+    [x] EEPROM
     [x] Save type detection
         [x] String search for library version
         [ ] Save overrides (or database)
-    [ ] Persist save game to disk
+    [ ] Persist save game to disk automatically
     [ ] Save states
 [ ] GPIO peripherals
     [ ] Real time clock
@@ -61,8 +61,10 @@
     [x] Tile mode 0 (w/ BG offsets, BG priority, transparency color, tile flipping, 32/256 color palettes)
     [ ] Tile mode 1
     [ ] Tile mode 2
-    [ ] Objects
-    [ ] Windowing
+    [x] Regular objects
+    [ ] Affine objects
+    [x] Windows 0 and 1
+    [ ] Object window
     [ ] Alpha blending
 [ ] Sound
     [ ] 8-bit signed digital sound
@@ -87,3 +89,4 @@
     [ ] Single step
     [ ] Breakpoints
 [ ] GDB remote debug protocol
+[ ] Rotate screen for vertically held gameplay
