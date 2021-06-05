@@ -273,7 +273,7 @@ uint8_t backup_sram[0x10000];
 #define REG_POSTFLG     0x300
 #define REG_HALTCNT     0x301
 
-#define FIFO_SIZE 8192
+#define FIFO_SIZE 1568
 
 struct {
     uint16_t io_dispcnt;
@@ -356,9 +356,6 @@ struct {
     uint8_t io_haltcnt;
 } ioreg;
 
-//int dma_active = -1;
-//bool dma_special = false;
-
 void gba_audio_callback(void *userdata, uint8_t *stream, int len) {
     UNUSED(userdata);
 
@@ -394,25 +391,11 @@ void gba_audio_callback(void *userdata, uint8_t *stream, int len) {
 void gba_audio_fifo_a(uint32_t sample) {
     *(uint32_t *)&ioreg.fifo_a[ioreg.fifo_a_w] = sample;
     ioreg.fifo_a_w = (ioreg.fifo_a_w + 4) % FIFO_SIZE;
-
-    /*
-    printf("%d ", dma_active);
-    printf(dma_special ? "!" : " ");
-    printf("%08x", sample);
-    printf("\n");
-    */
 }
 
 void gba_audio_fifo_b(uint32_t sample) {
     *(uint32_t *)&ioreg.fifo_b[ioreg.fifo_b_w] = sample;
     ioreg.fifo_b_w = (ioreg.fifo_b_w + 4) % FIFO_SIZE;
-
-    /*
-    printf("%d ", dma_active);
-    printf(dma_special ? "!" : " ");
-    printf("%08x", sample);
-    printf("\n");
-    */
 }
 
 SDL_AudioDeviceID gba_audio_init(void) {
@@ -421,7 +404,7 @@ SDL_AudioDeviceID gba_audio_init(void) {
     want.freq = 48000;
     want.format = AUDIO_S8;
     want.channels = 2;
-    want.samples = 8192;
+    want.samples = FIFO_SIZE;
     want.callback = gba_audio_callback;
     SDL_AudioDeviceID audio_device = SDL_OpenAudioDevice(NULL, 0, &want, NULL, 0);
     if (audio_device == 0) {
@@ -2083,8 +2066,6 @@ void gba_reset(bool keep_backup) {
     timer_cycles = 0;
     halted = false;
     last_bios_access = 0xe4;
-    //dma_active = -1;
-    //dma_special = false;
 
     if (skip_bios) {
         ioreg.io_dispcnt = 0x80;
@@ -2558,11 +2539,10 @@ void gba_dma_update(void) {
 
         if (start_timing == DMA_AT_VBLANK && !(ioreg.io_vcount == 160)) continue;
         if (start_timing == DMA_AT_HBLANK && !(ppu_cycles < 197120 && ppu_cycles % 1232 == 960)) continue;
-        //dma_active = ch;
-        //dma_special = false;
+        bool dma_special = false;
         if (start_timing == DMA_AT_REFRESH) {
             if (ch == 1 || ch == 2) {
-                //dma_special = true;
+                dma_special = true;
                 if (!(*dst_addr == 0x40000a0 || *dst_addr == 0x40000a4)) continue;
                 assert((dmacnt & DMA_REPEAT) != 0);
                 if (*dst_addr == 0x40000a0 && !ioreg.fifo_a_refill) continue;
@@ -2597,11 +2577,15 @@ void gba_dma_update(void) {
         } else {
             gba_dma_transfer_halfwords(dst_ctrl, src_ctrl, dst_addr, src_addr, count);
         }
-        //dma_active = -1;
-        //dma_special = false;
 
         if (dst_ctrl == DMA_RELOAD) {
             *dst_addr = dst_addr_initial;
+        }
+
+        if (dma_special) {  // FIXME hack
+            // Pokemon Emerald
+            //if (*dst_addr == 0x040000a0 && *src_addr >= 0x3006cf0) *src_addr = 0x30066d0;
+            //if (*dst_addr == 0x040000a4 && *src_addr >= 0x3007320) *src_addr = 0x3006d00;
         }
 
         if ((dmacnt & DMA_IRQ) != 0) {
@@ -2723,7 +2707,7 @@ int main(int argc, char **argv) {
     }
     SDL_GLContext gl_context = SDL_GL_CreateContext(window);
     SDL_GL_MakeCurrent(window, gl_context);
-    SDL_GL_SetSwapInterval(1);  // Enable vsync
+    SDL_GL_SetSwapInterval(0);  // Enable vsync
 
     // Enable drag and drop
     SDL_EventState(SDL_DROPFILE, SDL_ENABLE);
@@ -2947,8 +2931,12 @@ int main(int argc, char **argv) {
         ImGui::Text("R14: %08X", r[14]);
         ImGui::Text("R15: %08X", r[15] - 2 * SIZEOF_INSTR);
         ImGui::Text("T: %d", FLAG_T());
-        ImGui::Text("BG2X: %.2lf", fixed24p8_to_double(ioreg.io_bg2x));
-        ImGui::Text("BG2Y: %.2lf", fixed24p8_to_double(ioreg.io_bg2y));
+        ImGui::Text("DMA1SAD: %08X", ioreg.io_dma1sad);
+        ImGui::Text("DMA2SAD: %08X", ioreg.io_dma2sad);
+        ImGui::Text("fifo_a_r: %d", ioreg.fifo_a_r);
+        ImGui::Text("fifo_a_w: %d", ioreg.fifo_a_w);
+        ImGui::Text("fifo_b_r: %d", ioreg.fifo_b_r);
+        ImGui::Text("fifo_b_w: %d", ioreg.fifo_b_w);
         if (ImGui::Button("Reset")) {
             gba_reset(true);
         }
