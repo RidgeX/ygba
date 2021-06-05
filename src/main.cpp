@@ -273,6 +273,8 @@ uint8_t backup_sram[0x10000];
 #define REG_POSTFLG     0x300
 #define REG_HALTCNT     0x301
 
+#define FIFO_SIZE 8192
+
 struct {
     uint16_t io_dispcnt;
     uint16_t io_dispstat;
@@ -321,8 +323,8 @@ struct {
     uint32_t io_wave_ram1;  // 32
     uint32_t io_wave_ram2;  // 32
     uint32_t io_wave_ram3;  // 32
-    //uint8_t fifo_a[32];
-    //uint8_t fifo_b[32];
+    uint8_t fifo_a[FIFO_SIZE];
+    uint8_t fifo_b[FIFO_SIZE];
     uint32_t io_dma0sad;  // 32
     uint32_t io_dma0dad;  // 32
     uint16_t io_dma0cnt_l, io_dma0cnt_h;
@@ -336,8 +338,8 @@ struct {
     uint32_t io_dma3dad;  // 32
     uint16_t io_dma3cnt_l, io_dma3cnt_h;
 
-    //int fifo_a_r, fifo_b_r;
-    //int fifo_a_w, fifo_b_w;
+    int fifo_a_r, fifo_b_r;
+    int fifo_a_w, fifo_b_w;
     bool fifo_a_refill, fifo_b_refill;
     uint16_t timer_0_counter, timer_0_reload, timer_0_control;
     uint16_t timer_1_counter, timer_1_reload, timer_1_control;
@@ -359,29 +361,40 @@ struct {
 
 void gba_audio_callback(void *userdata, uint8_t *stream, int len) {
     UNUSED(userdata);
-    UNUSED(stream);
-    UNUSED(len);
 
-    /*
-    assert(len == 32);
+    static int hold_amount = 4;
+    static int a_hold = 0;
+    static int b_hold = 0;
+
     for (int i = 0; i < len; i += 2) {
-        stream[i] = ioreg.fifo_a[ioreg.fifo_a_r];
-        stream[i + 1] = ioreg.fifo_b[ioreg.fifo_b_r];
-        ioreg.fifo_a_r = (ioreg.fifo_a_r + 1) % 32;
-        ioreg.fifo_b_r = (ioreg.fifo_b_r + 1) % 32;
+        uint16_t a_control = ((ioreg.io_soundcnt_h & (1 << 10)) != 0 ? ioreg.timer_1_control : ioreg.timer_0_control);
+        if (a_control & (1 << 7)) {
+            stream[i] = ioreg.fifo_a[ioreg.fifo_a_r];
+            a_hold = (a_hold + 1) % hold_amount;
+            if (a_hold == 0) {
+                ioreg.fifo_a_r = (ioreg.fifo_a_r + 1) % FIFO_SIZE;
+            }
+        } else {
+            stream[i] = 0;
+        }
+
+        uint16_t b_control = ((ioreg.io_soundcnt_h & (1 << 14)) != 0 ? ioreg.timer_1_control : ioreg.timer_0_control);
+        if (b_control & (1 << 7)) {
+            stream[i + 1] = ioreg.fifo_b[ioreg.fifo_b_r];
+            b_hold = (b_hold + 1) % hold_amount;
+            if (b_hold == 0) {
+                ioreg.fifo_b_r = (ioreg.fifo_b_r + 1) % FIFO_SIZE;
+            }
+        } else {
+            stream[i + 1] = 0;
+        }
     }
-    ioreg.fifo_a_refill = true;
-    ioreg.fifo_b_refill = true;
-    */
 }
 
 void gba_audio_fifo_a(uint32_t sample) {
-    UNUSED(sample);
+    *(uint32_t *)&ioreg.fifo_a[ioreg.fifo_a_w] = sample;
+    ioreg.fifo_a_w = (ioreg.fifo_a_w + 4) % FIFO_SIZE;
 
-    /*
-    *(uint32_t*)&ioreg.fifo_a[ioreg.fifo_a_w] = sample;
-    ioreg.fifo_a_w = (ioreg.fifo_a_w + 4) % 32;
-    */
     /*
     printf("%d ", dma_active);
     printf(dma_special ? "!" : " ");
@@ -391,12 +404,9 @@ void gba_audio_fifo_a(uint32_t sample) {
 }
 
 void gba_audio_fifo_b(uint32_t sample) {
-    UNUSED(sample);
+    *(uint32_t *)&ioreg.fifo_b[ioreg.fifo_b_w] = sample;
+    ioreg.fifo_b_w = (ioreg.fifo_b_w + 4) % FIFO_SIZE;
 
-    /*
-    *(uint32_t*)&ioreg.fifo_b[ioreg.fifo_b_w] = sample;
-    ioreg.fifo_b_w = (ioreg.fifo_b_w + 4) % 32;
-    */
     /*
     printf("%d ", dma_active);
     printf(dma_special ? "!" : " ");
@@ -406,23 +416,20 @@ void gba_audio_fifo_b(uint32_t sample) {
 }
 
 SDL_AudioDeviceID gba_audio_init(void) {
-    /*
     SDL_AudioSpec want;
     memset(&want, 0, sizeof(want));
     want.freq = 48000;
     want.format = AUDIO_S8;
     want.channels = 2;
-    want.samples = 16;
+    want.samples = 8192;
     want.callback = gba_audio_callback;
     SDL_AudioDeviceID audio_device = SDL_OpenAudioDevice(NULL, 0, &want, NULL, 0);
     if (audio_device == 0) {
         SDL_Log("Failed to open audio device: %s", SDL_GetError());
         exit(EXIT_FAILURE);
     }
-    SDL_PauseAudioDevice(audio_device, 0);
+    //SDL_PauseAudioDevice(audio_device, 0);
     return audio_device;
-    */
-    return 0;
 }
 
 uint8_t io_read_byte(uint32_t address) {
@@ -2457,6 +2464,8 @@ void gba_ppu_update(void) {
 }
 
 void gba_timer_update(void) {
+    ioreg.fifo_a_refill = false;
+    ioreg.fifo_b_refill = false;
     timer_cycles = (timer_cycles + 1) % 1024;
     bool last_increment = false;
     for (int i = 0; i < 4; i++) {
@@ -2488,6 +2497,13 @@ void gba_timer_update(void) {
                     *counter = *reload;
                     if ((*control & (1 << 6)) != 0) {
                         ioreg.io_if |= 1 << (3 + i);
+                    }
+                    if (i == 0) {
+                        if ((ioreg.io_soundcnt_h & (1 << 10)) == 0) ioreg.fifo_a_refill = true;
+                        if ((ioreg.io_soundcnt_h & (1 << 14)) == 0) ioreg.fifo_b_refill = true;
+                    } else if (i == 1) {
+                        if ((ioreg.io_soundcnt_h & (1 << 10)) != 0) ioreg.fifo_a_refill = true;
+                        if ((ioreg.io_soundcnt_h & (1 << 14)) != 0) ioreg.fifo_b_refill = true;
                     }
                     last_increment = true;
                 } else {
@@ -2547,13 +2563,10 @@ void gba_dma_update(void) {
         if (start_timing == DMA_AT_REFRESH) {
             if (ch == 1 || ch == 2) {
                 //dma_special = true;
-                assert(*dst_addr == 0x40000a0 || *dst_addr == 0x40000a4);
-                //if (!(*dst_addr == 0x40000a0 || *dst_addr == 0x40000a4)) continue;  // FIXME
+                if (!(*dst_addr == 0x40000a0 || *dst_addr == 0x40000a4)) continue;
                 assert((dmacnt & DMA_REPEAT) != 0);
                 if (*dst_addr == 0x40000a0 && !ioreg.fifo_a_refill) continue;
                 if (*dst_addr == 0x40000a4 && !ioreg.fifo_b_refill) continue;
-                if (*dst_addr == 0x40000a0) ioreg.fifo_a_refill = false;
-                if (*dst_addr == 0x40000a4) ioreg.fifo_b_refill = false;
                 dst_ctrl = DMA_FIXED;
                 transfer_word = true;
                 count = 4;
