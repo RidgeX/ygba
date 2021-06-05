@@ -411,7 +411,7 @@ SDL_AudioDeviceID gba_audio_init(void) {
         SDL_Log("Failed to open audio device: %s", SDL_GetError());
         exit(EXIT_FAILURE);
     }
-    //SDL_PauseAudioDevice(audio_device, 0);
+    SDL_PauseAudioDevice(audio_device, 0);  // FIXME
     return audio_device;
 }
 
@@ -2582,10 +2582,16 @@ void gba_dma_update(void) {
             *dst_addr = dst_addr_initial;
         }
 
-        if (dma_special) {  // FIXME hack
-            // Pokemon Emerald
-            //if (*dst_addr == 0x040000a0 && *src_addr >= 0x3006cf0) *src_addr = 0x30066d0;
-            //if (*dst_addr == 0x040000a4 && *src_addr >= 0x3007320) *src_addr = 0x3006d00;
+        if (dma_special) {  // FIXME hack for sound engine
+            uint32_t info = *(uint32_t *)&cpu_iwram[0x7ff0];
+            if (info >= 0x2000000 && info < 0x4000000) {
+                uint32_t a_start = info + 848;
+                uint32_t a_end = a_start + 1568;
+                uint32_t b_start = info + 848 + 1568 + 16;
+                uint32_t b_end = b_start + 1568;
+                if (*dst_addr == 0x040000a0 && *src_addr >= a_end) *src_addr = a_start;
+                if (*dst_addr == 0x040000a4 && *src_addr >= b_end) *src_addr = b_start;
+            }
         }
 
         if ((dmacnt & DMA_IRQ) != 0) {
@@ -2707,7 +2713,7 @@ int main(int argc, char **argv) {
     }
     SDL_GLContext gl_context = SDL_GL_CreateContext(window);
     SDL_GL_MakeCurrent(window, gl_context);
-    SDL_GL_SetSwapInterval(0);  // Enable vsync
+    SDL_GL_SetSwapInterval(1);  // Enable vsync
 
     // Enable drag and drop
     SDL_EventState(SDL_DROPFILE, SDL_ENABLE);
