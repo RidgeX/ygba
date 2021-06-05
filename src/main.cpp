@@ -699,6 +699,15 @@ uint8_t io_read_byte(uint32_t address) {
 
         case REG_KEYINPUT: return (uint8_t) ioreg.io_keyinput;
 
+        case REG_IE + 0: return (uint8_t) ioreg.io_ie;
+        case REG_IE + 1: return (uint8_t)(ioreg.io_ie >> 8);
+        case REG_IF + 0: return (uint8_t) ioreg.io_if;
+        case REG_IF + 1: return (uint8_t)(ioreg.io_if >> 8);
+        case REG_WAITCNT + 0: return (uint8_t) ioreg.io_waitcnt;
+        case REG_WAITCNT + 1: return (uint8_t)(ioreg.io_waitcnt >> 8);
+        case REG_IME + 0: return ioreg.io_ime;
+        case REG_IME + 1: return 0;
+
         default:
 #ifdef LOG_BAD_MEMORY_ACCESS
             printf("io_read_byte(0x%08x);\n", address);
@@ -979,13 +988,14 @@ void io_write_byte(uint32_t address, uint8_t value) {
         case REG_TM3CNT_L + 0: assert(false); break;
         case REG_TM3CNT_L + 1: assert(false); break;
 
-        case REG_IF:
-            ioreg.io_if &= ~value;
-            break;
-
-        case REG_IME:
-            ioreg.io_ime = (ioreg.io_ime & 0xff00) | value;
-            break;
+        case REG_IE + 0: ioreg.io_ie = (ioreg.io_ie & 0xff00) | ((value << 0) & 0x00ff); break;
+        case REG_IE + 1: ioreg.io_ie = (ioreg.io_ie & 0x00ff) | ((value << 8) & 0x3f00); break;
+        case REG_IF + 0: ioreg.io_if &= ~value; break;
+        case REG_IF + 1: ioreg.io_if &= ~(value << 8); break;
+        case REG_WAITCNT + 0: ioreg.io_waitcnt = (ioreg.io_waitcnt & 0xff00) | ((value << 0) & 0x00ff); break;
+        case REG_WAITCNT + 1: ioreg.io_waitcnt = (ioreg.io_waitcnt & 0x00ff) | ((value << 8) & 0x5f00); break;
+        case REG_IME + 0: ioreg.io_ime = value & 1; break;
+        case REG_IME + 1: break;
 
         case REG_HALTCNT:
             ioreg.io_haltcnt = value;
@@ -1152,6 +1162,7 @@ uint16_t io_read_halfword(uint32_t address) {
 
         case REG_IE: return ioreg.io_ie;
         case REG_IF: return ioreg.io_if;
+        case REG_WAITCNT: return ioreg.io_waitcnt;
         case REG_IME: return ioreg.io_ime;
 
         default:
@@ -1331,15 +1342,10 @@ void io_write_halfword(uint32_t address, uint16_t value) {
             if (ioreg.timer_3_control & 0x80) ioreg.timer_3_counter = ioreg.timer_3_reload;
             break;
 
-        case REG_IE: ioreg.io_ie = value; break;
+        case REG_IE: ioreg.io_ie = value & 0x3fff; break;
         case REG_IF: ioreg.io_if &= ~value; break;
-
-        //case IO_WAITCNT:
-        //    ioreg.io_waitcnt = value;
-        //    printf("WAITCNT = 0x%04x\n", ioreg.io_waitcnt);
-        //    break;
-
-        case REG_IME: ioreg.io_ime = value; break;
+        case REG_WAITCNT: ioreg.io_waitcnt = value & 0x5fff; break;
+        case REG_IME: ioreg.io_ime = value & 1; break;
 
         default:
 #ifdef LOG_BAD_MEMORY_ACCESS
@@ -1425,11 +1431,9 @@ uint32_t io_read_word(uint32_t address) {
         case REG_KEYINPUT:
             return ioreg.io_keyinput | ioreg.io_keycnt << 16;
 
-        case REG_IE:
-            return ioreg.io_ie | ioreg.io_if << 16;
-
-        case REG_IME:
-            return ioreg.io_ime;
+        case REG_IE: return ioreg.io_ie | ioreg.io_if << 16;
+        case REG_WAITCNT: return ioreg.io_waitcnt;
+        case REG_IME: return ioreg.io_ime;
 
         default:
 #ifdef LOG_BAD_MEMORY_ACCESS
@@ -1531,18 +1535,9 @@ void io_write_word(uint32_t address, uint32_t value) {
             if (ioreg.timer_3_control & 0x80) ioreg.timer_3_counter = ioreg.timer_3_reload;
             break;
 
-        case REG_IE:
-            ioreg.io_ie = (uint16_t) value;
-            ioreg.io_if &= ~(uint16_t)(value >> 16);
-            break;
-
-        case REG_WAITCNT:
-            ioreg.io_waitcnt = (uint16_t) value;
-            break;
-
-        case REG_IME:
-            ioreg.io_ime = (uint16_t) value;
-            break;
+        case REG_IE: ioreg.io_ie = value & 0x3fff; ioreg.io_if &= ~(uint16_t)(value >> 16); break;
+        case REG_WAITCNT: ioreg.io_waitcnt = value & 0x5fff; break;
+        case REG_IME: ioreg.io_ime = value & 1; break;
 
         default:
 #ifdef LOG_BAD_MEMORY_ACCESS
@@ -2429,12 +2424,12 @@ void gba_ppu_update(void) {
             gba_draw_scanline();
         }
         ioreg.io_vcount = (ioreg.io_vcount + 1) % 228;
-        if (ioreg.io_vcount == 0) {
+        if (ioreg.io_vcount == 227) {
             ioreg.io_dispstat &= ~DSTAT_IN_VBL;
         } else if (ioreg.io_vcount == 160) {
             if ((ioreg.io_dispstat & DSTAT_IN_VBL) == 0) {
                 ioreg.io_dispstat |= DSTAT_IN_VBL;
-                if ((ioreg.io_dispstat & DSTAT_VBL_IRQ) != 0 && ioreg.io_ime == 1 && (ioreg.io_ie & INT_VBLANK) != 0) {
+                if ((ioreg.io_dispstat & DSTAT_VBL_IRQ) != 0) {
                     ioreg.io_if |= INT_VBLANK;
                 }
             }
@@ -2442,7 +2437,7 @@ void gba_ppu_update(void) {
         if (ioreg.io_vcount == (uint8_t)(ioreg.io_dispstat >> 8)) {
             if ((ioreg.io_dispstat & DSTAT_IN_VCT) == 0) {
                 ioreg.io_dispstat |= DSTAT_IN_VCT;
-                if ((ioreg.io_dispstat & DSTAT_VCT_IRQ) != 0 && ioreg.io_ime == 1 && (ioreg.io_ie & INT_VCOUNT) != 0) {
+                if ((ioreg.io_dispstat & DSTAT_VCT_IRQ) != 0) {
                     ioreg.io_if |= INT_VCOUNT;
                 }
             }
@@ -2454,7 +2449,7 @@ void gba_ppu_update(void) {
     if (ppu_cycles < 197120 && ppu_cycles % 1232 == 960) {
         if ((ioreg.io_dispstat & DSTAT_IN_HBL) == 0) {
             ioreg.io_dispstat |= DSTAT_IN_HBL;
-            if ((ioreg.io_dispstat & DSTAT_HBL_IRQ) != 0 && ioreg.io_ime == 1 && (ioreg.io_ie & INT_HBLANK) != 0) {
+            if ((ioreg.io_dispstat & DSTAT_HBL_IRQ) != 0) {
                 ioreg.io_if |= INT_HBLANK;
             }
         }
@@ -2491,7 +2486,7 @@ void gba_timer_update(void) {
                 *counter = *counter + 1;
                 if (*counter == 0) {
                     *counter = *reload;
-                    if ((*control & (1 << 6)) != 0 && ioreg.io_ime == 1 && (ioreg.io_ie & (1 << (3 + i))) != 0) {
+                    if ((*control & (1 << 6)) != 0) {
                         ioreg.io_if |= 1 << (3 + i);
                     }
                     last_increment = true;
@@ -2596,7 +2591,7 @@ void gba_dma_update(void) {
             *dst_addr = dst_addr_initial;
         }
 
-        if ((dmacnt & DMA_IRQ) != 0 && ioreg.io_ime == 1 && (ioreg.io_ie & (1 << (8 + ch))) != 0) {
+        if ((dmacnt & DMA_IRQ) != 0) {
             ioreg.io_if |= 1 << (8 + ch);
         }
 
@@ -2647,7 +2642,7 @@ void gba_emulate(void) {
 #endif
         }
 
-        if (!branch_taken && (cpsr & PSR_I) == 0 && ioreg.io_if != 0) {
+        if (!branch_taken && (cpsr & PSR_I) == 0 && ioreg.io_ime != 0 && (ioreg.io_if & ioreg.io_ie) != 0) {
             arm_hardware_interrupt();
             halted = false;
         }
