@@ -1836,8 +1836,8 @@ void memory_write_byte(uint32_t address, uint8_t value) {
     }
     if (address >= 0x06000000 && address < 0x07000000) {
         address &= 0x1ffff;
-        if (address >= 0x18000) address -= 0x18000;        
-        *(uint16_t *)&video_ram[address] = value | value << 8;  // FIXME ignored sometimes?
+        if (address >= 0x18000) return;
+        *(uint16_t *)&video_ram[address] = value | value << 8;
         return;
     }
     if (address >= 0x07000000 && address < 0x08000000) {
@@ -1918,7 +1918,7 @@ void memory_write_halfword(uint32_t address, uint16_t value) {
     }
     if (address >= 0x06000000 && address < 0x07000000) {
         address &= 0x1fffe;
-        if (address >= 0x18000) address -= 0x18000;
+        if (address >= 0x18000) return;
         *(uint16_t *)&video_ram[address] = value;
         return;
     }
@@ -2005,7 +2005,7 @@ void memory_write_word(uint32_t address, uint32_t value) {
     }
     if (address >= 0x06000000 && address < 0x07000000) {
         address &= 0x1fffc;
-        if (address >= 0x18000) address -= 0x18000;
+        if (address >= 0x18000) return;
         *(uint32_t *)&video_ram[address] = value;
         return;
     }
