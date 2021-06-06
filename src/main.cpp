@@ -426,12 +426,20 @@ SDL_AudioDeviceID gba_audio_init(void) {
     return audio_device;
 }
 
+uint32_t open_bus(void) {
+    if (FLAG_T()) {
+        return thumb_pipeline[1] | thumb_pipeline[1] << 16;
+    } else {
+        return arm_pipeline[1];
+    }
+}
+
 uint8_t io_read_byte(uint32_t address) {
     switch (address) {
         case REG_DISPCNT + 0: return (uint8_t)(ioreg.io_dispcnt >> 0);
         case REG_DISPCNT + 1: return (uint8_t)(ioreg.io_dispcnt >> 8);
-        case 0x2: return 0xad;
-        case 0x3: return 0xde;
+        case 0x2: break;
+        case 0x3: break;
         case REG_DISPSTAT + 0: return (uint8_t)(ioreg.io_dispstat >> 0);
         case REG_DISPSTAT + 1: return (uint8_t)(ioreg.io_dispstat >> 8);
         case REG_VCOUNT + 0: return (uint8_t)(ioreg.io_vcount >> 0);
@@ -444,86 +452,86 @@ uint8_t io_read_byte(uint32_t address) {
         case REG_BG2CNT + 1: return (uint8_t)(ioreg.io_bg2cnt >> 8);
         case REG_BG3CNT + 0: return (uint8_t)(ioreg.io_bg3cnt >> 0);
         case REG_BG3CNT + 1: return (uint8_t)(ioreg.io_bg3cnt >> 8);
-        case REG_BG0HOFS + 0: return 0xad;
-        case REG_BG0HOFS + 1: return 0xde;
-        case REG_BG0VOFS + 0: return 0xad;
-        case REG_BG0VOFS + 1: return 0xde;
-        case REG_BG1HOFS + 0: return 0xad;
-        case REG_BG1HOFS + 1: return 0xde;
-        case REG_BG1VOFS + 0: return 0xad;
-        case REG_BG1VOFS + 1: return 0xde;
-        case REG_BG2HOFS + 0: return 0xad;
-        case REG_BG2HOFS + 1: return 0xde;
-        case REG_BG2VOFS + 0: return 0xad;
-        case REG_BG2VOFS + 1: return 0xde;
-        case REG_BG3HOFS + 0: return 0xad;
-        case REG_BG3HOFS + 1: return 0xde;
-        case REG_BG3VOFS + 0: return 0xad;
-        case REG_BG3VOFS + 1: return 0xde;
-        case REG_BG2PA + 0: return 0xad;
-        case REG_BG2PA + 1: return 0xde;
-        case REG_BG2PB + 0: return 0xad;
-        case REG_BG2PB + 1: return 0xde;
-        case REG_BG2PC + 0: return 0xad;
-        case REG_BG2PC + 1: return 0xde;
-        case REG_BG2PD + 0: return 0xad;
-        case REG_BG2PD + 1: return 0xde;
-        case REG_BG2X_L + 0: return 0xad;
-        case REG_BG2X_L + 1: return 0xde;
-        case REG_BG2X_H + 0: return 0xad;
-        case REG_BG2X_H + 1: return 0xde;
-        case REG_BG2Y_L + 0: return 0xad;
-        case REG_BG2Y_L + 1: return 0xde;
-        case REG_BG2Y_H + 0: return 0xad;
-        case REG_BG2Y_H + 1: return 0xde;
-        case REG_BG3PA + 0: return 0xad;
-        case REG_BG3PA + 1: return 0xde;
-        case REG_BG3PB + 0: return 0xad;
-        case REG_BG3PB + 1: return 0xde;
-        case REG_BG3PC + 0: return 0xad;
-        case REG_BG3PC + 1: return 0xde;
-        case REG_BG3PD + 0: return 0xad;
-        case REG_BG3PD + 1: return 0xde;
-        case REG_BG3X_L + 0: return 0xad;
-        case REG_BG3X_L + 1: return 0xde;
-        case REG_BG3X_H + 0: return 0xad;
-        case REG_BG3X_H + 1: return 0xde;
-        case REG_BG3Y_L + 0: return 0xad;
-        case REG_BG3Y_L + 1: return 0xde;
-        case REG_BG3Y_H + 0: return 0xad;
-        case REG_BG3Y_H + 1: return 0xde;
-        case REG_WIN0H + 0: return 0xad;
-        case REG_WIN0H + 1: return 0xde;
-        case REG_WIN1H + 0: return 0xad;
-        case REG_WIN1H + 1: return 0xde;
-        case REG_WIN0V + 0: return 0xad;
-        case REG_WIN0V + 1: return 0xde;
-        case REG_WIN1V + 0: return 0xad;
-        case REG_WIN1V + 1: return 0xde;
+        case REG_BG0HOFS + 0: break;
+        case REG_BG0HOFS + 1: break;
+        case REG_BG0VOFS + 0: break;
+        case REG_BG0VOFS + 1: break;
+        case REG_BG1HOFS + 0: break;
+        case REG_BG1HOFS + 1: break;
+        case REG_BG1VOFS + 0: break;
+        case REG_BG1VOFS + 1: break;
+        case REG_BG2HOFS + 0: break;
+        case REG_BG2HOFS + 1: break;
+        case REG_BG2VOFS + 0: break;
+        case REG_BG2VOFS + 1: break;
+        case REG_BG3HOFS + 0: break;
+        case REG_BG3HOFS + 1: break;
+        case REG_BG3VOFS + 0: break;
+        case REG_BG3VOFS + 1: break;
+        case REG_BG2PA + 0: break;
+        case REG_BG2PA + 1: break;
+        case REG_BG2PB + 0: break;
+        case REG_BG2PB + 1: break;
+        case REG_BG2PC + 0: break;
+        case REG_BG2PC + 1: break;
+        case REG_BG2PD + 0: break;
+        case REG_BG2PD + 1: break;
+        case REG_BG2X_L + 0: break;
+        case REG_BG2X_L + 1: break;
+        case REG_BG2X_H + 0: break;
+        case REG_BG2X_H + 1: break;
+        case REG_BG2Y_L + 0: break;
+        case REG_BG2Y_L + 1: break;
+        case REG_BG2Y_H + 0: break;
+        case REG_BG2Y_H + 1: break;
+        case REG_BG3PA + 0: break;
+        case REG_BG3PA + 1: break;
+        case REG_BG3PB + 0: break;
+        case REG_BG3PB + 1: break;
+        case REG_BG3PC + 0: break;
+        case REG_BG3PC + 1: break;
+        case REG_BG3PD + 0: break;
+        case REG_BG3PD + 1: break;
+        case REG_BG3X_L + 0: break;
+        case REG_BG3X_L + 1: break;
+        case REG_BG3X_H + 0: break;
+        case REG_BG3X_H + 1: break;
+        case REG_BG3Y_L + 0: break;
+        case REG_BG3Y_L + 1: break;
+        case REG_BG3Y_H + 0: break;
+        case REG_BG3Y_H + 1: break;
+        case REG_WIN0H + 0: break;
+        case REG_WIN0H + 1: break;
+        case REG_WIN1H + 0: break;
+        case REG_WIN1H + 1: break;
+        case REG_WIN0V + 0: break;
+        case REG_WIN0V + 1: break;
+        case REG_WIN1V + 0: break;
+        case REG_WIN1V + 1: break;
         case REG_WININ + 0: return (uint8_t)(ioreg.io_winin >> 0);
         case REG_WININ + 1: return (uint8_t)(ioreg.io_winin >> 8);
         case REG_WINOUT + 0: return (uint8_t)(ioreg.io_winout >> 0);
         case REG_WINOUT + 1: return (uint8_t)(ioreg.io_winout >> 8);
-        case REG_MOSAIC + 0: return 0xad;
-        case REG_MOSAIC + 1: return 0xde;
-        case 0x4e: return 0xad;
-        case 0x4f: return 0xde;
+        case REG_MOSAIC + 0: break;
+        case REG_MOSAIC + 1: break;
+        case 0x4e: break;
+        case 0x4f: break;
         case REG_BLDCNT + 0: return (uint8_t)(ioreg.io_bldcnt >> 0);
         case REG_BLDCNT + 1: return (uint8_t)(ioreg.io_bldcnt >> 8);
         case REG_BLDALPHA + 0: return (uint8_t)(ioreg.io_bldalpha >> 0);
         case REG_BLDALPHA + 1: return (uint8_t)(ioreg.io_bldalpha >> 8);
-        case REG_BLDY + 0: return 0xad;
-        case REG_BLDY + 1: return 0xde;
-        case 0x56: return 0xad;
-        case 0x57: return 0xde;
-        case 0x58: return 0xad;
-        case 0x59: return 0xde;
-        case 0x5a: return 0xad;
-        case 0x5b: return 0xde;
-        case 0x5c: return 0xad;
-        case 0x5d: return 0xde;
-        case 0x5e: return 0xad;
-        case 0x5f: return 0xde;
+        case REG_BLDY + 0: break;
+        case REG_BLDY + 1: break;
+        case 0x56: break;
+        case 0x57: break;
+        case 0x58: break;
+        case 0x59: break;
+        case 0x5a: break;
+        case 0x5b: break;
+        case 0x5c: break;
+        case 0x5d: break;
+        case 0x5e: break;
+        case 0x5f: break;
         case REG_SOUND1CNT_L + 0: return (uint8_t)(ioreg.io_sound1cnt_l >> 0);
         case REG_SOUND1CNT_L + 1: return (uint8_t)(ioreg.io_sound1cnt_l >> 8);
         case REG_SOUND1CNT_H + 0: return (uint8_t)(ioreg.io_sound1cnt_h >> 0) & 0xc0;
@@ -568,10 +576,10 @@ uint8_t io_read_byte(uint32_t address) {
         case REG_SOUNDBIAS + 1: return (uint8_t)(ioreg.io_soundbias >> 8);
         case 0x8a: return 0;
         case 0x8b: return 0;
-        case 0x8c: return 0xad;
-        case 0x8d: return 0xde;
-        case 0x8e: return 0xad;
-        case 0x8f: return 0xde;
+        case 0x8c: break;
+        case 0x8d: break;
+        case 0x8e: break;
+        case 0x8f: break;
         case REG_WAVE_RAM0_L + 0: return (uint8_t)(ioreg.io_wave_ram0 >> 0);
         case REG_WAVE_RAM0_L + 1: return (uint8_t)(ioreg.io_wave_ram0 >> 8);
         case REG_WAVE_RAM0_H + 0: return (uint8_t)(ioreg.io_wave_ram0 >> 16);
@@ -588,106 +596,106 @@ uint8_t io_read_byte(uint32_t address) {
         case REG_WAVE_RAM3_L + 1: return (uint8_t)(ioreg.io_wave_ram3 >> 8);
         case REG_WAVE_RAM3_H + 0: return (uint8_t)(ioreg.io_wave_ram3 >> 16);
         case REG_WAVE_RAM3_H + 1: return (uint8_t)(ioreg.io_wave_ram3 >> 24);
-        case REG_FIFO_A_L + 0: return 0xad;
-        case REG_FIFO_A_L + 1: return 0xde;
-        case REG_FIFO_A_H + 0: return 0xad;
-        case REG_FIFO_A_H + 1: return 0xde;
-        case REG_FIFO_B_L + 0: return 0xad;
-        case REG_FIFO_B_L + 1: return 0xde;
-        case REG_FIFO_B_H + 0: return 0xad;
-        case REG_FIFO_B_H + 1: return 0xde;
-        case 0xa8: return 0xad;
-        case 0xa9: return 0xde;
-        case 0xaa: return 0xad;
-        case 0xab: return 0xde;
-        case 0xac: return 0xad;
-        case 0xad: return 0xde;
-        case 0xae: return 0xad;
-        case 0xaf: return 0xde;
-        case REG_DMA0SAD_L + 0: return 0xad;
-        case REG_DMA0SAD_L + 1: return 0xde;
-        case REG_DMA0SAD_H + 0: return 0xad;
-        case REG_DMA0SAD_H + 1: return 0xde;
-        case REG_DMA0DAD_L + 0: return 0xad;
-        case REG_DMA0DAD_L + 1: return 0xde;
-        case REG_DMA0DAD_H + 0: return 0xad;
-        case REG_DMA0DAD_H + 1: return 0xde;
+        case REG_FIFO_A_L + 0: break;
+        case REG_FIFO_A_L + 1: break;
+        case REG_FIFO_A_H + 0: break;
+        case REG_FIFO_A_H + 1: break;
+        case REG_FIFO_B_L + 0: break;
+        case REG_FIFO_B_L + 1: break;
+        case REG_FIFO_B_H + 0: break;
+        case REG_FIFO_B_H + 1: break;
+        case 0xa8: break;
+        case 0xa9: break;
+        case 0xaa: break;
+        case 0xab: break;
+        case 0xac: break;
+        case 0xad: break;
+        case 0xae: break;
+        case 0xaf: break;
+        case REG_DMA0SAD_L + 0: break;
+        case REG_DMA0SAD_L + 1: break;
+        case REG_DMA0SAD_H + 0: break;
+        case REG_DMA0SAD_H + 1: break;
+        case REG_DMA0DAD_L + 0: break;
+        case REG_DMA0DAD_L + 1: break;
+        case REG_DMA0DAD_H + 0: break;
+        case REG_DMA0DAD_H + 1: break;
         case REG_DMA0CNT_L + 0: return 0;
         case REG_DMA0CNT_L + 1: return 0;
         case REG_DMA0CNT_H + 0: return (uint8_t)(ioreg.io_dma0cnt_h >> 0);
         case REG_DMA0CNT_H + 1: return (uint8_t)(ioreg.io_dma0cnt_h >> 8);
-        case REG_DMA1SAD_L + 0: return 0xad;
-        case REG_DMA1SAD_L + 1: return 0xde;
-        case REG_DMA1SAD_H + 0: return 0xad;
-        case REG_DMA1SAD_H + 1: return 0xde;
-        case REG_DMA1DAD_L + 0: return 0xad;
-        case REG_DMA1DAD_L + 1: return 0xde;
-        case REG_DMA1DAD_H + 0: return 0xad;
-        case REG_DMA1DAD_H + 1: return 0xde;
+        case REG_DMA1SAD_L + 0: break;
+        case REG_DMA1SAD_L + 1: break;
+        case REG_DMA1SAD_H + 0: break;
+        case REG_DMA1SAD_H + 1: break;
+        case REG_DMA1DAD_L + 0: break;
+        case REG_DMA1DAD_L + 1: break;
+        case REG_DMA1DAD_H + 0: break;
+        case REG_DMA1DAD_H + 1: break;
         case REG_DMA1CNT_L + 0: return 0;
         case REG_DMA1CNT_L + 1: return 0;
         case REG_DMA1CNT_H + 0: return (uint8_t)(ioreg.io_dma1cnt_h >> 0);
         case REG_DMA1CNT_H + 1: return (uint8_t)(ioreg.io_dma1cnt_h >> 8);
-        case REG_DMA2SAD_L + 0: return 0xad;
-        case REG_DMA2SAD_L + 1: return 0xde;
-        case REG_DMA2SAD_H + 0: return 0xad;
-        case REG_DMA2SAD_H + 1: return 0xde;
-        case REG_DMA2DAD_L + 0: return 0xad;
-        case REG_DMA2DAD_L + 1: return 0xde;
-        case REG_DMA2DAD_H + 0: return 0xad;
-        case REG_DMA2DAD_H + 1: return 0xde;
+        case REG_DMA2SAD_L + 0: break;
+        case REG_DMA2SAD_L + 1: break;
+        case REG_DMA2SAD_H + 0: break;
+        case REG_DMA2SAD_H + 1: break;
+        case REG_DMA2DAD_L + 0: break;
+        case REG_DMA2DAD_L + 1: break;
+        case REG_DMA2DAD_H + 0: break;
+        case REG_DMA2DAD_H + 1: break;
         case REG_DMA2CNT_L + 0: return 0;
         case REG_DMA2CNT_L + 1: return 0;
         case REG_DMA2CNT_H + 0: return (uint8_t)(ioreg.io_dma2cnt_h >> 0);
         case REG_DMA2CNT_H + 1: return (uint8_t)(ioreg.io_dma2cnt_h >> 8);
-        case REG_DMA3SAD_L + 0: return 0xad;
-        case REG_DMA3SAD_L + 1: return 0xde;
-        case REG_DMA3SAD_H + 0: return 0xad;
-        case REG_DMA3SAD_H + 1: return 0xde;
-        case REG_DMA3DAD_L + 0: return 0xad;
-        case REG_DMA3DAD_L + 1: return 0xde;
-        case REG_DMA3DAD_H + 0: return 0xad;
-        case REG_DMA3DAD_H + 1: return 0xde;
+        case REG_DMA3SAD_L + 0: break;
+        case REG_DMA3SAD_L + 1: break;
+        case REG_DMA3SAD_H + 0: break;
+        case REG_DMA3SAD_H + 1: break;
+        case REG_DMA3DAD_L + 0: break;
+        case REG_DMA3DAD_L + 1: break;
+        case REG_DMA3DAD_H + 0: break;
+        case REG_DMA3DAD_H + 1: break;
         case REG_DMA3CNT_L + 0: return 0;
         case REG_DMA3CNT_L + 1: return 0;
         case REG_DMA3CNT_H + 0: return (uint8_t)(ioreg.io_dma3cnt_h >> 0);
         case REG_DMA3CNT_H + 1: return (uint8_t)(ioreg.io_dma3cnt_h >> 8);
-        case 0xe0: return 0xad;
-        case 0xe1: return 0xde;
-        case 0xe2: return 0xad;
-        case 0xe3: return 0xde;
-        case 0xe4: return 0xad;
-        case 0xe5: return 0xde;
-        case 0xe6: return 0xad;
-        case 0xe7: return 0xde;
-        case 0xe8: return 0xad;
-        case 0xe9: return 0xde;
-        case 0xea: return 0xad;
-        case 0xeb: return 0xde;
-        case 0xec: return 0xad;
-        case 0xed: return 0xde;
-        case 0xee: return 0xad;
-        case 0xef: return 0xde;
-        case 0xf0: return 0xad;
-        case 0xf1: return 0xde;
-        case 0xf2: return 0xad;
-        case 0xf3: return 0xde;
-        case 0xf4: return 0xad;
-        case 0xf5: return 0xde;
-        case 0xf6: return 0xad;
-        case 0xf7: return 0xde;
-        case 0xf8: return 0xad;
-        case 0xf9: return 0xde;
-        case 0xfa: return 0xad;
-        case 0xfb: return 0xde;
-        case 0xfc: return 0xad;
-        case 0xfd: return 0xde;
-        case 0xfe: return 0xad;
-        case 0xff: return 0xde;
-        case 0x100c: return 0xad;
-        case 0x100d: return 0xde;
-        case 0x100e: return 0xad;
-        case 0x100f: return 0xde;
+        case 0xe0: break;
+        case 0xe1: break;
+        case 0xe2: break;
+        case 0xe3: break;
+        case 0xe4: break;
+        case 0xe5: break;
+        case 0xe6: break;
+        case 0xe7: break;
+        case 0xe8: break;
+        case 0xe9: break;
+        case 0xea: break;
+        case 0xeb: break;
+        case 0xec: break;
+        case 0xed: break;
+        case 0xee: break;
+        case 0xef: break;
+        case 0xf0: break;
+        case 0xf1: break;
+        case 0xf2: break;
+        case 0xf3: break;
+        case 0xf4: break;
+        case 0xf5: break;
+        case 0xf6: break;
+        case 0xf7: break;
+        case 0xf8: break;
+        case 0xf9: break;
+        case 0xfa: break;
+        case 0xfb: break;
+        case 0xfc: break;
+        case 0xfd: break;
+        case 0xfe: break;
+        case 0xff: break;
+        case 0x100c: break;
+        case 0x100d: break;
+        case 0x100e: break;
+        case 0x100f: break;
 
         case REG_TM0CNT_L + 0: return (uint8_t) ioreg.timer_0_counter;
         case REG_TM0CNT_L + 1: return (uint8_t)(ioreg.timer_0_counter >> 8);
@@ -713,8 +721,10 @@ uint8_t io_read_byte(uint32_t address) {
 #ifdef LOG_BAD_MEMORY_ACCESS
             printf("io_read_byte(0x%08x);\n", address);
 #endif
-            return 0;
+            break;
     }
+
+    return (uint8_t)(open_bus() >> 8 * (address & 1));
 }
 
 void io_write_byte(uint32_t address, uint8_t value) {
@@ -1014,53 +1024,53 @@ void io_write_byte(uint32_t address, uint8_t value) {
 uint16_t io_read_halfword(uint32_t address) {
     switch (address) {
         case REG_DISPCNT: return ioreg.io_dispcnt;
-        case 0x2: return 0xdead;
+        case 0x2: break;
         case REG_DISPSTAT: return ioreg.io_dispstat;
         case REG_VCOUNT: return ioreg.io_vcount;
         case REG_BG0CNT: return ioreg.io_bg0cnt;
         case REG_BG1CNT: return ioreg.io_bg1cnt;
         case REG_BG2CNT: return ioreg.io_bg2cnt;
         case REG_BG3CNT: return ioreg.io_bg3cnt;
-        case REG_BG0HOFS: return 0xdead;
-        case REG_BG0VOFS: return 0xdead;
-        case REG_BG1HOFS: return 0xdead;
-        case REG_BG1VOFS: return 0xdead;
-        case REG_BG2HOFS: return 0xdead;
-        case REG_BG2VOFS: return 0xdead;
-        case REG_BG3HOFS: return 0xdead;
-        case REG_BG3VOFS: return 0xdead;
-        case REG_BG2PA: return 0xdead;
-        case REG_BG2PB: return 0xdead;
-        case REG_BG2PC: return 0xdead;
-        case REG_BG2PD: return 0xdead;
-        case REG_BG2X_L: return 0xdead;
-        case REG_BG2X_H: return 0xdead;
-        case REG_BG2Y_L: return 0xdead;
-        case REG_BG2Y_H: return 0xdead;
-        case REG_BG3PA: return 0xdead;
-        case REG_BG3PB: return 0xdead;
-        case REG_BG3PC: return 0xdead;
-        case REG_BG3PD: return 0xdead;
-        case REG_BG3X_L: return 0xdead;
-        case REG_BG3X_H: return 0xdead;
-        case REG_BG3Y_L: return 0xdead;
-        case REG_BG3Y_H: return 0xdead;
-        case REG_WIN0H: return 0xdead;
-        case REG_WIN1H: return 0xdead;
-        case REG_WIN0V: return 0xdead;
-        case REG_WIN1V: return 0xdead;
+        case REG_BG0HOFS: break;
+        case REG_BG0VOFS: break;
+        case REG_BG1HOFS: break;
+        case REG_BG1VOFS: break;
+        case REG_BG2HOFS: break;
+        case REG_BG2VOFS: break;
+        case REG_BG3HOFS: break;
+        case REG_BG3VOFS: break;
+        case REG_BG2PA: break;
+        case REG_BG2PB: break;
+        case REG_BG2PC: break;
+        case REG_BG2PD: break;
+        case REG_BG2X_L: break;
+        case REG_BG2X_H: break;
+        case REG_BG2Y_L: break;
+        case REG_BG2Y_H: break;
+        case REG_BG3PA: break;
+        case REG_BG3PB: break;
+        case REG_BG3PC: break;
+        case REG_BG3PD: break;
+        case REG_BG3X_L: break;
+        case REG_BG3X_H: break;
+        case REG_BG3Y_L: break;
+        case REG_BG3Y_H: break;
+        case REG_WIN0H: break;
+        case REG_WIN1H: break;
+        case REG_WIN0V: break;
+        case REG_WIN1V: break;
         case REG_WININ: return ioreg.io_winin;
         case REG_WINOUT: return ioreg.io_winout;
-        case REG_MOSAIC: return 0xdead;
-        case 0x4e: return 0xdead;
+        case REG_MOSAIC: break;
+        case 0x4e: break;
         case REG_BLDCNT: return ioreg.io_bldcnt;
         case REG_BLDALPHA: return ioreg.io_bldalpha;
-        case REG_BLDY: return 0xdead;
-        case 0x56: return 0xdead;
-        case 0x58: return 0xdead;
-        case 0x5a: return 0xdead;
-        case 0x5c: return 0xdead;
-        case 0x5e: return 0xdead;
+        case REG_BLDY: break;
+        case 0x56: break;
+        case 0x58: break;
+        case 0x5a: break;
+        case 0x5c: break;
+        case 0x5e: break;
         case REG_SOUND1CNT_L: return ioreg.io_sound1cnt_l;
         case REG_SOUND1CNT_H: return ioreg.io_sound1cnt_h & 0xffc0;
         case REG_SOUND1CNT_X: return ioreg.io_sound1cnt_x & 0x7800;
@@ -1083,8 +1093,8 @@ uint16_t io_read_halfword(uint32_t address) {
         case 0x86: return 0;
         case REG_SOUNDBIAS: return ioreg.io_soundbias;
         case 0x8a: return 0;
-        case 0x8c: return 0xdead;
-        case 0x8e: return 0xdead;
+        case 0x8c: break;
+        case 0x8e: break;
         case REG_WAVE_RAM0_L: return (uint16_t)(ioreg.io_wave_ram0 >> 0);
         case REG_WAVE_RAM0_H: return (uint16_t)(ioreg.io_wave_ram0 >> 16);
         case REG_WAVE_RAM1_L: return (uint16_t)(ioreg.io_wave_ram1 >> 0);
@@ -1093,56 +1103,56 @@ uint16_t io_read_halfword(uint32_t address) {
         case REG_WAVE_RAM2_H: return (uint16_t)(ioreg.io_wave_ram2 >> 16);
         case REG_WAVE_RAM3_L: return (uint16_t)(ioreg.io_wave_ram3 >> 0);
         case REG_WAVE_RAM3_H: return (uint16_t)(ioreg.io_wave_ram3 >> 16);
-        case REG_FIFO_A_L: return 0xdead;
-        case REG_FIFO_A_H: return 0xdead;
-        case REG_FIFO_B_L: return 0xdead;
-        case REG_FIFO_B_H: return 0xdead;
-        case 0xa8: return 0xdead;
-        case 0xaa: return 0xdead;
-        case 0xac: return 0xdead;
-        case 0xae: return 0xdead;
-        case REG_DMA0SAD_L: return 0xdead;
-        case REG_DMA0SAD_H: return 0xdead;
-        case REG_DMA0DAD_L: return 0xdead;
-        case REG_DMA0DAD_H: return 0xdead;
+        case REG_FIFO_A_L: break;
+        case REG_FIFO_A_H: break;
+        case REG_FIFO_B_L: break;
+        case REG_FIFO_B_H: break;
+        case 0xa8: break;
+        case 0xaa: break;
+        case 0xac: break;
+        case 0xae: break;
+        case REG_DMA0SAD_L: break;
+        case REG_DMA0SAD_H: break;
+        case REG_DMA0DAD_L: break;
+        case REG_DMA0DAD_H: break;
         case REG_DMA0CNT_L: return 0;
         case REG_DMA0CNT_H: return ioreg.io_dma0cnt_h;
-        case REG_DMA1SAD_L: return 0xdead;
-        case REG_DMA1SAD_H: return 0xdead;
-        case REG_DMA1DAD_L: return 0xdead;
-        case REG_DMA1DAD_H: return 0xdead;
+        case REG_DMA1SAD_L: break;
+        case REG_DMA1SAD_H: break;
+        case REG_DMA1DAD_L: break;
+        case REG_DMA1DAD_H: break;
         case REG_DMA1CNT_L: return 0;
         case REG_DMA1CNT_H: return ioreg.io_dma1cnt_h;
-        case REG_DMA2SAD_L: return 0xdead;
-        case REG_DMA2SAD_H: return 0xdead;
-        case REG_DMA2DAD_L: return 0xdead;
-        case REG_DMA2DAD_H: return 0xdead;
+        case REG_DMA2SAD_L: break;
+        case REG_DMA2SAD_H: break;
+        case REG_DMA2DAD_L: break;
+        case REG_DMA2DAD_H: break;
         case REG_DMA2CNT_L: return 0;
         case REG_DMA2CNT_H: return ioreg.io_dma2cnt_h;
-        case REG_DMA3SAD_L: return 0xdead;
-        case REG_DMA3SAD_H: return 0xdead;
-        case REG_DMA3DAD_L: return 0xdead;
-        case REG_DMA3DAD_H: return 0xdead;
+        case REG_DMA3SAD_L: break;
+        case REG_DMA3SAD_H: break;
+        case REG_DMA3DAD_L: break;
+        case REG_DMA3DAD_H: break;
         case REG_DMA3CNT_L: return 0;
         case REG_DMA3CNT_H: return ioreg.io_dma3cnt_h;
-        case 0xe0: return 0xdead;
-        case 0xe2: return 0xdead;
-        case 0xe4: return 0xdead;
-        case 0xe6: return 0xdead;
-        case 0xe8: return 0xdead;
-        case 0xea: return 0xdead;
-        case 0xec: return 0xdead;
-        case 0xee: return 0xdead;
-        case 0xf0: return 0xdead;
-        case 0xf2: return 0xdead;
-        case 0xf4: return 0xdead;
-        case 0xf6: return 0xdead;
-        case 0xf8: return 0xdead;
-        case 0xfa: return 0xdead;
-        case 0xfc: return 0xdead;
-        case 0xfe: return 0xdead;
-        case 0x100c: return 0xdead;
-        case 0x100e: return 0xdead;
+        case 0xe0: break;
+        case 0xe2: break;
+        case 0xe4: break;
+        case 0xe6: break;
+        case 0xe8: break;
+        case 0xea: break;
+        case 0xec: break;
+        case 0xee: break;
+        case 0xf0: break;
+        case 0xf2: break;
+        case 0xf4: break;
+        case 0xf6: break;
+        case 0xf8: break;
+        case 0xfa: break;
+        case 0xfc: break;
+        case 0xfe: break;
+        case 0x100c: break;
+        case 0x100e: break;
 
         case REG_TM0CNT_L: return ioreg.timer_0_counter;
         case REG_TM0CNT_H: return ioreg.timer_0_control;
@@ -1170,8 +1180,10 @@ uint16_t io_read_halfword(uint32_t address) {
 #ifdef LOG_BAD_MEMORY_ACCESS
             printf("io_read_halfword(0x%08x);\n", address);
 #endif
-            return 0;
+            break;
     }
+
+    return (uint16_t)(open_bus() >> 8 * (address & 3));
 }
 
 void io_write_halfword(uint32_t address, uint16_t value) {
@@ -1362,26 +1374,26 @@ uint32_t io_read_word(uint32_t address) {
         case REG_DISPSTAT: return ioreg.io_dispstat | ioreg.io_vcount << 16;
         case REG_BG0CNT: return ioreg.io_bg0cnt | ioreg.io_bg1cnt << 16;
         case REG_BG2CNT: return ioreg.io_bg2cnt | ioreg.io_bg3cnt << 16;
-        case REG_BG0HOFS: return 0xdeaddead;
-        case REG_BG1HOFS: return 0xdeaddead;
-        case REG_BG2HOFS: return 0xdeaddead;
-        case REG_BG3HOFS: return 0xdeaddead;
-        case REG_BG2PA: return 0xdeaddead;
-        case REG_BG2PC: return 0xdeaddead;
-        case REG_BG2X_L: return 0xdeaddead;
-        case REG_BG2Y_L: return 0xdeaddead;
-        case REG_BG3PA: return 0xdeaddead;
-        case REG_BG3PC: return 0xdeaddead;
-        case REG_BG3X_L: return 0xdeaddead;
-        case REG_BG3Y_L: return 0xdeaddead;
-        case REG_WIN0H: return 0xdeaddead;
-        case REG_WIN0V: return 0xdeaddead;
+        case REG_BG0HOFS: break;
+        case REG_BG1HOFS: break;
+        case REG_BG2HOFS: break;
+        case REG_BG3HOFS: break;
+        case REG_BG2PA: break;
+        case REG_BG2PC: break;
+        case REG_BG2X_L: break;
+        case REG_BG2Y_L: break;
+        case REG_BG3PA: break;
+        case REG_BG3PC: break;
+        case REG_BG3X_L: break;
+        case REG_BG3Y_L: break;
+        case REG_WIN0H: break;
+        case REG_WIN0V: break;
         case REG_WININ: return ioreg.io_winin | ioreg.io_winout << 16;
-        case REG_MOSAIC: return 0xdeaddead;
+        case REG_MOSAIC: break;
         case REG_BLDCNT: return ioreg.io_bldcnt | ioreg.io_bldalpha << 16;
         case REG_BLDY: return ioreg.io_bldy | 0xdead << 16;
-        case 0x58: return 0xdeaddead;
-        case 0x5c: return 0xdeaddead;
+        case 0x58: break;
+        case 0x5c: break;
         case REG_SOUND1CNT_L: return ioreg.io_sound1cnt_l | (ioreg.io_sound1cnt_h & 0xffc0) << 16;
         case REG_SOUND1CNT_X: return ioreg.io_sound1cnt_x & 0x7800;
         case REG_SOUND2CNT_L: return ioreg.io_sound2cnt_l & 0xffc0;
@@ -1393,36 +1405,36 @@ uint32_t io_read_word(uint32_t address) {
         case REG_SOUNDCNT_L: return ioreg.io_soundcnt_l | (ioreg.io_soundcnt_h & 0x77ff) << 16;
         case REG_SOUNDCNT_X: return ioreg.io_soundcnt_x & 0xfff0;
         case REG_SOUNDBIAS: return ioreg.io_soundbias;
-        case 0x8c: return 0xdeaddead;
+        case 0x8c: break;
         case REG_WAVE_RAM0_L: return ioreg.io_wave_ram0;
         case REG_WAVE_RAM1_L: return ioreg.io_wave_ram1;
         case REG_WAVE_RAM2_L: return ioreg.io_wave_ram2;
         case REG_WAVE_RAM3_L: return ioreg.io_wave_ram3;
-        case REG_FIFO_A_L: return 0xdeaddead;
-        case REG_FIFO_B_L: return 0xdeaddead;
-        case 0xa8: return 0xdeaddead;
-        case 0xac: return 0xdeaddead;
-        case REG_DMA0SAD_L: return 0xdeaddead;
-        case REG_DMA0DAD_L: return 0xdeaddead;
+        case REG_FIFO_A_L: break;
+        case REG_FIFO_B_L: break;
+        case 0xa8: break;
+        case 0xac: break;
+        case REG_DMA0SAD_L: break;
+        case REG_DMA0DAD_L: break;
         case REG_DMA0CNT_L: return ioreg.io_dma0cnt_h << 16;
-        case REG_DMA1SAD_L: return 0xdeaddead;
-        case REG_DMA1DAD_L: return 0xdeaddead;
+        case REG_DMA1SAD_L: break;
+        case REG_DMA1DAD_L: break;
         case REG_DMA1CNT_L: return ioreg.io_dma1cnt_h << 16;
-        case REG_DMA2SAD_L: return 0xdeaddead;
-        case REG_DMA2DAD_L: return 0xdeaddead;
+        case REG_DMA2SAD_L: break;
+        case REG_DMA2DAD_L: break;
         case REG_DMA2CNT_L: return ioreg.io_dma2cnt_h << 16;
-        case REG_DMA3SAD_L: return 0xdeaddead;
-        case REG_DMA3DAD_L: return 0xdeaddead;
+        case REG_DMA3SAD_L: break;
+        case REG_DMA3DAD_L: break;
         case REG_DMA3CNT_L: return ioreg.io_dma3cnt_h << 16;
-        case 0xe0: return 0xdeaddead;
-        case 0xe4: return 0xdeaddead;
-        case 0xe8: return 0xdeaddead;
-        case 0xec: return 0xdeaddead;
-        case 0xf0: return 0xdeaddead;
-        case 0xf4: return 0xdeaddead;
-        case 0xf8: return 0xdeaddead;
-        case 0xfc: return 0xdeaddead;
-        case 0x100c: return 0xdeaddead;
+        case 0xe0: break;
+        case 0xe4: break;
+        case 0xe8: break;
+        case 0xec: break;
+        case 0xf0: break;
+        case 0xf4: break;
+        case 0xf8: break;
+        case 0xfc: break;
+        case 0x100c: break;
 
         case REG_TM0CNT_L: return ioreg.timer_0_counter | ioreg.timer_0_control << 16;
         case REG_TM1CNT_L: return ioreg.timer_1_counter | ioreg.timer_1_control << 16;
@@ -1440,8 +1452,10 @@ uint32_t io_read_word(uint32_t address) {
 #ifdef LOG_BAD_MEMORY_ACCESS
             printf("io_read_word(0x%08x);\n", address);
 #endif
-            return 0;
+            break;
     }
+
+    return open_bus();
 }
 
 void io_write_word(uint32_t address, uint32_t value) {
@@ -1811,7 +1825,7 @@ uint8_t memory_read_byte(uint32_t address) {
 #ifdef LOG_BAD_MEMORY_ACCESS
     printf("memory_read_byte(0x%08x);\n", address);
 #endif
-    return 0;
+    return (uint8_t)(open_bus() >> 8 * (address & 1));
 }
 
 void memory_write_byte(uint32_t address, uint8_t value) {
@@ -1893,7 +1907,7 @@ uint16_t memory_read_halfword(uint32_t address) {
 #ifdef LOG_BAD_MEMORY_ACCESS
     printf("memory_read_halfword(0x%08x);\n", address);
 #endif
-    return 0;
+    return (uint16_t)(open_bus() >> 8 * (address & 3));
 }
 
 void memory_write_halfword(uint32_t address, uint16_t value) {
@@ -1945,9 +1959,6 @@ uint32_t memory_read_word(uint32_t address) {
         if (r[15] < 0x4000) last_bios_access = address & 0x3ffc;
         return *(uint32_t *)&system_rom[last_bios_access];
     }
-    if (address < 0x02000000) {
-        //return 0;  // Unmapped
-    }
     if (address >= 0x02000000 && address < 0x03000000) {
         return *(uint32_t *)&cpu_ewram[address & 0x3fffc];
     }
@@ -1977,15 +1988,12 @@ uint32_t memory_read_word(uint32_t address) {
 #ifdef LOG_BAD_MEMORY_ACCESS
     printf("memory_read_word(0x%08x);\n", address);
 #endif
-    return 0;
+    return open_bus();
 }
 
 void memory_write_word(uint32_t address, uint32_t value) {
     if (address < 0x4000) {
         //return;  // Read only
-    }
-    if (address < 0x02000000) {
-        //return;  // Unmapped
     }
     if (address >= 0x02000000 && address < 0x03000000) {
         *(uint32_t *)&cpu_ewram[address & 0x3fffc] = value;
@@ -2565,8 +2573,8 @@ void gba_dma_update(void) {
             } else if (ch == 3) {
                 if (ppu_cycles % 1232 != 0) continue;
             } else {
-                assert(false);
-                //continue;  // FIXME
+                //assert(false);
+                continue;  // FIXME
             }
         }
 
