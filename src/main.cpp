@@ -359,7 +359,13 @@ struct {
 void gba_audio_callback(void *userdata, uint8_t *stream, int len) {
     UNUSED(userdata);
 
-    static int hold_amount = 4;
+    int a_reload = ((ioreg.io_soundcnt_h & (1 << 10)) != 0 ? ioreg.timer_1_reload : ioreg.timer_0_reload);
+    int b_reload = ((ioreg.io_soundcnt_h & (1 << 14)) != 0 ? ioreg.timer_1_reload : ioreg.timer_0_reload);
+    double a_source_rate = 16777216.0 / (65536 - a_reload);
+    double b_source_rate = 16777216.0 / (65536 - b_reload);
+    double target_rate = 48000.0;
+    int a_hold_amount = (int) ceil(target_rate / a_source_rate);
+    int b_hold_amount = (int) ceil(target_rate / b_source_rate);
     static int a_hold = 0;
     static int b_hold = 0;
 
@@ -367,7 +373,7 @@ void gba_audio_callback(void *userdata, uint8_t *stream, int len) {
         uint16_t a_control = ((ioreg.io_soundcnt_h & (1 << 10)) != 0 ? ioreg.timer_1_control : ioreg.timer_0_control);
         if (a_control & (1 << 7)) {
             stream[i] = ioreg.fifo_a[ioreg.fifo_a_r];
-            a_hold = (a_hold + 1) % hold_amount;
+            a_hold = (a_hold + 1) % a_hold_amount;
             if (a_hold == 0) {
                 ioreg.fifo_a_r = (ioreg.fifo_a_r + 1) % FIFO_SIZE;
             }
@@ -378,7 +384,7 @@ void gba_audio_callback(void *userdata, uint8_t *stream, int len) {
         uint16_t b_control = ((ioreg.io_soundcnt_h & (1 << 14)) != 0 ? ioreg.timer_1_control : ioreg.timer_0_control);
         if (b_control & (1 << 7)) {
             stream[i + 1] = ioreg.fifo_b[ioreg.fifo_b_r];
-            b_hold = (b_hold + 1) % hold_amount;
+            b_hold = (b_hold + 1) % b_hold_amount;
             if (b_hold == 0) {
                 ioreg.fifo_b_r = (ioreg.fifo_b_r + 1) % FIFO_SIZE;
             }
@@ -2582,8 +2588,8 @@ void gba_dma_update(void) {
             *dst_addr = dst_addr_initial;
         }
 
-        if (dma_special) {  // FIXME hack for sound engine
-            uint32_t info = *(uint32_t *)&cpu_iwram[0x7ff0];
+        if (dma_special) {  // FIXME Hack for sound DMA source address not being reloaded by interrupt service routine
+            uint32_t info = *(uint32_t *)&cpu_iwram[0x7ff0];  // Pointer to MP2K sound engine info
             if (info >= 0x2000000 && info < 0x4000000) {
                 uint32_t a_start = info + 848;
                 uint32_t a_end = a_start + 1568;
