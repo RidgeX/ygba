@@ -422,7 +422,7 @@ SDL_AudioDeviceID gba_audio_init(void) {
         SDL_Log("Failed to open audio device: %s", SDL_GetError());
         exit(EXIT_FAILURE);
     }
-    SDL_PauseAudioDevice(audio_device, 0);  // FIXME
+    SDL_PauseAudioDevice(audio_device, 0);
     return audio_device;
 }
 
@@ -2948,12 +2948,19 @@ int main(int argc, char **argv) {
         ImGui::Text("R14: %08X", r[14]);
         ImGui::Text("R15: %08X", r[15] - 2 * SIZEOF_INSTR);
         ImGui::Text("T: %d", FLAG_T());
+
+        if (ImGui::Button("Mute")) {
+            static bool muted = false;
+            SDL_PauseAudioDevice(audio_device, muted ? 0 : 1);
+            muted = !muted;
+        }
         ImGui::Text("DMA1SAD: %08X", ioreg.io_dma1sad);
         ImGui::Text("DMA2SAD: %08X", ioreg.io_dma2sad);
         ImGui::Text("fifo_a_r: %d", ioreg.fifo_a_r);
         ImGui::Text("fifo_a_w: %d", ioreg.fifo_a_w);
         ImGui::Text("fifo_b_r: %d", ioreg.fifo_b_r);
         ImGui::Text("fifo_b_w: %d", ioreg.fifo_b_w);
+
         if (ImGui::Button("Reset")) {
             gba_reset(true);
         }
