@@ -2214,8 +2214,7 @@ void gba_draw_obj(uint32_t mode, int pri, int y) {
         int priority = (attr2 >> 10) & 3;
         int palette_no = (attr2 >> 12) & 0xf;
 
-        int ow = 0;
-        int oh = 0;
+        int ow, oh;
         if (shape == 0) {
             if (size == 0) { ow = 8; oh = 8; }
             else if (size == 1) { ow = 16; oh = 16; }
@@ -2231,8 +2230,8 @@ void gba_draw_obj(uint32_t mode, int pri, int y) {
             else if (size == 1) { ow = 8; oh = 32; }
             else if (size == 2) { ow = 16; oh = 32; }
             else if (size == 3) { ow = 32; oh = 64; }
-        } else if (shape == 3) {
-            assert(false);
+        } else {  // shape == 3
+            ow = 8; oh = 8;
         }
 
         if (ox + ow > 511) ox -= 512;
