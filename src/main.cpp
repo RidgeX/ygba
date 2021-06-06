@@ -2544,6 +2544,7 @@ void gba_dma_update(void) {
         uint32_t start_timing = (dmacnt >> 28) & 3;
         uint32_t dst_ctrl = (dmacnt >> 21) & 3;
         uint32_t src_ctrl = (dmacnt >> 23) & 3;
+        if (*src_addr >= 0x08000000 && *src_addr <= 0x0e000000) src_ctrl = DMA_INC;
         bool transfer_word = (dmacnt & DMA_32) != 0;
         uint32_t count = dmacnt & 0xffff;
         if (count == 0) count = (ch == 3 ? 0x10000 : 0x4000);
