@@ -2445,7 +2445,7 @@ void gba_ppu_update(void) {
         }
     }
     ppu_cycles = (ppu_cycles + 1) % 280896;
-    if (ppu_cycles < 197120 && ppu_cycles % 1232 == 960) {
+    if (ppu_cycles % 1232 == 1006) {
         if ((ioreg.io_dispstat & DSTAT_IN_HBL) == 0) {
             ioreg.io_dispstat |= DSTAT_IN_HBL;
             if ((ioreg.io_dispstat & DSTAT_HBL_IRQ) != 0) {
@@ -2550,7 +2550,7 @@ void gba_dma_update(void) {
         if (count == 0) count = (ch == 3 ? 0x10000 : 0x4000);
 
         if (start_timing == DMA_AT_VBLANK && !(ioreg.io_vcount == 160)) continue;
-        if (start_timing == DMA_AT_HBLANK && !(ppu_cycles < 197120 && ppu_cycles % 1232 == 960)) continue;
+        if (start_timing == DMA_AT_HBLANK && !(ppu_cycles < 197120 && ppu_cycles % 1232 == 1006)) continue;
         bool dma_special = false;
         if (start_timing == DMA_AT_REFRESH) {
             if (ch == 1 || ch == 2) {
