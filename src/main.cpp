@@ -359,8 +359,10 @@ struct {
 void gba_audio_callback(void *userdata, uint8_t *stream, int len) {
     UNUSED(userdata);
 
-    int a_reload = ((ioreg.io_soundcnt_h & (1 << 10)) != 0 ? ioreg.timer_1_reload : ioreg.timer_0_reload);
-    int b_reload = ((ioreg.io_soundcnt_h & (1 << 14)) != 0 ? ioreg.timer_1_reload : ioreg.timer_0_reload);
+    uint16_t a_control = ((ioreg.io_soundcnt_h & (1 << 10)) != 0 ? ioreg.timer_1_control : ioreg.timer_0_control);
+    uint16_t b_control = ((ioreg.io_soundcnt_h & (1 << 14)) != 0 ? ioreg.timer_1_control : ioreg.timer_0_control);
+    uint16_t a_reload = ((ioreg.io_soundcnt_h & (1 << 10)) != 0 ? ioreg.timer_1_reload : ioreg.timer_0_reload);
+    uint16_t b_reload = ((ioreg.io_soundcnt_h & (1 << 14)) != 0 ? ioreg.timer_1_reload : ioreg.timer_0_reload);
     double a_source_rate = 16777216.0 / (65536 - a_reload);
     double b_source_rate = 16777216.0 / (65536 - b_reload);
     double target_rate = 48000.0;
@@ -370,27 +372,30 @@ void gba_audio_callback(void *userdata, uint8_t *stream, int len) {
     static int b_hold = 0;
 
     for (int i = 0; i < len; i += 2) {
-        uint16_t a_control = ((ioreg.io_soundcnt_h & (1 << 10)) != 0 ? ioreg.timer_1_control : ioreg.timer_0_control);
+        uint8_t a = 0;
         if (a_control & (1 << 7)) {
-            stream[i] = ioreg.fifo_a[ioreg.fifo_a_r];
+            a = ioreg.fifo_a[ioreg.fifo_a_r];
             a_hold = (a_hold + 1) % a_hold_amount;
             if (a_hold == 0) {
                 ioreg.fifo_a_r = (ioreg.fifo_a_r + 1) % FIFO_SIZE;
             }
-        } else {
-            stream[i] = 0;
         }
 
-        uint16_t b_control = ((ioreg.io_soundcnt_h & (1 << 14)) != 0 ? ioreg.timer_1_control : ioreg.timer_0_control);
+        uint8_t b = 0;
         if (b_control & (1 << 7)) {
-            stream[i + 1] = ioreg.fifo_b[ioreg.fifo_b_r];
+            b = ioreg.fifo_b[ioreg.fifo_b_r];
             b_hold = (b_hold + 1) % b_hold_amount;
             if (b_hold == 0) {
                 ioreg.fifo_b_r = (ioreg.fifo_b_r + 1) % FIFO_SIZE;
             }
-        } else {
-            stream[i + 1] = 0;
         }
+
+        stream[i] = 0;
+        stream[i + 1] = 0;
+        if ((ioreg.io_soundcnt_h & (1 << 8)) != 0) stream[i + 1] += a;
+        if ((ioreg.io_soundcnt_h & (1 << 9)) != 0) stream[i] += a;
+        if ((ioreg.io_soundcnt_h & (1 << 12)) != 0) stream[i + 1] += b;
+        if ((ioreg.io_soundcnt_h & (1 << 13)) != 0) stream[i] += b;
     }
 }
 
