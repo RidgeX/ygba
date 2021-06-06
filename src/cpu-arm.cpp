@@ -1075,10 +1075,13 @@ int arm_branch_and_exchange(void) {
 #endif
 
     assert(sbo == 0xfff);
-    assert(BITS(r[Rm], 0, 1) != 2);  // FIXME
 
     ASSIGN_T(BIT(r[Rm], 0));
-    r[REG_PC] = r[Rm] & ~1;
+    if (FLAG_T()) {
+        r[REG_PC] = r[Rm] & ~1;
+    } else {
+        r[REG_PC] = r[Rm] & ~3;
+    }
     branch_taken = true;
 
     return 1;
