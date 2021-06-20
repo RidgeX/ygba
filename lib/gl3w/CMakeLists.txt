@@ -4,7 +4,9 @@ add_library(gl3w OBJECT
     GL/glcorearb.h
 )
 
-if(WIN32)
+if(UNIX)
+    target_link_libraries(gl3w PRIVATE dl GL)
+elseif(WIN32)
     target_link_libraries(gl3w PRIVATE opengl32)
 endif()
 
