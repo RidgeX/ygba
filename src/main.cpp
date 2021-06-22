@@ -1,3 +1,7 @@
+#ifdef WIN32
+#define _CRT_SECURE_NO_WARNINGS
+#endif
+
 #include "imgui.h"
 #include "imgui_impl_sdl.h"
 #include "imgui_impl_opengl3.h"
@@ -716,7 +720,7 @@ uint8_t io_read_byte(uint32_t address) {
         case REG_IF + 1: return (uint8_t)(ioreg.io_if >> 8);
         case REG_WAITCNT + 0: return (uint8_t) ioreg.io_waitcnt;
         case REG_WAITCNT + 1: return (uint8_t)(ioreg.io_waitcnt >> 8);
-        case REG_IME + 0: return ioreg.io_ime;
+        case REG_IME + 0: return (uint8_t) ioreg.io_ime;
         case REG_IME + 1: return 0;
 
         default:
@@ -1652,13 +1656,13 @@ void backup_write_byte(uint32_t address, uint8_t value) {
                 if (flash_state & 4) {  // Erase mode
                     if (address == 0x5555 && value == 0x10) {  // Chip erase
                         printf("Chip erase\n");
-                        memset(backup_flash, 0xff, sizeof(uint8_t) * sizeof(backup_flash));
+                        memset(backup_flash, 0xff, sizeof(backup_flash));
                         break;
                     }
                     if (value == 0x30) {  // Sector erase
                         uint32_t sector = address >> 12;
                         printf("Sector erase, sector = %d\n", sector);
-                        memset(&backup_flash[flash_bank * 0x10000 + sector * 0x1000], 0xff, sizeof(uint8_t) * 0x1000);
+                        memset(&backup_flash[flash_bank * 0x10000 + sector * 0x1000], 0xff, 0x1000);
                         break;
                     }
                     assert(false);
@@ -1734,7 +1738,7 @@ void eeprom_write_bit(uint16_t value) {
     switch (eeprom_state) {
         case 0:  // Start of stream
             if (eeprom_num_wbits < 2) break;
-            eeprom_state = eeprom_wbits;
+            eeprom_state = (uint32_t) eeprom_wbits;
             assert(eeprom_state == 2 || eeprom_state == 3);
             eeprom_wbits = 0;
             eeprom_num_wbits = 0;
@@ -1748,7 +1752,7 @@ void eeprom_write_bit(uint16_t value) {
 
         case 2:  // Write request
             if (eeprom_num_wbits < eeprom_width) break;
-            eeprom_addr = eeprom_wbits * 8;
+            eeprom_addr = (uint32_t)(eeprom_wbits * 8);
             eeprom_rbits = 0;
             eeprom_num_rbits = 0;
             eeprom_state = 4;
@@ -1758,7 +1762,7 @@ void eeprom_write_bit(uint16_t value) {
 
         case 3:  // Read request
             if (eeprom_num_wbits < eeprom_width) break;
-            eeprom_addr = eeprom_wbits * 8;
+            eeprom_addr = (uint32_t)(eeprom_wbits * 8);
             eeprom_rbits = 0;
             eeprom_num_rbits = 68;
             for (int i = 0; i < 8; i++) {
@@ -2067,16 +2071,16 @@ void gba_detect_cartridge_features(void) {
 }
 
 void gba_reset(bool keep_backup) {
-    memset(cpu_ewram, 0, sizeof(uint8_t) * sizeof(cpu_ewram));
-    memset(cpu_iwram, 0, sizeof(uint8_t) * sizeof(cpu_iwram));
-    memset(&ioreg, 0, sizeof(uint8_t) * sizeof(ioreg));
-    memset(palette_ram, 0, sizeof(uint8_t) * sizeof(palette_ram));
-    memset(video_ram, 0, sizeof(uint8_t) * sizeof(video_ram));
-    memset(object_ram, 0, sizeof(uint8_t) * sizeof(object_ram));
+    memset(cpu_ewram, 0, sizeof(cpu_ewram));
+    memset(cpu_iwram, 0, sizeof(cpu_iwram));
+    memset(&ioreg, 0, sizeof(ioreg));
+    memset(palette_ram, 0, sizeof(palette_ram));
+    memset(video_ram, 0, sizeof(video_ram));
+    memset(object_ram, 0, sizeof(object_ram));
     if (!keep_backup) {
-        memset(backup_eeprom, 0xff, sizeof(uint8_t) * sizeof(backup_eeprom));
-        memset(backup_flash, 0xff, sizeof(uint8_t) * sizeof(backup_flash));
-        memset(backup_sram, 0xff, sizeof(uint8_t) * sizeof(backup_sram));
+        memset(backup_eeprom, 0xff, sizeof(backup_eeprom));
+        memset(backup_flash, 0xff, sizeof(backup_flash));
+        memset(backup_sram, 0xff, sizeof(backup_sram));
     }
 
     memset(r, 0, sizeof(uint32_t) * 16);
@@ -2100,30 +2104,32 @@ void gba_reset(bool keep_backup) {
 void gba_load(const char *filename) {
     gba_reset(false);
 
-    memset(game_rom, 0, sizeof(uint8_t) * sizeof(game_rom));
+    memset(game_rom, 0, sizeof(game_rom));
 
     FILE *fp = fopen(filename, "rb");
     assert(fp != NULL);
     fseek(fp, 0, SEEK_END);
     game_rom_size = ftell(fp);
-    assert(game_rom_size > 0);
+    assert(game_rom_size != 0);
     game_rom_mask = next_power_of_2(game_rom_size) - 1;
     fseek(fp, 0, SEEK_SET);
-    fread(game_rom, sizeof(uint8_t), game_rom_size, fp);
+    if (game_rom_size <= sizeof(game_rom)) {
+        fread(game_rom, 1, game_rom_size, fp);
+    }
     fclose(fp);
 
     gba_detect_cartridge_features();
 }
 
 uint32_t rgb555(uint32_t pixel) {
-    uint32_t r, g, b;
-    r = pixel & 0x1f;
-    g = (pixel >> 5) & 0x1f;
-    b = (pixel >> 10) & 0x1f;
-    r = (r << 3) | (r >> 2);
-    g = (g << 3) | (g >> 2);
-    b = (b << 3) | (b >> 2);
-    return 0xff << 24 | b << 16 | g << 8 | r;
+    uint32_t red, green, blue;
+    red = pixel & 0x1f;
+    green = (pixel >> 5) & 0x1f;
+    blue = (pixel >> 10) & 0x1f;
+    red = (red << 3) | (red >> 2);
+    green = (green << 3) | (green >> 2);
+    blue = (blue << 3) | (blue >> 2);
+    return 0xff << 24 | blue << 16 | green << 8 | red;
 }
 
 void gba_draw_blank(int y) {
@@ -2216,7 +2222,8 @@ void gba_draw_obj(uint32_t mode, int pri, int y) {
         int priority = (attr2 >> 10) & 3;
         int palette_no = (attr2 >> 12) & 0xf;
 
-        int ow, oh;
+        int ow = 8;
+        int oh = 8;
         if (shape == 0) {
             if (size == 0) { ow = 8; oh = 8; }
             else if (size == 1) { ow = 16; oh = 16; }
@@ -2232,8 +2239,8 @@ void gba_draw_obj(uint32_t mode, int pri, int y) {
             else if (size == 1) { ow = 8; oh = 32; }
             else if (size == 2) { ow = 16; oh = 32; }
             else if (size == 3) { ow = 32; oh = 64; }
-        } else {  // shape == 3
-            ow = 8; oh = 8;
+        } else if (shape == 3) {
+            // Fall through
         }
 
         if (ox + ow > 511) ox -= 512;
@@ -2305,7 +2312,8 @@ void gba_draw_tiled_bg(uint32_t mode, int bg, int y, uint32_t bgcnt, int hofs, i
     bool is_affine = ((mode == 1 && bg == 2) || (mode == 2 && (bg == 2 || bg == 3)));
     if (is_affine) colors_256 = true;
 
-    int width_in_tiles, height_in_tiles;
+    int width_in_tiles = 32;
+    int height_in_tiles = 32;
     if (is_affine) {
         switch (screen_size) {
             case 0: width_in_tiles = 16; height_in_tiles = 16; break;
@@ -2680,15 +2688,19 @@ void gba_emulate(void) {
     }
 }
 
+void load_bios(void) {
+    FILE *fp = fopen("gba_bios.bin", "rb");
+    assert(fp != NULL);
+    fread(system_rom, 1, sizeof(system_rom), fp);
+    fclose(fp);
+}
+
 // Main code
 int main(int argc, char **argv) {
     arm_init_lookup();
     thumb_init_lookup();
 
-    FILE *fp = fopen("system_rom.bin", "rb");
-    assert(fp != NULL);
-    fread(system_rom, sizeof(uint8_t), 0x4000, fp);
-    fclose(fp);
+    load_bios();
 
     if (argc == 2) {
         skip_bios = true;
@@ -2890,30 +2902,30 @@ int main(int argc, char **argv) {
 
         // Input
         const Uint8 *key_state = SDL_GetKeyboardState(NULL);
-        done |= key_state[SDL_SCANCODE_ESCAPE];
+        done |= (bool) key_state[SDL_SCANCODE_ESCAPE];
         static bool keys[10];
-        memset(keys, 0, sizeof(bool) * sizeof(keys));
-        keys[0] |= key_state[SDL_SCANCODE_X];          // Button A
-        keys[1] |= key_state[SDL_SCANCODE_Z];          // Button B
-        keys[2] |= key_state[SDL_SCANCODE_BACKSPACE];  // Select
-        keys[3] |= key_state[SDL_SCANCODE_RETURN];     // Start
-        keys[4] |= key_state[SDL_SCANCODE_RIGHT];      // Right
-        keys[5] |= key_state[SDL_SCANCODE_LEFT];       // Left
-        keys[6] |= key_state[SDL_SCANCODE_UP];         // Up
-        keys[7] |= key_state[SDL_SCANCODE_DOWN];       // Down
-        keys[8] |= key_state[SDL_SCANCODE_S];          // Button R
-        keys[9] |= key_state[SDL_SCANCODE_A];          // Button L
+        memset(keys, 0, sizeof(keys));
+        keys[0] |= (bool) key_state[SDL_SCANCODE_X];          // Button A
+        keys[1] |= (bool) key_state[SDL_SCANCODE_Z];          // Button B
+        keys[2] |= (bool) key_state[SDL_SCANCODE_BACKSPACE];  // Select
+        keys[3] |= (bool) key_state[SDL_SCANCODE_RETURN];     // Start
+        keys[4] |= (bool) key_state[SDL_SCANCODE_RIGHT];      // Right
+        keys[5] |= (bool) key_state[SDL_SCANCODE_LEFT];       // Left
+        keys[6] |= (bool) key_state[SDL_SCANCODE_UP];         // Up
+        keys[7] |= (bool) key_state[SDL_SCANCODE_DOWN];       // Down
+        keys[8] |= (bool) key_state[SDL_SCANCODE_S];          // Button R
+        keys[9] |= (bool) key_state[SDL_SCANCODE_A];          // Button L
         if (game_controller != NULL) {
-            keys[0] |= SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_B);              // Button A
-            keys[1] |= SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_A);              // Button B
-            keys[2] |= SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_BACK);           // Select
-            keys[3] |= SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_START);          // Start
-            keys[4] |= SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_DPAD_RIGHT);     // Right
-            keys[5] |= SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_DPAD_LEFT);      // Left
-            keys[6] |= SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_DPAD_UP);        // Up
-            keys[7] |= SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_DPAD_DOWN);      // Down
-            keys[8] |= SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER);  // Button R
-            keys[9] |= SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_LEFTSHOULDER);   // Button L
+            keys[0] |= (bool) SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_B);              // Button A
+            keys[1] |= (bool) SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_A);              // Button B
+            keys[2] |= (bool) SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_BACK);           // Select
+            keys[3] |= (bool) SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_START);          // Start
+            keys[4] |= (bool) SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_DPAD_RIGHT);     // Right
+            keys[5] |= (bool) SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_DPAD_LEFT);      // Left
+            keys[6] |= (bool) SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_DPAD_UP);        // Up
+            keys[7] |= (bool) SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_DPAD_DOWN);      // Down
+            keys[8] |= (bool) SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER);  // Button R
+            keys[9] |= (bool) SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_LEFTSHOULDER);   // Button L
         }
         if (keys[4] && keys[5]) { keys[4] = false; keys[5] = false; }  // Disallow opposing directions
         if (keys[6] && keys[7]) { keys[6] = false; keys[7] = false; }
@@ -2989,13 +3001,13 @@ int main(int argc, char **argv) {
             FILE *fp = fopen("save.bin", "rb");
             assert(fp != NULL);
             if (has_eeprom) {
-                fread(backup_eeprom, sizeof(uint8_t), sizeof(backup_eeprom), fp);
+                fread(backup_eeprom, 1, sizeof(backup_eeprom), fp);
             }
             if (has_flash) {
-                fread(backup_flash, sizeof(uint8_t), sizeof(backup_flash), fp);
+                fread(backup_flash, 1, sizeof(backup_flash), fp);
             }
             if (has_sram) {
-                fread(backup_sram, sizeof(uint8_t), sizeof(backup_sram), fp);
+                fread(backup_sram, 1, sizeof(backup_sram), fp);
             }
             fclose(fp);
         }
@@ -3004,13 +3016,13 @@ int main(int argc, char **argv) {
             FILE *fp = fopen("save.bin", "wb");
             assert(fp != NULL);
             if (has_eeprom) {
-                fwrite(backup_eeprom, sizeof(uint8_t), sizeof(backup_eeprom), fp);
+                fwrite(backup_eeprom, 1, sizeof(backup_eeprom), fp);
             }
             if (has_flash) {
-                fwrite(backup_flash, sizeof(uint8_t), sizeof(backup_flash), fp);
+                fwrite(backup_flash, 1, sizeof(backup_flash), fp);
             }
             if (has_sram) {
-                fwrite(backup_sram, sizeof(uint8_t), sizeof(backup_sram), fp);
+                fwrite(backup_sram, 1, sizeof(backup_sram), fp);
             }
             fclose(fp);
         }

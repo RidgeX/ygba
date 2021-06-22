@@ -69,7 +69,7 @@ static int max(int a, int b) {
 }
 
 static unsigned char *reverse(unsigned char *pattern, int m) {
-    unsigned char *rev_pattern = (unsigned char *) malloc(sizeof(unsigned char) * m);
+    unsigned char *rev_pattern = (unsigned char *) calloc(m, sizeof(unsigned char));
     assert(rev_pattern != NULL);
 
     for (int i = 0; i < m; i++) {
@@ -80,7 +80,7 @@ static unsigned char *reverse(unsigned char *pattern, int m) {
 }
 
 static int *compute_prefix(unsigned char *pattern, int m) {
-    int *prefix = (int *) malloc(sizeof(int) * m);
+    int *prefix = (int *) calloc(m, sizeof(int));
     assert(prefix != NULL);
 
     prefix[0] = 0;
@@ -122,7 +122,7 @@ unsigned char *knuth_morris_pratt_matcher(unsigned char *text, int n, unsigned c
 }
 
 static int *compute_last_occurrence(unsigned char *pattern, int m) {
-    int *last_occurrence = (int *) malloc(sizeof(int) * 256);
+    int *last_occurrence = (int *) calloc(256, sizeof(int));
     assert(last_occurrence != NULL);
 
     for (int i = 0; i < 256; i++) {
@@ -139,7 +139,7 @@ static int *compute_good_suffix(unsigned char *pattern, int m) {
     int *prefix = compute_prefix(pattern, m);
     unsigned char *rev_pattern = reverse(pattern, m);
     int *rev_prefix = compute_prefix(rev_pattern, m);
-    int *good_suffix = (int *) malloc(sizeof(int) * (m + 1));
+    int *good_suffix = (int *) calloc(m + 1, sizeof(int));
     assert(good_suffix != NULL);
 
     for (int i = 0; i <= m; i++) {
