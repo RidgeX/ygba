@@ -434,6 +434,8 @@ uint32_t open_bus(void) {
     }
 }
 
+void gba_dma_update(uint32_t current_timing);
+
 uint8_t io_read_byte(uint32_t address) {
     switch (address) {
         case REG_DISPCNT + 0: return (uint8_t)(ioreg.io_dispcnt >> 0);
@@ -916,7 +918,7 @@ void io_write_byte(uint32_t address, uint8_t value) {
         case REG_DMA0CNT_L + 0: ioreg.io_dma0cnt_l = (ioreg.io_dma0cnt_l & 0xff00) | ((value << 0) & 0x00ff); break;
         case REG_DMA0CNT_L + 1: ioreg.io_dma0cnt_l = (ioreg.io_dma0cnt_l & 0x00ff) | ((value << 8) & 0x3f00); break;
         case REG_DMA0CNT_H + 0: ioreg.io_dma0cnt_h = (ioreg.io_dma0cnt_h & 0xff00) | ((value << 0) & 0x00e0); break;
-        case REG_DMA0CNT_H + 1: ioreg.io_dma0cnt_h = (ioreg.io_dma0cnt_h & 0x00ff) | ((value << 8) & 0xf700); break;
+        case REG_DMA0CNT_H + 1: ioreg.io_dma0cnt_h = (ioreg.io_dma0cnt_h & 0x00ff) | ((value << 8) & 0xf700); gba_dma_update(DMA_NOW); break;
         case REG_DMA1SAD_L + 0: ioreg.io_dma1sad = (ioreg.io_dma1sad & 0xffffff00) | ((value << 0) & 0x000000ff); break;
         case REG_DMA1SAD_L + 1: ioreg.io_dma1sad = (ioreg.io_dma1sad & 0xffff00ff) | ((value << 8) & 0x0000ff00); break;
         case REG_DMA1SAD_H + 0: ioreg.io_dma1sad = (ioreg.io_dma1sad & 0xff00ffff) | ((value << 16) & 0x00ff0000); break;
@@ -928,7 +930,7 @@ void io_write_byte(uint32_t address, uint8_t value) {
         case REG_DMA1CNT_L + 0: ioreg.io_dma1cnt_l = (ioreg.io_dma1cnt_l & 0xff00) | ((value << 0) & 0x00ff); break;
         case REG_DMA1CNT_L + 1: ioreg.io_dma1cnt_l = (ioreg.io_dma1cnt_l & 0x00ff) | ((value << 8) & 0x3f00); break;
         case REG_DMA1CNT_H + 0: ioreg.io_dma1cnt_h = (ioreg.io_dma1cnt_h & 0xff00) | ((value << 0) & 0x00e0); break;
-        case REG_DMA1CNT_H + 1: ioreg.io_dma1cnt_h = (ioreg.io_dma1cnt_h & 0x00ff) | ((value << 8) & 0xf700); break;
+        case REG_DMA1CNT_H + 1: ioreg.io_dma1cnt_h = (ioreg.io_dma1cnt_h & 0x00ff) | ((value << 8) & 0xf700); gba_dma_update(DMA_NOW); break;
         case REG_DMA2SAD_L + 0: ioreg.io_dma2sad = (ioreg.io_dma2sad & 0xffffff00) | ((value << 0) & 0x000000ff); break;
         case REG_DMA2SAD_L + 1: ioreg.io_dma2sad = (ioreg.io_dma2sad & 0xffff00ff) | ((value << 8) & 0x0000ff00); break;
         case REG_DMA2SAD_H + 0: ioreg.io_dma2sad = (ioreg.io_dma2sad & 0xff00ffff) | ((value << 16) & 0x00ff0000); break;
@@ -940,7 +942,7 @@ void io_write_byte(uint32_t address, uint8_t value) {
         case REG_DMA2CNT_L + 0: ioreg.io_dma2cnt_l = (ioreg.io_dma2cnt_l & 0xff00) | ((value << 0) & 0x00ff); break;
         case REG_DMA2CNT_L + 1: ioreg.io_dma2cnt_l = (ioreg.io_dma2cnt_l & 0x00ff) | ((value << 8) & 0x3f00); break;
         case REG_DMA2CNT_H + 0: ioreg.io_dma2cnt_h = (ioreg.io_dma2cnt_h & 0xff00) | ((value << 0) & 0x00e0); break;
-        case REG_DMA2CNT_H + 1: ioreg.io_dma2cnt_h = (ioreg.io_dma2cnt_h & 0x00ff) | ((value << 8) & 0xf700); break;
+        case REG_DMA2CNT_H + 1: ioreg.io_dma2cnt_h = (ioreg.io_dma2cnt_h & 0x00ff) | ((value << 8) & 0xf700); gba_dma_update(DMA_NOW); break;
         case REG_DMA3SAD_L + 0: ioreg.io_dma3sad = (ioreg.io_dma3sad & 0xffffff00) | ((value << 0) & 0x000000ff); break;
         case REG_DMA3SAD_L + 1: ioreg.io_dma3sad = (ioreg.io_dma3sad & 0xffff00ff) | ((value << 8) & 0x0000ff00); break;
         case REG_DMA3SAD_H + 0: ioreg.io_dma3sad = (ioreg.io_dma3sad & 0xff00ffff) | ((value << 16) & 0x00ff0000); break;
@@ -952,7 +954,7 @@ void io_write_byte(uint32_t address, uint8_t value) {
         case REG_DMA3CNT_L + 0: ioreg.io_dma3cnt_l = (ioreg.io_dma3cnt_l & 0xff00) | ((value << 0) & 0x00ff); break;
         case REG_DMA3CNT_L + 1: ioreg.io_dma3cnt_l = (ioreg.io_dma3cnt_l & 0x00ff) | ((value << 8) & 0xff00); break;
         case REG_DMA3CNT_H + 0: ioreg.io_dma3cnt_h = (ioreg.io_dma3cnt_h & 0xff00) | ((value << 0) & 0x00e0); break;
-        case REG_DMA3CNT_H + 1: ioreg.io_dma3cnt_h = (ioreg.io_dma3cnt_h & 0x00ff) | ((value << 8) & 0xff00); break;
+        case REG_DMA3CNT_H + 1: ioreg.io_dma3cnt_h = (ioreg.io_dma3cnt_h & 0x00ff) | ((value << 8) & 0xff00); gba_dma_update(DMA_NOW); break;
         case 0xe0: break;
         case 0xe1: break;
         case 0xe2: break;
@@ -1281,25 +1283,25 @@ void io_write_halfword(uint32_t address, uint16_t value) {
         case REG_DMA0DAD_L: ioreg.io_dma0dad = (ioreg.io_dma0dad & 0xffff0000) | ((value << 0) & 0x0000ffff); break;
         case REG_DMA0DAD_H: ioreg.io_dma0dad = (ioreg.io_dma0dad & 0x0000ffff) | ((value << 16) & 0x07ff0000); break;
         case REG_DMA0CNT_L: ioreg.io_dma0cnt_l = value & 0x3fff; break;
-        case REG_DMA0CNT_H: ioreg.io_dma0cnt_h = value & 0xf7e0; break;
+        case REG_DMA0CNT_H: ioreg.io_dma0cnt_h = value & 0xf7e0; gba_dma_update(DMA_NOW); break;
         case REG_DMA1SAD_L: ioreg.io_dma1sad = (ioreg.io_dma1sad & 0xffff0000) | ((value << 0) & 0x0000ffff); break;
         case REG_DMA1SAD_H: ioreg.io_dma1sad = (ioreg.io_dma1sad & 0x0000ffff) | ((value << 16) & 0x0fff0000); break;
         case REG_DMA1DAD_L: ioreg.io_dma1dad = (ioreg.io_dma1dad & 0xffff0000) | ((value << 0) & 0x0000ffff); break;
         case REG_DMA1DAD_H: ioreg.io_dma1dad = (ioreg.io_dma1dad & 0x0000ffff) | ((value << 16) & 0x07ff0000); break;
         case REG_DMA1CNT_L: ioreg.io_dma1cnt_l = value & 0x3fff; break;
-        case REG_DMA1CNT_H: ioreg.io_dma1cnt_h = value & 0xf7e0; break;
+        case REG_DMA1CNT_H: ioreg.io_dma1cnt_h = value & 0xf7e0; gba_dma_update(DMA_NOW); break;
         case REG_DMA2SAD_L: ioreg.io_dma2sad = (ioreg.io_dma2sad & 0xffff0000) | ((value << 0) & 0x0000ffff); break;
         case REG_DMA2SAD_H: ioreg.io_dma2sad = (ioreg.io_dma2sad & 0x0000ffff) | ((value << 16) & 0x0fff0000); break;
         case REG_DMA2DAD_L: ioreg.io_dma2dad = (ioreg.io_dma2dad & 0xffff0000) | ((value << 0) & 0x0000ffff); break;
         case REG_DMA2DAD_H: ioreg.io_dma2dad = (ioreg.io_dma2dad & 0x0000ffff) | ((value << 16) & 0x07ff0000); break;
         case REG_DMA2CNT_L: ioreg.io_dma2cnt_l = value & 0x3fff; break;
-        case REG_DMA2CNT_H: ioreg.io_dma2cnt_h = value & 0xf7e0; break;
+        case REG_DMA2CNT_H: ioreg.io_dma2cnt_h = value & 0xf7e0; gba_dma_update(DMA_NOW); break;
         case REG_DMA3SAD_L: ioreg.io_dma3sad = (ioreg.io_dma3sad & 0xffff0000) | ((value << 0) & 0x0000ffff); break;
         case REG_DMA3SAD_H: ioreg.io_dma3sad = (ioreg.io_dma3sad & 0x0000ffff) | ((value << 16) & 0x0fff0000); break;
         case REG_DMA3DAD_L: ioreg.io_dma3dad = (ioreg.io_dma3dad & 0xffff0000) | ((value << 0) & 0x0000ffff); break;
         case REG_DMA3DAD_H: ioreg.io_dma3dad = (ioreg.io_dma3dad & 0x0000ffff) | ((value << 16) & 0x0fff0000); break;
         case REG_DMA3CNT_L: ioreg.io_dma3cnt_l = value & 0xffff; break;
-        case REG_DMA3CNT_H: ioreg.io_dma3cnt_h = value & 0xffe0; break;
+        case REG_DMA3CNT_H: ioreg.io_dma3cnt_h = value & 0xffe0; gba_dma_update(DMA_NOW); break;
         case 0xe0: break;
         case 0xe2: break;
         case 0xe4: break;
@@ -1506,16 +1508,16 @@ void io_write_word(uint32_t address, uint32_t value) {
         case 0xac: break;
         case REG_DMA0SAD_L: ioreg.io_dma0sad = value & 0x07ffffff; break;
         case REG_DMA0DAD_L: ioreg.io_dma0dad = value & 0x07ffffff; break;
-        case REG_DMA0CNT_L: ioreg.io_dma0cnt_l = value & 0x3fff; ioreg.io_dma0cnt_h = (value >> 16) & 0xf7e0; break;
+        case REG_DMA0CNT_L: ioreg.io_dma0cnt_l = value & 0x3fff; ioreg.io_dma0cnt_h = (value >> 16) & 0xf7e0; gba_dma_update(DMA_NOW); break;
         case REG_DMA1SAD_L: ioreg.io_dma1sad = value & 0x0fffffff; break;
         case REG_DMA1DAD_L: ioreg.io_dma1dad = value & 0x07ffffff; break;
-        case REG_DMA1CNT_L: ioreg.io_dma1cnt_l = value & 0x3fff; ioreg.io_dma1cnt_h = (value >> 16) & 0xf7e0; break;
+        case REG_DMA1CNT_L: ioreg.io_dma1cnt_l = value & 0x3fff; ioreg.io_dma1cnt_h = (value >> 16) & 0xf7e0; gba_dma_update(DMA_NOW); break;
         case REG_DMA2SAD_L: ioreg.io_dma2sad = value & 0x0fffffff; break;
         case REG_DMA2DAD_L: ioreg.io_dma2dad = value & 0x07ffffff; break;
-        case REG_DMA2CNT_L: ioreg.io_dma2cnt_l = value & 0x3fff; ioreg.io_dma2cnt_h = (value >> 16) & 0xf7e0; break;
+        case REG_DMA2CNT_L: ioreg.io_dma2cnt_l = value & 0x3fff; ioreg.io_dma2cnt_h = (value >> 16) & 0xf7e0; gba_dma_update(DMA_NOW); break;
         case REG_DMA3SAD_L: ioreg.io_dma3sad = value & 0x0fffffff; break;
         case REG_DMA3DAD_L: ioreg.io_dma3dad = value & 0x0fffffff; break;
-        case REG_DMA3CNT_L: ioreg.io_dma3cnt_l = value & 0xffff; ioreg.io_dma3cnt_h = (value >> 16) & 0xffe0; break;
+        case REG_DMA3CNT_L: ioreg.io_dma3cnt_l = value & 0xffff; ioreg.io_dma3cnt_h = (value >> 16) & 0xffe0; gba_dma_update(DMA_NOW); break;
         case 0xe0: break;
         case 0xe4: break;
         case 0xe8: break;
@@ -2438,6 +2440,7 @@ void gba_ppu_update(void) {
                 if ((ioreg.io_dispstat & DSTAT_VBL_IRQ) != 0) {
                     ioreg.io_if |= INT_VBLANK;
                 }
+                gba_dma_update(DMA_AT_VBLANK);
             }
         }
         if (ioreg.io_vcount == (uint8_t)(ioreg.io_dispstat >> 8)) {
@@ -2457,6 +2460,9 @@ void gba_ppu_update(void) {
             ioreg.io_dispstat |= DSTAT_IN_HBL;
             if ((ioreg.io_dispstat & DSTAT_HBL_IRQ) != 0) {
                 ioreg.io_if |= INT_HBLANK;
+            }
+            if (ppu_cycles < 197120) {
+                gba_dma_update(DMA_AT_HBLANK);
             }
         }
     }
@@ -2504,6 +2510,9 @@ void gba_timer_update(void) {
                         if ((ioreg.io_soundcnt_h & (1 << 10)) != 0) ioreg.fifo_a_refill = true;
                         if ((ioreg.io_soundcnt_h & (1 << 14)) != 0) ioreg.fifo_b_refill = true;
                     }
+                    if (ioreg.fifo_a_refill || ioreg.fifo_b_refill) {
+                        gba_dma_update(DMA_AT_REFRESH);
+                    }
                     last_increment = true;
                 } else {
                     last_increment = false;
@@ -2535,7 +2544,7 @@ void gba_dma_transfer_words(uint32_t dst_ctrl, uint32_t src_ctrl, uint32_t *dst_
     }
 }
 
-void gba_dma_update(void) {
+void gba_dma_update(uint32_t current_timing) {
     for (int ch = 0; ch < 4; ch++) {
         uint32_t dmacnt, *dst_addr, *src_addr;
         switch (ch) {
@@ -2549,6 +2558,8 @@ void gba_dma_update(void) {
         if ((dmacnt & DMA_ENABLE) == 0) continue;
 
         uint32_t start_timing = (dmacnt >> 28) & 3;
+        if (start_timing != current_timing) continue;
+
         uint32_t dst_ctrl = (dmacnt >> 21) & 3;
         uint32_t src_ctrl = (dmacnt >> 23) & 3;
         if (*src_addr >= 0x08000000 && *src_addr <= 0x0e000000) src_ctrl = DMA_INC;
@@ -2556,11 +2567,13 @@ void gba_dma_update(void) {
         uint32_t count = dmacnt & 0xffff;
         if (count == 0) count = (ch == 3 ? 0x10000 : 0x4000);
 
-        if (start_timing == DMA_AT_VBLANK && !(ioreg.io_vcount == 160)) continue;
-        if (start_timing == DMA_AT_HBLANK && !(ppu_cycles < 197120 && ppu_cycles % 1232 == 1006)) continue;
+        if (start_timing == DMA_AT_VBLANK) assert(ioreg.io_vcount == 160);
+        if (start_timing == DMA_AT_HBLANK) assert(ppu_cycles < 197120 && ppu_cycles % 1232 == 1006);
         bool dma_special = false;
         if (start_timing == DMA_AT_REFRESH) {
-            if (ch == 1 || ch == 2) {
+            if (ch == 0) {
+                continue;
+            } else if (ch == 1 || ch == 2) {
                 dma_special = true;
                 if (!(*dst_addr == 0x40000a0 || *dst_addr == 0x40000a4)) continue;
                 assert((dmacnt & DMA_REPEAT) != 0);
@@ -2570,9 +2583,6 @@ void gba_dma_update(void) {
                 transfer_word = true;
                 count = 4;
             } else if (ch == 3) {
-                if (ppu_cycles % 1232 != 0) continue;
-            } else {
-                //assert(false);
                 continue;  // FIXME
             }
         }
@@ -2627,7 +2637,6 @@ void gba_dma_update(void) {
 void gba_emulate(void) {
     while (true) {
         gba_timer_update();
-        gba_dma_update();
         gba_ppu_update();
         if (ppu_cycles == 0) break;
 
@@ -2732,7 +2741,7 @@ int main(int argc, char **argv) {
     }
     SDL_GLContext gl_context = SDL_GL_CreateContext(window);
     SDL_GL_MakeCurrent(window, gl_context);
-    SDL_GL_SetSwapInterval(1);  // Enable vsync
+    SDL_GL_SetSwapInterval(0);  // Disable vsync
 
     // Enable drag and drop
     SDL_EventState(SDL_DROPFILE, SDL_ENABLE);
@@ -2951,17 +2960,21 @@ int main(int argc, char **argv) {
         ImGui::Checkbox("Has Flash", &has_flash);
         ImGui::Checkbox("Has SRAM", &has_sram);
         ImGui::Checkbox("Skip BIOS", &skip_bios);
-        ImGui::Checkbox("Paused", &paused);
+        //ImGui::Checkbox("Paused", &paused);
+
+        static bool sync_to_video = false;
+        ImGui::Checkbox("Sync to video", &sync_to_video);
+        SDL_GL_SetSwapInterval(sync_to_video ? 1 : 0);
+
+        static bool mute_audio = false;
+        ImGui::Checkbox("Mute audio", &mute_audio);
+        SDL_PauseAudioDevice(audio_device, mute_audio ? 1 : 0);
+
         ImGui::Text("R13: %08X", r[13]);
         ImGui::Text("R14: %08X", r[14]);
         ImGui::Text("R15: %08X", r[15] - 2 * SIZEOF_INSTR);
         ImGui::Text("T: %d", FLAG_T());
 
-        if (ImGui::Button("Mute")) {
-            static bool muted = false;
-            SDL_PauseAudioDevice(audio_device, muted ? 0 : 1);
-            muted = !muted;
-        }
         ImGui::Text("DMA1SAD: %08X", ioreg.io_dma1sad);
         ImGui::Text("DMA2SAD: %08X", ioreg.io_dma2sad);
         ImGui::Text("fifo_a_r: %d", ioreg.fifo_a_r);
