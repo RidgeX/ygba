@@ -1,7 +1,8 @@
 add_library(gl3w OBJECT
-    GL/gl3w.c
+    gl3w.c
     GL/gl3w.h
     GL/glcorearb.h
+    KHR/khrplatform.h
 )
 
 if(UNIX)
