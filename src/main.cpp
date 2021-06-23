@@ -59,6 +59,8 @@ bool has_eeprom = false;
 bool has_flash = false;
 //bool has_rtc = false;
 bool has_sram = false;
+char game_title[13];
+char game_code[5];
 
 //#define LOG_BAD_MEMORY_ACCESS
 
@@ -1643,6 +1645,13 @@ void gba_detect_cartridge_features(void) {
     uint8_t *sram_f_v = (uint8_t *) "SRAM_F_V";
     match = boyer_moore_matcher(game_rom, game_rom_size, sram_f_v, 8);
     if (match) { has_sram = true; }
+
+    memcpy(game_title, game_rom + 0xa0, 12);
+    game_title[12] = '\0';
+    memcpy(game_code, game_rom + 0xac, 4);
+    game_code[4] = '\0';
+
+    if (strcmp(game_code, "ALUE") == 0 && strcmp(game_title, "MONKEYBALLJR") == 0) { has_eeprom = true; has_flash = false; has_sram = false; }
 }
 
 void gba_reset(bool keep_backup) {
