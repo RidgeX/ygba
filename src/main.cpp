@@ -275,8 +275,15 @@ uint8_t backup_sram[0x10000];
 #define REG_TM3CNT_H    0x10e
 
 // Serial Communication (1)
-#define REG_SIODATA32   0x120
+#define REG_SIODATA32_L 0x120
+#define REG_SIOMULTI0   0x120
+#define REG_SIODATA32_H 0x122
+#define REG_SIOMULTI1   0x122
+#define REG_SIOMULTI2   0x124
+#define REG_SIOMULTI3   0x126
 #define REG_SIOCNT      0x128
+#define REG_SIOMLT_SEND 0x12a
+#define REG_SIODATA8    0x12a
 
 // Keypad Input
 #define REG_KEYINPUT    0x130
@@ -284,6 +291,12 @@ uint8_t backup_sram[0x10000];
 
 // Serial Communication (2)
 #define REG_RCNT        0x134
+#define REG_JOYCNT      0x140
+#define REG_JOY_RECV_L  0x150
+#define REG_JOY_RECV_H  0x152
+#define REG_JOY_TRANS_L 0x154
+#define REG_JOY_TRANS_H 0x156
+#define REG_JOYSTAT     0x158
 
 // Interrupt, Waitstate, and Power-Down Control
 #define REG_IE          0x200
@@ -375,13 +388,20 @@ struct {
     } timer[4];
 
     // Serial Communication (1)
+    io_union16 siomulti[4];
+    io_union16 siocnt;
+    io_union16 siomlt_send;
 
     // Keypad Input
     io_union16 keyinput;
     io_union16 keycnt;
 
     // Serial Communication (2)
-    uint16_t io_rcnt;
+    io_union16 rcnt;
+    io_union16 joycnt;
+    io_union32 joy_recv;
+    io_union32 joy_trans;
+    io_union16 joystat;
 
     // Interrupt, Waitstate, and Power-Down Control
     io_union16 ie;
@@ -592,10 +612,38 @@ uint8_t io_read_byte(uint32_t address) {
         case REG_TM3CNT_H + 0: return ioreg.timer[3].control.b.b0;
         case REG_TM3CNT_H + 1: return ioreg.timer[3].control.b.b1;
 
+        case REG_SIOMULTI0 + 0: return ioreg.siomulti[0].b.b0;
+        case REG_SIOMULTI0 + 1: return ioreg.siomulti[0].b.b1;
+        case REG_SIOMULTI1 + 0: return ioreg.siomulti[1].b.b0;
+        case REG_SIOMULTI1 + 1: return ioreg.siomulti[1].b.b1;
+        case REG_SIOMULTI2 + 0: return ioreg.siomulti[2].b.b0;
+        case REG_SIOMULTI2 + 1: return ioreg.siomulti[2].b.b1;
+        case REG_SIOMULTI3 + 0: return ioreg.siomulti[3].b.b0;
+        case REG_SIOMULTI3 + 1: return ioreg.siomulti[3].b.b1;
+        case REG_SIOCNT + 0: return ioreg.siocnt.b.b0;
+        case REG_SIOCNT + 1: return ioreg.siocnt.b.b1;
+        case REG_SIOMLT_SEND + 0: return ioreg.siomlt_send.b.b0;
+        case REG_SIOMLT_SEND + 1: return ioreg.siomlt_send.b.b1;
+
         case REG_KEYINPUT + 0: return ioreg.keyinput.b.b0;
         case REG_KEYINPUT + 1: return ioreg.keyinput.b.b1;
         case REG_KEYCNT + 0: return ioreg.keycnt.b.b0;
         case REG_KEYCNT + 1: return ioreg.keycnt.b.b1;
+
+        case REG_RCNT + 0: return ioreg.rcnt.b.b0;
+        case REG_RCNT + 1: return ioreg.rcnt.b.b1;
+        case REG_JOYCNT + 0: return ioreg.joycnt.b.b0;
+        case REG_JOYCNT + 1: return ioreg.joycnt.b.b1;
+        case REG_JOY_RECV_L + 0: return ioreg.joy_recv.b.b0;
+        case REG_JOY_RECV_L + 1: return ioreg.joy_recv.b.b1;
+        case REG_JOY_RECV_H + 0: return ioreg.joy_recv.b.b2;
+        case REG_JOY_RECV_H + 1: return ioreg.joy_recv.b.b3;
+        case REG_JOY_TRANS_L + 0: return ioreg.joy_trans.b.b0;
+        case REG_JOY_TRANS_L + 1: return ioreg.joy_trans.b.b1;
+        case REG_JOY_TRANS_H + 0: return ioreg.joy_trans.b.b2;
+        case REG_JOY_TRANS_H + 1: return ioreg.joy_trans.b.b3;
+        case REG_JOYSTAT + 0: return ioreg.joystat.b.b0;
+        case REG_JOYSTAT + 1: return ioreg.joystat.b.b1;
 
         case REG_IE + 0: return ioreg.ie.b.b0;
         case REG_IE + 1: return ioreg.ie.b.b1;
@@ -820,8 +868,36 @@ void io_write_byte(uint32_t address, uint8_t value) {
         case REG_TM3CNT_H + 0: ioreg.timer[3].control.b.b0 = value & 0xc7; if (value & 0x80) { ioreg.timer[3].counter.w = ioreg.timer[3].reload.w; } break;
         case REG_TM3CNT_H + 1: ioreg.timer[3].control.b.b1 = value & 0x00; break;
 
+        //case REG_SIOMULTI0 + 0:
+        //case REG_SIOMULTI0 + 1:
+        //case REG_SIOMULTI1 + 0:
+        //case REG_SIOMULTI1 + 1:
+        //case REG_SIOMULTI2 + 0:
+        //case REG_SIOMULTI2 + 1:
+        //case REG_SIOMULTI3 + 0:
+        //case REG_SIOMULTI3 + 1:
+        //case REG_SIOCNT + 0:
+        //case REG_SIOCNT + 1:
+        //case REG_SIOMLT_SEND + 0:
+        //case REG_SIOMLT_SEND + 1:
+
         case REG_KEYCNT + 0: ioreg.keycnt.b.b0 = value; break;
         case REG_KEYCNT + 1: ioreg.keycnt.b.b1 = value & 0xc3; break;
+
+        //case REG_RCNT + 0:
+        //case REG_RCNT + 1:
+        //case REG_JOYCNT + 0:
+        //case REG_JOYCNT + 1:
+        //case REG_JOY_RECV_L + 0:
+        //case REG_JOY_RECV_L + 1:
+        //case REG_JOY_RECV_H + 0:
+        //case REG_JOY_RECV_H + 1:
+        //case REG_JOY_TRANS_L + 0:
+        //case REG_JOY_TRANS_L + 1:
+        //case REG_JOY_TRANS_H + 0:
+        //case REG_JOY_TRANS_H + 1:
+        //case REG_JOYSTAT + 0:
+        //case REG_JOYSTAT + 1:
 
         case REG_IE + 0: ioreg.ie.b.b0 = value; break;
         case REG_IE + 1: ioreg.ie.b.b1 = value & 0x3f; break;
@@ -905,13 +981,23 @@ uint16_t io_read_halfword(uint32_t address) {
         case REG_TM3CNT_L: return ioreg.timer[3].counter.w;
         case REG_TM3CNT_H: return ioreg.timer[3].control.w;
 
-        case REG_SIODATA32: return 0;  // FIXME
-        case REG_SIOCNT: return 0;  // FIXME
+        case REG_SIOMULTI0: return ioreg.siomulti[0].w;
+        case REG_SIOMULTI1: return ioreg.siomulti[1].w;
+        case REG_SIOMULTI2: return ioreg.siomulti[2].w;
+        case REG_SIOMULTI3: return ioreg.siomulti[3].w;
+        case REG_SIOCNT: return ioreg.siocnt.w;
+        case REG_SIOMLT_SEND: return ioreg.siomlt_send.w;
 
         case REG_KEYINPUT: return ioreg.keyinput.w;
         case REG_KEYCNT: return ioreg.keycnt.w;
 
-        //case IO_RCNT: return ioreg.io_rcnt;
+        case REG_RCNT: return ioreg.rcnt.w;
+        case REG_JOYCNT: return ioreg.joycnt.w;
+        case REG_JOY_RECV_L: return ioreg.joy_recv.w.w0;
+        case REG_JOY_RECV_H: return ioreg.joy_recv.w.w1;
+        case REG_JOY_TRANS_L: return ioreg.joy_trans.w.w0;
+        case REG_JOY_TRANS_H: return ioreg.joy_trans.w.w1;
+        case REG_JOYSTAT: return ioreg.joystat.w;
 
         case REG_IE: return ioreg.ie.w;
         case REG_IF: return ioreg.irq.w;
@@ -1033,7 +1119,22 @@ void io_write_halfword(uint32_t address, uint16_t value) {
         case REG_TM3CNT_L: ioreg.timer[3].reload.w = value; break;
         case REG_TM3CNT_H: ioreg.timer[3].control.w = value & 0x00c7; if (value & 0x80) { ioreg.timer[3].counter.w = ioreg.timer[3].reload.w; } break;
 
+        //case REG_SIOMULTI0:
+        //case REG_SIOMULTI1:
+        //case REG_SIOMULTI2:
+        //case REG_SIOMULTI3:
+        //case REG_SIOCNT:
+        //case REG_SIOMLT_SEND:
+
         case REG_KEYCNT: ioreg.keycnt.w = value & 0xc3ff; break;
+
+        //case REG_RCNT:
+        //case REG_JOYCNT:
+        //case REG_JOY_RECV_L:
+        //case REG_JOY_RECV_H:
+        //case REG_JOY_TRANS_L:
+        //case REG_JOY_TRANS_H:
+        //case REG_JOYSTAT:
 
         case REG_IE: ioreg.ie.w = value & 0x3fff; break;
         case REG_IF: ioreg.irq.w &= ~value; break;
@@ -1085,7 +1186,17 @@ uint32_t io_read_word(uint32_t address) {
         case REG_TM2CNT_L: return ioreg.timer[2].counter.w | ioreg.timer[2].control.w << 16;
         case REG_TM3CNT_L: return ioreg.timer[3].counter.w | ioreg.timer[3].control.w << 16;
 
+        case REG_SIOMULTI0: return ioreg.siomulti[0].w | ioreg.siomulti[1].w << 16;
+        case REG_SIOMULTI2: return ioreg.siomulti[2].w | ioreg.siomulti[3].w << 16;
+        case REG_SIOCNT: return ioreg.siocnt.w | ioreg.siomlt_send.w << 16;
+
         case REG_KEYINPUT: return ioreg.keyinput.w | ioreg.keycnt.w << 16;
+
+        case REG_RCNT: return ioreg.rcnt.w;
+        case REG_JOYCNT: return ioreg.joycnt.w;
+        case REG_JOY_RECV_L: return ioreg.joy_recv.dw;
+        case REG_JOY_TRANS_L: return ioreg.joy_trans.dw;
+        case REG_JOYSTAT: return ioreg.joystat.w;
 
         case REG_IE: return ioreg.ie.w | ioreg.irq.w << 16;
         case REG_WAITCNT: return ioreg.waitcnt.w;
@@ -1163,7 +1274,17 @@ void io_write_word(uint32_t address, uint32_t value) {
         case REG_TM2CNT_L: ioreg.timer[2].reload.w = value & 0xffff; ioreg.timer[2].control.w = (value >> 16) & 0x00c7; if ((value >> 16) & 0x80) { ioreg.timer[2].counter.w = ioreg.timer[2].reload.w; } break;
         case REG_TM3CNT_L: ioreg.timer[3].reload.w = value & 0xffff; ioreg.timer[3].control.w = (value >> 16) & 0x00c7; if ((value >> 16) & 0x80) { ioreg.timer[3].counter.w = ioreg.timer[3].reload.w; } break;
 
+        //case REG_SIOMULTI0:
+        //case REG_SIOMULTI2:
+        //case REG_SIOCNT:
+
         case REG_KEYINPUT: ioreg.keycnt.w = (value >> 16) & 0xc3ff; break;
+
+        //case REG_RCNT:
+        //case REG_JOYCNT:
+        //case REG_JOY_RECV_L:
+        //case REG_JOY_TRANS_L:
+        //case REG_JOYSTAT:
 
         case REG_IE: ioreg.ie.w = value & 0x3fff; ioreg.irq.w &= ~(uint16_t)(value >> 16); break;
         case REG_WAITCNT: ioreg.waitcnt.w = (ioreg.waitcnt.w & 0x8000) | (value & 0x5fff); break;
@@ -1559,6 +1680,7 @@ void memory_write_halfword(uint32_t address, uint16_t value) {
     if (address >= 0x08000000 && address < 0x0e000000) {
         if (has_eeprom && game_rom_size <= 0x1000000 && address >= 0x0d000000) {
             eeprom_write_bit(value);
+            return;
         }
         //return;  // Read only
     }
