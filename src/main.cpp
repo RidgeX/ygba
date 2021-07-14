@@ -884,8 +884,8 @@ void io_write_byte(uint32_t address, uint8_t value) {
         case REG_KEYCNT + 0: ioreg.keycnt.b.b0 = value; break;
         case REG_KEYCNT + 1: ioreg.keycnt.b.b1 = value & 0xc3; break;
 
-        //case REG_RCNT + 0:
-        //case REG_RCNT + 1:
+        case REG_RCNT + 0: ioreg.rcnt.b.b0 = value; break;
+        case REG_RCNT + 1: ioreg.rcnt.b.b1 = value & 0xc1; break;
         //case REG_JOYCNT + 0:
         //case REG_JOYCNT + 1:
         //case REG_JOY_RECV_L + 0:
@@ -1128,7 +1128,7 @@ void io_write_halfword(uint32_t address, uint16_t value) {
 
         case REG_KEYCNT: ioreg.keycnt.w = value & 0xc3ff; break;
 
-        //case REG_RCNT:
+        case REG_RCNT: ioreg.rcnt.w = value & 0xc1ff; break;
         //case REG_JOYCNT:
         //case REG_JOY_RECV_L:
         //case REG_JOY_RECV_H:
@@ -1280,7 +1280,7 @@ void io_write_word(uint32_t address, uint32_t value) {
 
         case REG_KEYINPUT: ioreg.keycnt.w = (value >> 16) & 0xc3ff; break;
 
-        //case REG_RCNT:
+        case REG_RCNT: ioreg.rcnt.w = value & 0xc1ff; break;
         //case REG_JOYCNT:
         //case REG_JOY_RECV_L:
         //case REG_JOY_TRANS_L:
@@ -1836,6 +1836,7 @@ void gba_reset(bool keep_backup) {
         ioreg.bg_affine[0].dmy.w = 0x100;
         ioreg.bg_affine[1].dx.w = 0x100;
         ioreg.bg_affine[1].dmy.w = 0x100;
+        ioreg.rcnt.w = 0x8000;
     }
 }
 
