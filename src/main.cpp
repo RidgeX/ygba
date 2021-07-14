@@ -1340,10 +1340,9 @@ uint8_t backup_read_byte(uint32_t address) {
     if (has_flash) {
         flash_state &= ~7;
         if (flash_id) {
-            if (address == 0) return flash_manufacturer;
-            if (address == 1) return flash_device;
-            assert(false);
-            //return 0xff;
+            if ((address & 3) == 0) return flash_manufacturer;
+            if ((address & 3) == 1) return flash_device;
+            return 0;
         }
         return backup_flash[flash_bank * 0x10000 + address];
     } else if (has_sram) {
