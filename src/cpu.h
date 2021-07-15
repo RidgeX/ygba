@@ -141,19 +141,6 @@ int arm_step(void);
 int thumb_step(void);
 void arm_init_lookup(void);
 void thumb_init_lookup(void);
-void print_psr(uint32_t psr);
-void print_all_registers(void);
-void arm_print_opcode(void);
-void thumb_print_opcode(void);
-void print_mnemonic(const char *s);
-void print_mnemonic_d(const char *s, char *t);
-void print_register(uint32_t i);
-void print_immediate(uint32_t i);
-void print_address(uint32_t i);
-void print_shift_amount(uint32_t i);
-void arm_print_shifter_op(uint32_t shop, uint32_t shamt, uint32_t shreg, uint32_t Rs);
-bool arm_print_rlist(uint32_t rlist);
-bool thumb_print_rlist(uint32_t rlist);
 
 // cpu-arm.c
 int arm_data_processing_register(void);

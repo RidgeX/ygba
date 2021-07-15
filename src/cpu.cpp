@@ -203,10 +203,6 @@ void write_spsr(uint32_t psr) {
 }
 
 int arm_undefined_instruction(void) {
-    arm_print_opcode();
-    print_mnemonic("undefined");
-    printf("\n");
-
     assert(false);
 
     r14_und = r[REG_PC] - SIZEOF_INSTR;  // ARM: PC + 4, Thumb: PC + 2
@@ -219,10 +215,6 @@ int arm_undefined_instruction(void) {
 }
 
 int thumb_undefined_instruction(void) {
-    thumb_print_opcode();
-    print_mnemonic("undefined");
-    printf("\n");
-
     assert(false);
 
     return arm_undefined_instruction();
@@ -241,36 +233,14 @@ int arm_step(void) {
         arm_pipeline[1] = memory_read_word(r[15]);
     }
 
-#ifdef DEBUG
-    if (log_registers) {
-        print_all_registers();
-    }
-#endif
-
     uint32_t cond = (arm_op >> 28) & 0xf;
     int cycles = 1;
     if (condition_passed(cond)) {
         uint32_t index = ((arm_op >> 4) & 0xf) | ((arm_op >> 16) & 0xff0);
         int (*handler)(void) = arm_lookup[index];
-        if (handler == NULL) {
-            arm_print_opcode();
-            printf("unimplemented\n");
-            printf("index = 0x%03x\n", index);
-            assert(false);
-        }
+        assert(handler != NULL);
         cycles = (*handler)();
     }
-#ifdef DEBUG
-    else if (log_instructions) {
-        printf("...\n");
-    }
-#endif
-
-#ifdef DEBUG
-    //if (log_registers) {
-    //    printf("\n");
-    //}
-#endif
 
     if (!branch_taken) {
         r[15] += 4;
@@ -292,22 +262,10 @@ int thumb_step(void) {
         thumb_pipeline[1] = memory_read_halfword(r[15]);
     }
 
-#ifdef DEBUG
-    if (log_registers) {
-        print_all_registers();
-    }
-#endif
-
     uint16_t index = (thumb_op >> 8) & 0xff;
     int (*handler)(void) = thumb_lookup[index];
     assert(handler != NULL);
     int cycles = (*handler)();
-
-#ifdef DEBUG
-    //if (log_registers) {
-    //    printf("\n");
-    //}
-#endif
 
     if (!branch_taken) {
         r[15] += 2;
@@ -398,180 +356,4 @@ void thumb_init_lookup(void) {
     thumb_bind("11101xxx", thumb_undefined_instruction);
     thumb_bind("11110xxx", thumb_branch_with_link_prefix);
     thumb_bind("11111xxx", thumb_branch_with_link_suffix);
-}
-
-void print_psr(uint32_t psr) {
-    putchar(psr & PSR_N ? 'N' : '-');
-    putchar(psr & PSR_Z ? 'Z' : '-');
-    putchar(psr & PSR_C ? 'C' : '-');
-    putchar(psr & PSR_V ? 'V' : '-');
-    putchar(psr & PSR_I ? 'I' : '-');
-    putchar(psr & PSR_F ? 'F' : '-');
-    putchar(psr & PSR_T ? 'T' : '-');
-}
-
-void print_all_registers(void) {
-    printf("%08X %08X %08X %08X %08X %08X %08X %08X %08X %08X %08X %08X %08X %08X %08X %08X cpsr: %08X | ", r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8], r[9], r[10], r[11], r[12], r[13], r[14], r[15] - SIZEOF_INSTR, cpsr);
-    /*
-    printf(" r0: %08X   r1: %08X   r2: %08X   r3: %08X\n", r[0], r[1], r[2], r[3]);
-    printf(" r4: %08X   r5: %08X   r6: %08X   r7: %08X\n", r[4], r[5], r[6], r[7]);
-    printf(" r8: %08X   r9: %08X  r10: %08X  r11: %08X\n", r[8], r[9], r[10], r[11]);
-    printf("r12: %08X  r13: %08X  r14: %08X  r15: %08X\n", r[12], r[13], r[14], r[15] - SIZEOF_INSTR);
-    printf("cpsr: %08X [", cpsr);
-    print_psr(cpsr);
-    printf("]\n");
-    printf("Cycle: %lld\n", instruction_count);
-    */
-}
-
-void arm_print_opcode(void) {
-    printf("%08X: ", arm_op);
-    //printf("%08X:  %08X\t", r[15] - 2 * SIZEOF_INSTR, arm_op);
-}
-
-void thumb_print_opcode(void) {
-    printf("    %04X: ", thumb_op);
-    //printf("%08X:  %04X    \t", r[15] - 2 * SIZEOF_INSTR, thumb_op);
-}
-
-static void arm_print_condition(void) {
-    switch (BITS(arm_op, 28, 31)) {
-        case COND_EQ: printf("eq"); break;
-        case COND_NE: printf("ne"); break;
-        case COND_CS: printf("cs"); break;
-        case COND_CC: printf("cc"); break;
-        case COND_MI: printf("mi"); break;
-        case COND_PL: printf("pl"); break;
-        case COND_VS: printf("vs"); break;
-        case COND_VC: printf("vc"); break;
-        case COND_HI: printf("hi"); break;
-        case COND_LS: printf("ls"); break;
-        case COND_GE: printf("ge"); break;
-        case COND_LT: printf("lt"); break;
-        case COND_GT: printf("gt"); break;
-        case COND_LE: printf("le"); break;
-    }
-}
-
-void print_mnemonic(const char *s) {
-    printf("%s", s);
-    if (!FLAG_T()) arm_print_condition();
-    printf(" ");
-}
-
-void print_mnemonic_d(const char *s, char *t) {
-    printf("%s", s);
-    if (!FLAG_T()) arm_print_condition();
-    printf("%s", t);
-    printf(" ");
-}
-
-void print_register(uint32_t i) {
-    switch (i) {
-        case 13: printf("sp"); break;
-        case 14: printf("lr"); break;
-        case 15: printf("pc"); break;
-        default: printf("r%d", i); break;
-    }
-}
-
-void print_immediate(uint32_t i) {
-    //if (i > 9) {
-    //    printf("#0x%X", i);
-    //} else {
-    printf("#%d", i);
-    //}
-}
-
-void print_address(uint32_t i) {
-    printf("0x%08X", i);
-}
-
-void print_shift_amount(uint32_t i) {
-    printf("#%d", i);
-}
-
-void arm_print_shifter_op(uint32_t shop, uint32_t shamt, uint32_t shreg, uint32_t Rs) {
-    switch (shop) {
-        case SHIFT_LSL:
-            if (shreg) {
-                printf(", lsl ");
-                print_register(Rs);
-            } else if (shamt != 0) {
-                printf(", lsl ");
-                print_shift_amount(shamt);
-            }
-            break;
-
-        case SHIFT_LSR:
-            printf(", lsr ");
-            if (shreg) {
-                print_register(Rs);
-            } else {
-                print_shift_amount(shamt);
-            }
-            break;
-
-        case SHIFT_ASR:
-            printf(", asr ");
-            if (shreg) {
-                print_register(Rs);
-            } else {
-                print_shift_amount(shamt);
-            }
-            break;
-
-        case SHIFT_ROR:
-            if (shreg) {
-                printf(", ror ");
-                print_register(Rs);
-            } else if (shamt == 0) {
-                printf(", rrx");
-            } else {
-                printf(", ror ");
-                print_shift_amount(shamt);
-            }
-            break;
-
-        default:
-            assert(false);
-            break;
-    }
-}
-
-static bool print_rlist(uint32_t rlist, uint32_t max) {
-    bool first = true;
-    uint32_t i = 0;
-    while (i < max) {
-        if (rlist & (1 << i)) {
-            uint32_t j = i + 1;
-            while (rlist & (1 << j)) j++;
-            if (j == i + 1) {
-                if (!first) printf(",");
-                print_register(i);
-            } else if (j == i + 2) {
-                if (!first) printf(",");
-                print_register(i);
-                printf("-");
-                print_register(j - 1);
-            } else {
-                if (!first) printf(",");
-                print_register(i);
-                printf("-");
-                print_register(j - 1);
-            }
-            i = j;
-            first = false;
-        }
-        i++;
-    }
-    return first;
-}
-
-bool arm_print_rlist(uint32_t rlist) {
-    return print_rlist(rlist, 16);
-}
-
-bool thumb_print_rlist(uint32_t rlist) {
-    return print_rlist(rlist, 8);
 }

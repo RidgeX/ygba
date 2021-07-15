@@ -2709,7 +2709,7 @@ int main(int argc, char **argv) {
 
         ImGui::Text("R13: %08X", r[13]);
         ImGui::Text("R14: %08X", r[14]);
-        ImGui::Text("R15: %08X", r[15] - 2 * SIZEOF_INSTR);
+        ImGui::Text("R15: %08X", r[15] - (branch_taken ? 0 : 2 * SIZEOF_INSTR));
         ImGui::Text("T: %d", FLAG_T());
 
         ImGui::Text("DMA1SAD: %08X", ioreg.dma[1].sad.dw);

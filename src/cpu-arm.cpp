@@ -118,22 +118,6 @@ static void arm_shifter_flags(uint32_t shop, uint32_t s, uint32_t m) {
     }
 }
 
-// AND{<cond>}{S} Rd, Rn, Rm{, <shifter_operand>}
-// EOR{<cond>}{S} Rd, Rn, Rm{, <shifter_operand>}
-// SUB{<cond>}{S} Rd, Rn, Rm{, <shifter_operand>}
-// RSB{<cond>}{S} Rd, Rn, Rm{, <shifter_operand>}
-// ADD{<cond>}{S} Rd, Rn, Rm{, <shifter_operand>}
-// ADC{<cond>}{S} Rd, Rn, Rm{, <shifter_operand>}
-// SBC{<cond>}{S} Rd, Rn, Rm{, <shifter_operand>}
-// RSC{<cond>}{S} Rd, Rn, Rm{, <shifter_operand>}
-// TST{<cond>}{P} Rn, Rm{, <shifter_operand>}
-// TEQ{<cond>}{P} Rn, Rm{, <shifter_operand>}
-// CMP{<cond>}{P} Rn, Rm{, <shifter_operand>}
-// CMN{<cond>}{P} Rn, Rm{, <shifter_operand>}
-// ORR{<cond>}{S} Rd, Rn, Rm{, <shifter_operand>}
-// MOV{<cond>}{S} Rd, Rm{, <shifter_operand>}
-// BIC{<cond>}{S} Rd, Rn, Rm{, <shifter_operand>}
-// MVN{<cond>}{S} Rd, Rm{, <shifter_operand>}
 int arm_data_processing_register(void) {
     uint32_t opc = BITS(arm_op, 21, 24);
     bool S = BIT(arm_op, 20);
@@ -151,41 +135,6 @@ int arm_data_processing_register(void) {
 
     bool is_test_or_compare = (opc == ARM_TST || opc == ARM_TEQ || opc == ARM_CMP || opc == ARM_CMN);
     bool is_move = (opc == ARM_MOV || opc == ARM_MVN);
-
-#ifdef DEBUG
-    if (log_instructions && log_arm_instructions && !FLAG_T()) {
-        arm_print_opcode();
-        switch (opc) {
-            case ARM_AND: print_mnemonic(S ? "ands" : "and"); break;
-            case ARM_EOR: print_mnemonic(S ? "eors" : "eor"); break;
-            case ARM_SUB: print_mnemonic(S ? "subs" : "sub"); break;
-            case ARM_RSB: print_mnemonic(S ? "rsbs" : "rsb"); break;
-            case ARM_ADD: print_mnemonic(S ? "adds" : "add"); break;
-            case ARM_ADC: print_mnemonic(S ? "adcs" : "adc"); break;
-            case ARM_SBC: print_mnemonic(S ? "sbcs" : "sbc"); break;
-            case ARM_RSC: print_mnemonic(S ? "rscs" : "rsc"); break;
-            case ARM_TST: print_mnemonic(Rd == REG_PC ? "tstp" : "tst"); break;
-            case ARM_TEQ: print_mnemonic(Rd == REG_PC ? "teqp" : "teq"); break;
-            case ARM_CMP: print_mnemonic(Rd == REG_PC ? "cmpp" : "cmp"); break;
-            case ARM_CMN: print_mnemonic(Rd == REG_PC ? "cmnp" : "cmn"); break;
-            case ARM_ORR: print_mnemonic(S ? "orrs" : "orr"); break;
-            case ARM_MOV: print_mnemonic(S ? "movs" : "mov"); break;
-            case ARM_BIC: print_mnemonic(S ? "bics" : "bic"); break;
-            case ARM_MVN: print_mnemonic(S ? "mvns" : "mvn"); break;
-        }
-        if (!is_test_or_compare) {
-            print_register(Rd);
-            printf(", ");
-        }
-        if (!is_move) {
-            print_register(Rn);
-            printf(", ");
-        }
-        print_register(Rm);
-        arm_print_shifter_op(shop, shamt, shreg, Rs);
-        printf("\n");
-    }
-#endif
 
     if (is_test_or_compare) {
         assert(S == 1);
@@ -221,22 +170,6 @@ int arm_data_processing_register(void) {
     return 1;
 }
 
-// AND{<cond>}{S} Rd, Rn, #<immediate>
-// EOR{<cond>}{S} Rd, Rn, #<immediate>
-// SUB{<cond>}{S} Rd, Rn, #<immediate>
-// RSB{<cond>}{S} Rd, Rn, #<immediate>
-// ADD{<cond>}{S} Rd, Rn, #<immediate>
-// ADC{<cond>}{S} Rd, Rn, #<immediate>
-// SBC{<cond>}{S} Rd, Rn, #<immediate>
-// RSC{<cond>}{S} Rd, Rn, #<immediate>
-// TST{<cond>} Rn, #<immediate>
-// TEQ{<cond>} Rn, #<immediate>
-// CMP{<cond>} Rn, #<immediate>
-// CMN{<cond>} Rn, #<immediate>
-// ORR{<cond>}{S} Rd, Rn, #<immediate>
-// MOV{<cond>}{S} Rd, #<immediate>
-// BIC{<cond>}{S} Rd, Rn, #<immediate>
-// MVN{<cond>}{S} Rd, #<immediate>
 int arm_data_processing_immediate(void) {
     uint32_t opc = BITS(arm_op, 21, 24);
     bool S = BIT(arm_op, 20);
@@ -247,40 +180,6 @@ int arm_data_processing_immediate(void) {
 
     bool is_test_or_compare = (opc == ARM_TST || opc == ARM_TEQ || opc == ARM_CMP || opc == ARM_CMN);
     bool is_move = (opc == ARM_MOV || opc == ARM_MVN);
-
-#ifdef DEBUG
-    if (log_instructions && log_arm_instructions && !FLAG_T()) {
-        arm_print_opcode();
-        switch (opc) {
-            case ARM_AND: print_mnemonic(S ? "ands" : "and"); break;
-            case ARM_EOR: print_mnemonic(S ? "eors" : "eor"); break;
-            case ARM_SUB: print_mnemonic(S ? "subs" : "sub"); break;
-            case ARM_RSB: print_mnemonic(S ? "rsbs" : "rsb"); break;
-            case ARM_ADD: print_mnemonic(S ? "adds" : "add"); break;
-            case ARM_ADC: print_mnemonic(S ? "adcs" : "adc"); break;
-            case ARM_SBC: print_mnemonic(S ? "sbcs" : "sbc"); break;
-            case ARM_RSC: print_mnemonic(S ? "rscs" : "rsc"); break;
-            case ARM_TST: print_mnemonic("tst"); break;
-            case ARM_TEQ: print_mnemonic("teq"); break;
-            case ARM_CMP: print_mnemonic("cmp"); break;
-            case ARM_CMN: print_mnemonic("cmn"); break;
-            case ARM_ORR: print_mnemonic(S ? "orrs" : "orr"); break;
-            case ARM_MOV: print_mnemonic(S ? "movs" : "mov"); break;
-            case ARM_BIC: print_mnemonic(S ? "bics" : "bic"); break;
-            case ARM_MVN: print_mnemonic(S ? "mvns" : "mvn"); break;
-        }
-        if (!is_test_or_compare) {
-            print_register(Rd);
-            printf(", ");
-        }
-        if (!is_move) {
-            print_register(Rn);
-            printf(", ");
-        }
-        print_immediate(imm);
-        printf("\n");
-    }
-#endif
 
     if (is_test_or_compare) {
         assert(S == 1);
@@ -310,10 +209,6 @@ int arm_data_processing_immediate(void) {
     return 1;
 }
 
-// STR{<cond>} Rd, <addressing_mode>
-// STR{<cond>}B Rd, <addressing_mode>
-// LDR{<cond>} Rd, <addressing_mode>
-// LDR{<cond>}B Rd, <addressing_mode>
 int arm_load_store_word_or_byte_register(void) {
     bool P = BIT(arm_op, 24);
     bool U = BIT(arm_op, 23);
@@ -334,27 +229,6 @@ int arm_load_store_word_or_byte_register(void) {
     if ((shop == SHIFT_LSR || shop == SHIFT_ASR) && shamt == 0) {
         shamt = 32;  // LSR #0 -> LSR #32, ASR #0 -> ASR #32
     }
-
-#ifdef DEBUG
-    if (log_instructions && log_arm_instructions && !FLAG_T()) {
-        arm_print_opcode();
-        if (L) {
-            print_mnemonic(B ? "ldrb" : "ldr");
-        } else {
-            print_mnemonic(B ? "strb" : "str");
-        }
-        print_register(Rd);
-        printf(", [");
-        print_register(Rn);
-        printf(P ? ", " : "], ");
-        if (!U) printf("-");
-        print_register(Rm);
-        arm_print_shifter_op(shop, shamt, false, 0);
-        if (P) printf("]");
-        if (W) printf("!");
-        printf("\n");
-    }
-#endif
 
     uint32_t m = arm_shifter_op(r[Rm], shamt, shop, shamt, false, false);
     uint32_t n = r[Rn];
@@ -394,31 +268,6 @@ int arm_load_store_word_or_byte_immediate(void) {
     bool T = !P && W;
     assert(!T);
 
-#ifdef DEBUG
-    if (log_instructions && log_arm_instructions && !FLAG_T()) {
-        arm_print_opcode();
-        if (L) {
-            print_mnemonic(B ? "ldrb" : "ldr");
-        } else {
-            print_mnemonic(B ? "strb" : "str");
-        }
-        print_register(Rd);
-        if (P && U && !W && Rn == REG_PC) {
-            uint32_t pc_rel_address = r[Rn] - SIZEOF_INSTR + imm;  // FIXME
-            printf(", =0x%08X  @ 0x%08X", memory_read_word(pc_rel_address), pc_rel_address);
-        } else {
-            printf(", [");
-            print_register(Rn);
-            printf(P ? ", " : "], ");
-            if (!U) printf("-");
-            print_immediate(imm);
-            if (P) printf("]");
-            if (W) printf("!");
-        }
-        printf("\n");
-    }
-#endif
-
     uint32_t n = r[Rn];
     if (Rn == REG_PC) n &= ~3;
     if (P) n += (U ? imm : -imm);
@@ -454,38 +303,6 @@ int arm_load_store_multiple(void) {
     bool L = BIT(arm_op, 20);
     uint32_t Rn = BITS(arm_op, 16, 19);
     uint32_t rlist = BITS(arm_op, 0, 15);
-
-#ifdef DEBUG
-    if (log_instructions && log_arm_instructions && !FLAG_T()) {
-        arm_print_opcode();
-        if (L) {
-            if (!P && !U) {
-                print_mnemonic_d("ldm", "da");
-            } else if (!P && U) {
-                print_mnemonic_d("ldm", "ia");
-            } else if (P && !U) {
-                print_mnemonic_d("ldm", "db");
-            } else if (P && U) {
-                print_mnemonic_d("ldm", "ib");
-            }
-        } else {
-            if (!P && !U) {
-                print_mnemonic_d("stm", "da");
-            } else if (!P && U) {
-                print_mnemonic_d("stm", "ia");
-            } else if (P && !U) {
-                print_mnemonic_d("stm", "db");
-            } else if (P && U) {
-                print_mnemonic_d("stm", "ib");
-            }
-        }
-        print_register(Rn);
-        if (W) printf("!");
-        printf(", {");
-        arm_print_rlist(rlist);
-        printf("}\n");
-    }
-#endif
 
     uint32_t count = bits_popcount(rlist);
     if (rlist == 0) {  // Empty rlist
@@ -539,15 +356,6 @@ int arm_branch(void) {
     uint32_t imm = BITS(arm_op, 0, 23);
     ZERO_EXTEND(imm, 23);
 
-#ifdef DEBUG
-    if (log_instructions && log_arm_instructions && !FLAG_T()) {
-        arm_print_opcode();
-        print_mnemonic(L ? "bl" : "b");
-        print_address(r[REG_PC] - SIZEOF_INSTR + (imm << 2));  // FIXME
-        printf("\n");
-    }
-#endif
-
     if (L) r[REG_LR] = r[REG_PC] - 4;
     r[REG_PC] += imm << 2;
     branch_taken = true;
@@ -556,15 +364,6 @@ int arm_branch(void) {
 }
 
 int arm_software_interrupt(void) {
-#ifdef DEBUG
-    if (log_instructions && log_arm_instructions && !FLAG_T()) {
-        arm_print_opcode();
-        print_mnemonic("swi");
-        print_address(BITS(arm_op, 0, 23));
-        printf("\n");
-    }
-#endif
-
     r14_svc = r[REG_PC] - SIZEOF_INSTR;  // ARM: PC + 4, Thumb: PC + 2
     spsr_svc = cpsr;
     write_cpsr((cpsr & ~(PSR_T | PSR_MODE)) | PSR_I | PSR_MODE_SVC);
@@ -592,27 +391,6 @@ int arm_multiply(void) {
     uint32_t Rs = BITS(arm_op, 8, 11);
     uint32_t Rm = BITS(arm_op, 0, 3);
 
-#ifdef DEBUG
-    if (log_instructions && log_arm_instructions && !FLAG_T()) {
-        arm_print_opcode();
-        if (A) {
-            print_mnemonic(S ? "mlas" : "mla");
-        } else {
-            print_mnemonic(S ? "muls" : "mul");
-        }
-        print_register(Rd);
-        printf(",");
-        print_register(Rm);
-        printf(",");
-        print_register(Rs);
-        if (A) {
-            printf(",");
-            print_register(Rn);
-        }
-        printf("\n");
-    }
-#endif
-
     if (!A) assert(Rn == 0);
     assert(Rd != REG_PC && Rm != REG_PC && Rs != REG_PC);
 
@@ -636,33 +414,6 @@ int arm_multiply_long(void) {
     uint32_t RdLo = BITS(arm_op, 12, 15);
     uint32_t Rs = BITS(arm_op, 8, 11);
     uint32_t Rm = BITS(arm_op, 0, 3);
-
-#ifdef DEBUG
-    if (log_instructions && log_arm_instructions && !FLAG_T()) {
-        arm_print_opcode();
-        if (U) {
-            if (A) {
-                print_mnemonic(S ? "smlals" : "smlal");
-            } else {
-                print_mnemonic(S ? "smulls" : "smull");
-            }
-        } else {
-            if (A) {
-                print_mnemonic(S ? "umlals" : "umlal");
-            } else {
-                print_mnemonic(S ? "umulls" : "umull");
-            }
-        }
-        print_register(RdLo);
-        printf(",");
-        print_register(RdHi);
-        printf(",");
-        print_register(Rm);
-        printf(",");
-        print_register(Rs);
-        printf("\n");
-    }
-#endif
 
     assert(RdHi != REG_PC && RdLo != REG_PC && Rm != REG_PC && Rs != REG_PC);
     assert(RdHi != Rm && RdLo != Rm && RdHi != RdLo);
@@ -701,22 +452,6 @@ int arm_load_store_halfword_register(void) {
     bool T = !P && W;
     assert(!T);
 
-#ifdef DEBUG
-    if (log_instructions && log_arm_instructions && !FLAG_T()) {
-        arm_print_opcode();
-        print_mnemonic(L ? "ldrh" : "strh");
-        print_register(Rd);
-        printf(",[");
-        print_register(Rn);
-        printf(P ? "," : "],");
-        if (!U) printf("-");
-        print_register(Rm);
-        if (P) printf("]");
-        if (W) printf("!");
-        printf("\n");
-    }
-#endif
-
     assert(!I);
     assert(sbz == 0);
     assert(opc == 0xb);
@@ -751,22 +486,6 @@ int arm_load_store_halfword_immediate(void) {
     bool T = !P && W;
     assert(!T);
 
-#ifdef DEBUG
-    if (log_instructions && log_arm_instructions && !FLAG_T()) {
-        arm_print_opcode();
-        print_mnemonic(L ? "ldrh" : "strh");
-        print_register(Rd);
-        printf(",[");
-        print_register(Rn);
-        printf(P ? "," : "],");
-        if (!U) printf("-");
-        print_immediate(imm);
-        if (P) printf("]");
-        if (W) printf("!");
-        printf("\n");
-    }
-#endif
-
     assert(I);
     assert(opc == 0xb);
 
@@ -799,28 +518,6 @@ int arm_load_signed_halfword_or_signed_byte_register(void) {
 
     bool T = !P && W;
     assert(!T);
-
-#ifdef DEBUG
-    if (log_instructions && log_arm_instructions && !FLAG_T()) {
-        arm_print_opcode();
-        if (opc == 0xd) {
-            print_mnemonic("ldrsb");
-        } else if (opc == 0xf) {
-            print_mnemonic("ldrsh");
-        } else {
-            assert(false);
-        }
-        print_register(Rd);
-        printf(",[");
-        print_register(Rn);
-        printf(P ? "," : "],");
-        if (!U) printf("-");
-        print_register(Rm);
-        if (P) printf("]");
-        if (W) printf("!");
-        printf("\n");
-    }
-#endif
 
     assert(!I);
     assert(L);
@@ -865,28 +562,6 @@ int arm_load_signed_halfword_or_signed_byte_immediate(void) {
     bool T = !P && W;
     assert(!T);
 
-#ifdef DEBUG
-    if (log_instructions && log_arm_instructions && !FLAG_T()) {
-        arm_print_opcode();
-        if (opc == 0xd) {
-            print_mnemonic("ldrsb");
-        } else if (opc == 0xf) {
-            print_mnemonic("ldrsh");
-        } else {
-            assert(false);
-        }
-        print_register(Rd);
-        printf(",[");
-        print_register(Rn);
-        printf(P ? "," : "],");
-        if (!U) printf("-");
-        print_immediate(imm);
-        if (P) printf("]");
-        if (W) printf("!");
-        printf("\n");
-    }
-#endif
-
     assert(I);
     assert(L);
     assert(opc == 0xd || opc == 0xf);
@@ -921,31 +596,6 @@ int arm_special_data_processing_register(void) {
     uint32_t Rd = BITS(arm_op, 12, 15);
     uint32_t Rm = BITS(arm_op, 0, 3);
     uint32_t sbz = BITS(arm_op, 4, 11);
-
-#ifdef DEBUG
-    if (log_instructions && log_arm_instructions && !FLAG_T()) {
-        arm_print_opcode();
-        if (b21) {
-            print_mnemonic("msr");
-            printf(R ? "spsr" : "cpsr");
-            printf("_");
-            switch (mask_type) {
-                case 1: printf("c"); break;
-                case 8: printf("f"); break;
-                case 9: printf("cf"); break;
-                default: assert(false); break;
-            }
-            printf(", ");
-            print_register(Rm);
-        } else {
-            print_mnemonic("mrs");
-            print_register(Rd);
-            printf(", ");
-            printf(R ? "spsr" : "cpsr");
-        }
-        printf("\n");
-    }
-#endif
 
     if (b21) {
         assert(Rd == 0xf);
@@ -987,24 +637,6 @@ int arm_special_data_processing_immediate(void) {
     uint32_t rot = BITS(arm_op, 8, 11);
     uint32_t imm = ROR(BITS(arm_op, 0, 7), 2 * rot);
 
-#ifdef DEBUG
-    if (log_instructions && log_arm_instructions && !FLAG_T()) {
-        arm_print_opcode();
-        print_mnemonic("msr");
-        printf(R ? "spsr" : "cpsr");
-        printf("_");
-        switch (mask_type) {
-            case 1: printf("c"); break;
-            case 8: printf("f"); break;
-            case 9: printf("cf"); break;
-            default: printf("none"); break;
-        }
-        printf(",");
-        print_immediate(imm);
-        printf("\n");
-    }
-#endif
-
     assert(sbo == 0xf);
 
     uint32_t mask = 0;
@@ -1031,19 +663,6 @@ int arm_swap(void) {
     uint32_t sbz = BITS(arm_op, 8, 11);
     uint32_t Rm = BITS(arm_op, 0, 3);
 
-#ifdef DEBUG
-    if (log_instructions && log_arm_instructions && !FLAG_T()) {
-        arm_print_opcode();
-        print_mnemonic(B ? "swpb" : "swp");
-        print_register(Rd);
-        printf(",");
-        print_register(Rm);
-        printf(",[");
-        print_register(Rn);
-        printf("]\n");
-    }
-#endif
-
     assert(sbz == 0);
 
     if (B) {
@@ -1063,16 +682,6 @@ int arm_swap(void) {
 int arm_branch_and_exchange(void) {
     uint32_t sbo = BITS(arm_op, 8, 19);
     uint32_t Rm = BITS(arm_op, 0, 3);
-
-#ifdef DEBUG
-    if (log_instructions && log_arm_instructions && !FLAG_T()) {
-        arm_print_opcode();
-        print_mnemonic("bx");
-        print_register(Rm);
-        //printf("  ; Rm = 0x%x", r[Rm]);
-        printf("\n");
-    }
-#endif
 
     assert(sbo == 0xfff);
 
