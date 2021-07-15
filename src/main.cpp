@@ -1868,9 +1868,9 @@ uint32_t rgb555(uint32_t pixel) {
     return 0xff << 24 | blue << 16 | green << 8 | red;
 }
 
-void gba_draw_blank(int y) {
+void gba_draw_blank(int y, bool forced_blank) {
     uint16_t pixel = *(uint16_t *)&palette_ram[0];
-    uint32_t clear_color = rgb555(pixel);
+    uint32_t clear_color = rgb555(forced_blank ? 0x7fff : pixel);
 
     for (int x = 0; x < SCREEN_WIDTH; x++) {
         screen_pixels[y][x] = clear_color;
@@ -2144,7 +2144,9 @@ void gba_draw_scanline(void) {
     win1.bottom = ioreg.winv[1].b.b0;
     win1.top = ioreg.winv[1].b.b1;
 
-    gba_draw_blank(ioreg.vcount.w);  // FIXME forced blank
+    bool forced_blank = (ioreg.dispcnt.w & DCNT_BLANK) != 0;
+    gba_draw_blank(ioreg.vcount.w, forced_blank);
+    if (forced_blank) return;
 
     uint32_t mode = ioreg.dispcnt.w & 7;
     switch (mode) {
