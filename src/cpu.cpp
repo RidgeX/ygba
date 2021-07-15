@@ -6,10 +6,6 @@
 
 #include "cpu.h"
 
-bool log_instructions = false;
-bool log_arm_instructions = true;
-bool log_thumb_instructions = true;
-bool log_registers = false;
 uint64_t instruction_count = 0;
 
 uint32_t r[16];

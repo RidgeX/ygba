@@ -106,10 +106,6 @@
 #define VEC_IRQ            0x18
 #define VEC_FIQ            0x1c
 
-extern bool log_instructions;
-extern bool log_arm_instructions;
-extern bool log_thumb_instructions;
-extern bool log_registers;
 extern uint64_t instruction_count;
 extern uint32_t r[16];
 extern uint32_t r14_irq;

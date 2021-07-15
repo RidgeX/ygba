@@ -47,9 +47,6 @@ using namespace gl;
 
 #define UNUSED(x) (void)(x)
 
-bool single_step = false;
-uint64_t start_logging_at = 0;
-//uint64_t end_logging_at = 200000;
 int ppu_cycles = 0;
 int timer_cycles = 0;
 bool halted = false;
@@ -2376,15 +2373,6 @@ void gba_emulate(void) {
         int cpu_cycles = 1;
 
         if (!halted) {
-            //if (r[15] == 0x00000300) single_step = true;
-
-#ifdef DEBUG
-            if (single_step && instruction_count >= start_logging_at) {
-                log_instructions = true;
-                log_registers = true;
-            }
-#endif
-
             if (FLAG_T()) {
                 cpu_cycles = thumb_step();
             } else {
@@ -2392,18 +2380,6 @@ void gba_emulate(void) {
             }
             assert(cpu_cycles == 1);
             instruction_count++;
-
-#ifdef DEBUG
-            if (single_step && instruction_count > start_logging_at) {
-                char c = fgetc(stdin);
-                if (c == EOF) exit(EXIT_SUCCESS);
-            }
-            /*
-            if (instruction_count == end_logging_at) {
-                exit(EXIT_SUCCESS);
-            }
-            */
-#endif
         }
 
         if (!branch_taken && (cpsr & PSR_I) == 0 && ioreg.ime.w != 0 && (ioreg.irq.w & ioreg.ie.w) != 0) {
