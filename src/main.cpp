@@ -1986,6 +1986,10 @@ void gba_draw_obj(uint32_t mode, int pri, int y) {
             hflip = false;
             vflip = false;
         }
+        if (obj_mode == 3) {  // FIXME
+            ox += ow / 2;
+            oy += oh / 2;
+        }
 
         bool mode_bitmap = (mode == 3 || mode == 4 || mode == 5);
         bool obj_1d = (ioreg.dispcnt.w & DCNT_OBJ_1D) != 0;
