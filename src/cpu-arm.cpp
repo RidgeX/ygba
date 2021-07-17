@@ -608,9 +608,9 @@ int arm_special_data_processing_register(void) {
     if (b21) {
         uint32_t mask = 0;
         switch (mask_type) {
-            case 1: mask = 0x000000ff; break;  // Allow bits T, M[4] to be set?
+            case 1: mask = 0x000000ef; break;  // Allow T bit to be set?
             case 8: mask = 0xf0000000; break;
-            case 9: mask = 0xf00000ff; break;  // Allow bits T, M[4] to be set?
+            case 9: mask = 0xf00000ef; break;  // Allow T bit to be set?
             default: assert(false); break;
         }
         if (R) {
@@ -642,9 +642,9 @@ int arm_special_data_processing_immediate(void) {
     uint32_t mask = 0;
     switch (mask_type) {
         case 0: mask = 0x00000000; break;
-        case 1: mask = 0x000000ff; break;  // Allow bits T, M[4] to be set?
+        case 1: mask = 0x000000ef; break;  // Allow T bit to be set?
         case 8: mask = 0xf0000000; break;
-        case 9: mask = 0xf00000ff; break;  // Allow bits T, M[4] to be set?
+        case 9: mask = 0xf00000ef; break;  // Allow T bit to be set?
         default: assert(false); break;
     }
     if (R) {
