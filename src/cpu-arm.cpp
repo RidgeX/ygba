@@ -158,8 +158,8 @@ int arm_data_processing_register(void) {
         r[Rd] = (uint32_t) result;
         if (Rd == REG_PC) {  // PC altered
             r[Rd] &= ~1;
-            if (S) write_cpsr(read_spsr());
             branch_taken = true;
+            if (S) write_cpsr(read_spsr());
         }
     } else {
         if (Rd == REG_PC) {  // ARMv2 mode change (obsolete)
@@ -201,8 +201,8 @@ int arm_data_processing_immediate(void) {
         r[Rd] = (uint32_t) result;
         if (Rd == REG_PC) {  // PC altered
             r[Rd] &= ~1;
-            if (S) write_cpsr(read_spsr());
             branch_taken = true;
+            if (S) write_cpsr(read_spsr());
         }
     }
 
@@ -325,8 +325,8 @@ int arm_load_store_multiple(void) {
                 r[i] = memory_read_word(address);
                 if (i == REG_PC) {  // PC altered
                     r[i] &= ~1;
-                    if (S) write_cpsr(read_spsr());
                     branch_taken = true;
+                    if (S) write_cpsr(read_spsr());
                 }
             } else {
                 if (i == REG_PC) {
@@ -366,9 +366,9 @@ int arm_branch(void) {
 int arm_software_interrupt(void) {
     r14_svc = r[REG_PC] - SIZEOF_INSTR;  // ARM: PC + 4, Thumb: PC + 2
     spsr_svc = cpsr;
+    branch_taken = true;
     write_cpsr((cpsr & ~(PSR_T | PSR_MODE)) | PSR_I | PSR_MODE_SVC);
     r[REG_PC] = VEC_SWI;
-    branch_taken = true;
 
     return 1;
 }
@@ -376,9 +376,9 @@ int arm_software_interrupt(void) {
 int arm_hardware_interrupt(void) {
     r14_irq = r[REG_PC] - (FLAG_T() ? 0 : 4);  // ARM: PC + 4, Thumb: PC + 4
     spsr_irq = cpsr;
+    branch_taken = true;
     write_cpsr((cpsr & ~(PSR_T | PSR_MODE)) | PSR_I | PSR_MODE_IRQ);
     r[REG_PC] = VEC_IRQ;
-    branch_taken = true;
 
     return 1;
 }
@@ -608,10 +608,10 @@ int arm_special_data_processing_register(void) {
     if (b21) {
         uint32_t mask = 0;
         switch (mask_type) {
-            case 1: mask = 0x000000ef; break;  // Allow T bit to be set?
+            case 1: mask = 0x000000ff; break;
             case 8: mask = 0xf0000000; break;
-            case 9: mask = 0xf00000ef; break;  // Allow T bit to be set?
-            case 0xf: mask = 0xf00000ef; break;  // Allow T bit to be set?
+            case 9: mask = 0xf00000ff; break;
+            case 0xf: mask = 0xf00000ff; break;
             default: assert(false); break;
         }
         if (R) {
@@ -643,9 +643,9 @@ int arm_special_data_processing_immediate(void) {
     uint32_t mask = 0;
     switch (mask_type) {
         case 0: mask = 0x00000000; break;
-        case 1: mask = 0x000000ef; break;  // Allow T bit to be set?
+        case 1: mask = 0x000000ff; break;
         case 8: mask = 0xf0000000; break;
-        case 9: mask = 0xf00000ef; break;  // Allow T bit to be set?
+        case 9: mask = 0xf00000ff; break;
         default: assert(false); break;
     }
     if (R) {

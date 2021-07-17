@@ -134,7 +134,7 @@ void mode_change(uint32_t old_mode, uint32_t new_mode) {
             r[14] = r14_und;
             break;
         default:
-            //assert(false);  // FIXME
+            assert(false);
             break;
     }
 }
@@ -163,6 +163,13 @@ bool condition_passed(uint32_t cond) {
 }
 
 void write_cpsr(uint32_t psr) {
+    // T bit should only be set by branches
+    assert(branch_taken || ((cpsr & PSR_T) == (psr & PSR_T)));
+
+    // In architecture versions without 26-bit backwards-compatibility support,
+    // CPSR bit 4 (M[4]) always reads as 1, and all writes to it are ignored.
+    psr |= 0x10;
+
     uint32_t old_mode = cpsr & PSR_MODE;
     cpsr = psr;
     uint32_t new_mode = cpsr & PSR_MODE;
