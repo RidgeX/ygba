@@ -416,7 +416,7 @@ int arm_multiply_long(void) {
     uint32_t Rm = BITS(arm_op, 0, 3);
 
     assert(RdHi != REG_PC && RdLo != REG_PC && Rm != REG_PC && Rs != REG_PC);
-    assert(RdHi != Rm && RdLo != Rm && RdHi != RdLo);
+    assert(RdHi != RdLo);
 
     uint64_t m = r[Rm];
     uint64_t s = r[Rs];
