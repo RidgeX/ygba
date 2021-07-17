@@ -611,6 +611,7 @@ int arm_special_data_processing_register(void) {
             case 1: mask = 0x000000ef; break;  // Allow T bit to be set?
             case 8: mask = 0xf0000000; break;
             case 9: mask = 0xf00000ef; break;  // Allow T bit to be set?
+            case 0xf: mask = 0xf00000ef; break;  // Allow T bit to be set?
             default: assert(false); break;
         }
         if (R) {
