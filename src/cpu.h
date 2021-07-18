@@ -1,6 +1,8 @@
 #ifndef CPU_H
 #define CPU_H
 
+#define UNUSED(x) (void)(x)
+
 #define BIT(x, i) (((x) >> (i)) & 1)
 #define BITS(x, i, j) (((x) >> (i)) & ((1 << ((j) - (i) + 1)) - 1))
 
@@ -106,12 +108,10 @@
 #define VEC_IRQ            0x18
 #define VEC_FIQ            0x1c
 
-extern uint64_t instruction_count;
 extern uint32_t r[16];
-extern uint32_t r14_irq;
-extern uint32_t r14_svc;
+extern uint32_t r14_irq, r14_svc, r14_und;
 extern uint32_t cpsr;
-extern uint32_t spsr_irq, spsr_svc;
+extern uint32_t spsr_irq, spsr_svc, spsr_und;
 extern bool branch_taken;
 extern uint32_t arm_op;
 extern uint32_t arm_pipeline[2];
@@ -133,52 +133,109 @@ bool condition_passed(uint32_t cond);
 void write_cpsr(uint32_t psr);
 uint32_t read_spsr();
 void write_spsr(uint32_t psr);
+uint32_t get_pc(void);
+void arm_disasm(uint32_t address, uint32_t op, char *s);
 int arm_step(void);
+void thumb_disasm(uint32_t address, uint16_t op, char *s);
 int thumb_step(void);
 void arm_init_lookup(void);
 void thumb_init_lookup(void);
+void print_arm_condition(char *s, uint32_t op);
+void print_register(char *s, uint32_t i);
+void print_immediate(char *s, uint32_t i);
+void print_address(char *s, uint32_t i);
+void print_arm_shift(char *s, uint32_t shop, uint32_t shamt, uint32_t shreg, uint32_t Rs);
+bool print_arm_rlist(char *s, uint32_t rlist);
+bool print_thumb_rlist(char *s, uint32_t rlist);
 
 // cpu-arm.c
-int arm_data_processing_register(void);
-int arm_data_processing_immediate(void);
-int arm_load_store_word_or_byte_register(void);
-int arm_load_store_word_or_byte_immediate(void);
-int arm_load_store_multiple(void);
-int arm_branch(void);
-int arm_software_interrupt(void);
+void arm_data_processing_register_disasm(uint32_t address, uint32_t op, char *s);
+int arm_data_processing_register(uint32_t op);
+void arm_data_processing_immediate_disasm(uint32_t address, uint32_t op, char *s);
+int arm_data_processing_immediate(uint32_t op);
+void arm_load_store_word_or_byte_register_disasm(uint32_t address, uint32_t op, char *s);
+int arm_load_store_word_or_byte_register(uint32_t op);
+void arm_load_store_word_or_byte_immediate_disasm(uint32_t address, uint32_t op, char *s);
+int arm_load_store_word_or_byte_immediate(uint32_t op);
+void arm_load_store_multiple_disasm(uint32_t address, uint32_t op, char *s);
+int arm_load_store_multiple(uint32_t op);
+void arm_branch_disasm(uint32_t address, uint32_t op, char *s);
+int arm_branch(uint32_t op);
+void arm_software_interrupt_disasm(uint32_t address, uint32_t op, char *s);
+int arm_software_interrupt(uint32_t op);
+void arm_hardware_interrupt_disasm(uint32_t address, uint32_t op, char *s);
 int arm_hardware_interrupt(void);
-int arm_multiply(void);
-int arm_multiply_long(void);
-int arm_load_store_halfword_register(void);
-int arm_load_store_halfword_immediate(void);
-int arm_load_signed_halfword_or_signed_byte_register(void);
-int arm_load_signed_halfword_or_signed_byte_immediate(void);
-int arm_special_data_processing_register(void);
-int arm_special_data_processing_immediate(void);
-int arm_swap(void);
-int arm_branch_and_exchange(void);
+void arm_multiply_disasm(uint32_t address, uint32_t op, char *s);
+int arm_multiply(uint32_t op);
+void arm_multiply_long_disasm(uint32_t address, uint32_t op, char *s);
+int arm_multiply_long(uint32_t op);
+void arm_load_store_halfword_register_disasm(uint32_t address, uint32_t op, char *s);
+int arm_load_store_halfword_register(uint32_t op);
+void arm_load_store_halfword_immediate_disasm(uint32_t address, uint32_t op, char *s);
+int arm_load_store_halfword_immediate(uint32_t op);
+void arm_load_signed_halfword_or_signed_byte_register_disasm(uint32_t address, uint32_t op, char *s);
+int arm_load_signed_halfword_or_signed_byte_register(uint32_t op);
+void arm_load_signed_halfword_or_signed_byte_immediate_disasm(uint32_t address, uint32_t op, char *s);
+int arm_load_signed_halfword_or_signed_byte_immediate(uint32_t op);
+void arm_special_data_processing_register_disasm(uint32_t address, uint32_t op, char *s);
+int arm_special_data_processing_register(uint32_t op);
+void arm_special_data_processing_immediate_disasm(uint32_t address, uint32_t op, char *s);
+int arm_special_data_processing_immediate(uint32_t op);
+void arm_swap_disasm(uint32_t address, uint32_t op, char *s);
+int arm_swap(uint32_t op);
+void arm_branch_and_exchange_disasm(uint32_t address, uint32_t op, char *s);
+int arm_branch_and_exchange(uint32_t op);
+void arm_coprocessor_load_store_disasm(uint32_t address, uint32_t op, char *s);
+int arm_coprocessor_load_store(uint32_t op);
+void arm_coprocessor_data_processing_disasm(uint32_t address, uint32_t op, char *s);
+int arm_coprocessor_data_processing(uint32_t op);
+void arm_undefined_instruction_disasm(uint32_t address, uint32_t op, char *s);
+int arm_undefined_instruction(uint32_t op);
 
 // cpu-thumb.c
-int thumb_shift_by_immediate(void);
-int thumb_add_or_subtract_register(void);
-int thumb_add_or_subtract_immediate(void);
-int thumb_add_subtract_compare_or_move_immediate(void);
-int thumb_data_processing_register(void);
-int thumb_special_data_processing(void);
-int thumb_branch_and_exchange(void);
-int thumb_load_from_literal_pool(void);
-int thumb_load_store_register(void);
-int thumb_load_store_word_or_byte_immediate(void);
-int thumb_load_store_halfword_immediate(void);
-int thumb_load_store_to_or_from_stack(void);
-int thumb_add_to_sp_or_pc(void);
-int thumb_adjust_stack_pointer(void);
-int thumb_push_or_pop_register_list(void);
-int thumb_load_store_multiple(void);
-int thumb_conditional_branch(void);
-int thumb_software_interrupt(void);
-int thumb_unconditional_branch(void);
-int thumb_branch_with_link_prefix(void);
-int thumb_branch_with_link_suffix(void);
+void thumb_shift_by_immediate_disasm(uint32_t address, uint16_t op, char *s);
+int thumb_shift_by_immediate(uint16_t op);
+void thumb_add_or_subtract_register_disasm(uint32_t address, uint16_t op, char *s);
+int thumb_add_or_subtract_register(uint16_t op);
+void thumb_add_or_subtract_immediate_disasm(uint32_t address, uint16_t op, char *s);
+int thumb_add_or_subtract_immediate(uint16_t op);
+void thumb_add_subtract_compare_or_move_immediate_disasm(uint32_t address, uint16_t op, char *s);
+int thumb_add_subtract_compare_or_move_immediate(uint16_t op);
+void thumb_data_processing_register_disasm(uint32_t address, uint16_t op, char *s);
+int thumb_data_processing_register(uint16_t op);
+void thumb_special_data_processing_disasm(uint32_t address, uint16_t op, char *s);
+int thumb_special_data_processing(uint16_t op);
+void thumb_branch_and_exchange_disasm(uint32_t address, uint16_t op, char *s);
+int thumb_branch_and_exchange(uint16_t op);
+void thumb_load_from_literal_pool_disasm(uint32_t address, uint16_t op, char *s);
+int thumb_load_from_literal_pool(uint16_t op);
+void thumb_load_store_register_disasm(uint32_t address, uint16_t op, char *s);
+int thumb_load_store_register(uint16_t op);
+void thumb_load_store_word_or_byte_immediate_disasm(uint32_t address, uint16_t op, char *s);
+int thumb_load_store_word_or_byte_immediate(uint16_t op);
+void thumb_load_store_halfword_immediate_disasm(uint32_t address, uint16_t op, char *s);
+int thumb_load_store_halfword_immediate(uint16_t op);
+void thumb_load_store_to_or_from_stack_disasm(uint32_t address, uint16_t op, char *s);
+int thumb_load_store_to_or_from_stack(uint16_t op);
+void thumb_add_to_sp_or_pc_disasm(uint32_t address, uint16_t op, char *s);
+int thumb_add_to_sp_or_pc(uint16_t op);
+void thumb_adjust_stack_pointer_disasm(uint32_t address, uint16_t op, char *s);
+int thumb_adjust_stack_pointer(uint16_t op);
+void thumb_push_or_pop_register_list_disasm(uint32_t address, uint16_t op, char *s);
+int thumb_push_or_pop_register_list(uint16_t op);
+void thumb_load_store_multiple_disasm(uint32_t address, uint16_t op, char *s);
+int thumb_load_store_multiple(uint16_t op);
+void thumb_conditional_branch_disasm(uint32_t address, uint16_t op, char *s);
+int thumb_conditional_branch(uint16_t op);
+void thumb_software_interrupt_disasm(uint32_t address, uint16_t op, char *s);
+int thumb_software_interrupt(uint16_t op);
+void thumb_unconditional_branch_disasm(uint32_t address, uint16_t op, char *s);
+int thumb_unconditional_branch(uint16_t op);
+void thumb_branch_with_link_prefix_disasm(uint32_t address, uint16_t op, char *s);
+int thumb_branch_with_link_prefix(uint16_t op);
+void thumb_branch_with_link_suffix_disasm(uint32_t address, uint16_t op, char *s);
+int thumb_branch_with_link_suffix(uint16_t op);
+void thumb_undefined_instruction_disasm(uint32_t address, uint16_t op, char *s);
+int thumb_undefined_instruction(uint16_t op);
 
 #endif  // CPU_H

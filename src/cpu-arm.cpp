@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "algorithms.h"
 #include "cpu.h"
@@ -118,16 +119,68 @@ static void arm_shifter_flags(uint32_t shop, uint32_t s, uint32_t m) {
     }
 }
 
-int arm_data_processing_register(void) {
-    uint32_t opc = BITS(arm_op, 21, 24);
-    bool S = BIT(arm_op, 20);
-    uint32_t Rn = BITS(arm_op, 16, 19);
-    uint32_t Rd = BITS(arm_op, 12, 15);
-    uint32_t Rs = BITS(arm_op, 8, 11);
-    uint32_t shamt = BITS(arm_op, 7, 11);
-    uint32_t shop = BITS(arm_op, 5, 6);
-    bool shreg = BIT(arm_op, 4);
-    uint32_t Rm = BITS(arm_op, 0, 3);
+void arm_data_processing_register_disasm(uint32_t address, uint32_t op, char *s) {
+    UNUSED(address);
+
+    uint32_t opc = BITS(op, 21, 24);
+    bool S = BIT(op, 20);
+    uint32_t Rn = BITS(op, 16, 19);
+    uint32_t Rd = BITS(op, 12, 15);
+    uint32_t Rs = BITS(op, 8, 11);
+    uint32_t shamt = BITS(op, 7, 11);
+    uint32_t shop = BITS(op, 5, 6);
+    bool shreg = BIT(op, 4);
+    uint32_t Rm = BITS(op, 0, 3);
+
+    if (!shreg && (shop == SHIFT_LSR || shop == SHIFT_ASR) && shamt == 0) {
+        shamt = 32;  // LSR #0 -> LSR #32, ASR #0 -> ASR #32
+    }
+
+    bool is_test_or_compare = (opc == ARM_TST || opc == ARM_TEQ || opc == ARM_CMP || opc == ARM_CMN);
+    bool is_move = (opc == ARM_MOV || opc == ARM_MVN);
+
+    switch (opc) {
+        case ARM_AND: strcpy(s, S ? "ands" : "and"); break;
+        case ARM_EOR: strcpy(s, S ? "eors" : "eor"); break;
+        case ARM_SUB: strcpy(s, S ? "subs" : "sub"); break;
+        case ARM_RSB: strcpy(s, S ? "rsbs" : "rsb"); break;
+        case ARM_ADD: strcpy(s, S ? "adds" : "add"); break;
+        case ARM_ADC: strcpy(s, S ? "adcs" : "adc"); break;
+        case ARM_SBC: strcpy(s, S ? "sbcs" : "sbc"); break;
+        case ARM_RSC: strcpy(s, S ? "rscs" : "rsc"); break;
+        case ARM_TST: strcpy(s, Rd == REG_PC ? "tstp" : "tst"); break;
+        case ARM_TEQ: strcpy(s, Rd == REG_PC ? "teqp" : "teq"); break;
+        case ARM_CMP: strcpy(s, Rd == REG_PC ? "cmpp" : "cmp"); break;
+        case ARM_CMN: strcpy(s, Rd == REG_PC ? "cmnp" : "cmn"); break;
+        case ARM_ORR: strcpy(s, S ? "orrs" : "orr"); break;
+        case ARM_MOV: strcpy(s, S ? "movs" : "mov"); break;
+        case ARM_BIC: strcpy(s, S ? "bics" : "bic"); break;
+        case ARM_MVN: strcpy(s, S ? "mvns" : "mvn"); break;
+    }
+    print_arm_condition(s, op);
+    strcat(s, " ");
+    if (!is_test_or_compare) {
+        print_register(s, Rd);
+        strcat(s, ", ");
+    }
+    if (!is_move) {
+        print_register(s, Rn);
+        strcat(s, ", ");
+    }
+    print_register(s, Rm);
+    print_arm_shift(s, shop, shamt, shreg, Rs);
+}
+
+int arm_data_processing_register(uint32_t op) {
+    uint32_t opc = BITS(op, 21, 24);
+    bool S = BIT(op, 20);
+    uint32_t Rn = BITS(op, 16, 19);
+    uint32_t Rd = BITS(op, 12, 15);
+    uint32_t Rs = BITS(op, 8, 11);
+    uint32_t shamt = BITS(op, 7, 11);
+    uint32_t shop = BITS(op, 5, 6);
+    bool shreg = BIT(op, 4);
+    uint32_t Rm = BITS(op, 0, 3);
 
     if (!shreg && (shop == SHIFT_LSR || shop == SHIFT_ASR) && shamt == 0) {
         shamt = 32;  // LSR #0 -> LSR #32, ASR #0 -> ASR #32
@@ -170,13 +223,57 @@ int arm_data_processing_register(void) {
     return 1;
 }
 
-int arm_data_processing_immediate(void) {
-    uint32_t opc = BITS(arm_op, 21, 24);
-    bool S = BIT(arm_op, 20);
-    uint32_t Rn = BITS(arm_op, 16, 19);
-    uint32_t Rd = BITS(arm_op, 12, 15);
-    uint32_t rot = BITS(arm_op, 8, 11);
-    uint32_t imm = ROR(BITS(arm_op, 0, 7), 2 * rot);
+void arm_data_processing_immediate_disasm(uint32_t address, uint32_t op, char *s) {
+    UNUSED(address);
+
+    uint32_t opc = BITS(op, 21, 24);
+    bool S = BIT(op, 20);
+    uint32_t Rn = BITS(op, 16, 19);
+    uint32_t Rd = BITS(op, 12, 15);
+    uint32_t rot = BITS(op, 8, 11);
+    uint32_t imm = ROR(BITS(op, 0, 7), 2 * rot);
+
+    bool is_test_or_compare = (opc == ARM_TST || opc == ARM_TEQ || opc == ARM_CMP || opc == ARM_CMN);
+    bool is_move = (opc == ARM_MOV || opc == ARM_MVN);
+
+    switch (opc) {
+        case ARM_AND: strcpy(s, S ? "ands" : "and"); break;
+        case ARM_EOR: strcpy(s, S ? "eors" : "eor"); break;
+        case ARM_SUB: strcpy(s, S ? "subs" : "sub"); break;
+        case ARM_RSB: strcpy(s, S ? "rsbs" : "rsb"); break;
+        case ARM_ADD: strcpy(s, S ? "adds" : "add"); break;
+        case ARM_ADC: strcpy(s, S ? "adcs" : "adc"); break;
+        case ARM_SBC: strcpy(s, S ? "sbcs" : "sbc"); break;
+        case ARM_RSC: strcpy(s, S ? "rscs" : "rsc"); break;
+        case ARM_TST: strcpy(s, "tst"); break;
+        case ARM_TEQ: strcpy(s, "teq"); break;
+        case ARM_CMP: strcpy(s, "cmp"); break;
+        case ARM_CMN: strcpy(s, "cmn"); break;
+        case ARM_ORR: strcpy(s, S ? "orrs" : "orr"); break;
+        case ARM_MOV: strcpy(s, S ? "movs" : "mov"); break;
+        case ARM_BIC: strcpy(s, S ? "bics" : "bic"); break;
+        case ARM_MVN: strcpy(s, S ? "mvns" : "mvn"); break;
+    }
+    print_arm_condition(s, op);
+    strcat(s, " ");
+    if (!is_test_or_compare) {
+        print_register(s, Rd);
+        strcat(s, ", ");
+    }
+    if (!is_move) {
+        print_register(s, Rn);
+        strcat(s, ", ");
+    }
+    print_immediate(s, imm);
+}
+
+int arm_data_processing_immediate(uint32_t op) {
+    uint32_t opc = BITS(op, 21, 24);
+    bool S = BIT(op, 20);
+    uint32_t Rn = BITS(op, 16, 19);
+    uint32_t Rd = BITS(op, 12, 15);
+    uint32_t rot = BITS(op, 8, 11);
+    uint32_t imm = ROR(BITS(op, 0, 7), 2 * rot);
 
     bool is_test_or_compare = (opc == ARM_TST || opc == ARM_TEQ || opc == ARM_CMP || opc == ARM_CMN);
     bool is_move = (opc == ARM_MOV || opc == ARM_MVN);
@@ -209,18 +306,22 @@ int arm_data_processing_immediate(void) {
     return 1;
 }
 
-int arm_load_store_word_or_byte_register(void) {
-    bool P = BIT(arm_op, 24);
-    bool U = BIT(arm_op, 23);
-    bool B = BIT(arm_op, 22);
-    bool W = BIT(arm_op, 21);
-    bool L = BIT(arm_op, 20);
-    uint32_t Rn = BITS(arm_op, 16, 19);
-    uint32_t Rd = BITS(arm_op, 12, 15);
-    uint32_t shamt = BITS(arm_op, 7, 11);
-    uint32_t shop = BITS(arm_op, 5, 6);
-    bool shreg = BIT(arm_op, 4);
-    uint32_t Rm = BITS(arm_op, 0, 3);
+void arm_load_store_word_or_byte_register_disasm(uint32_t address, uint32_t op, char *s) {
+    strcpy(s, "???");
+}
+
+int arm_load_store_word_or_byte_register(uint32_t op) {
+    bool P = BIT(op, 24);
+    bool U = BIT(op, 23);
+    bool B = BIT(op, 22);
+    bool W = BIT(op, 21);
+    bool L = BIT(op, 20);
+    uint32_t Rn = BITS(op, 16, 19);
+    uint32_t Rd = BITS(op, 12, 15);
+    uint32_t shamt = BITS(op, 7, 11);
+    uint32_t shop = BITS(op, 5, 6);
+    bool shreg = BIT(op, 4);
+    uint32_t Rm = BITS(op, 0, 3);
 
     bool T = !P && W;
     assert(!T);
@@ -255,15 +356,19 @@ int arm_load_store_word_or_byte_register(void) {
     return 1;
 }
 
-int arm_load_store_word_or_byte_immediate(void) {
-    bool P = BIT(arm_op, 24);
-    bool U = BIT(arm_op, 23);
-    bool B = BIT(arm_op, 22);
-    bool W = BIT(arm_op, 21);
-    bool L = BIT(arm_op, 20);
-    uint32_t Rn = BITS(arm_op, 16, 19);
-    uint32_t Rd = BITS(arm_op, 12, 15);
-    uint32_t imm = BITS(arm_op, 0, 11);
+void arm_load_store_word_or_byte_immediate_disasm(uint32_t address, uint32_t op, char *s) {
+    strcpy(s, "???");
+}
+
+int arm_load_store_word_or_byte_immediate(uint32_t op) {
+    bool P = BIT(op, 24);
+    bool U = BIT(op, 23);
+    bool B = BIT(op, 22);
+    bool W = BIT(op, 21);
+    bool L = BIT(op, 20);
+    uint32_t Rn = BITS(op, 16, 19);
+    uint32_t Rd = BITS(op, 12, 15);
+    uint32_t imm = BITS(op, 0, 11);
 
     bool T = !P && W;
     assert(!T);
@@ -295,14 +400,45 @@ int arm_load_store_word_or_byte_immediate(void) {
     return 1;
 }
 
-int arm_load_store_multiple(void) {
-    bool P = BIT(arm_op, 24);
-    bool U = BIT(arm_op, 23);
-    bool S = BIT(arm_op, 22);
-    bool W = BIT(arm_op, 21);
-    bool L = BIT(arm_op, 20);
-    uint32_t Rn = BITS(arm_op, 16, 19);
-    uint32_t rlist = BITS(arm_op, 0, 15);
+void arm_load_store_multiple_disasm(uint32_t address, uint32_t op, char *s) {
+    UNUSED(address);
+
+    bool P = BIT(op, 24);
+    bool U = BIT(op, 23);
+    bool S = BIT(op, 22);
+    bool W = BIT(op, 21);
+    bool L = BIT(op, 20);
+    uint32_t Rn = BITS(op, 16, 19);
+    uint32_t rlist = BITS(op, 0, 15);
+
+    strcpy(s, L ? "ldm" : "stm");
+    if (!P && !U) {
+        strcat(s, "da");
+    } else if (!P && U) {
+        strcat(s, "ia");
+    } else if (P && !U) {
+        strcat(s, "db");
+    } else if (P && U) {
+        strcat(s, "ib");
+    }
+    print_arm_condition(s, op);
+    strcat(s, " ");
+    print_register(s, Rn);
+    if (W) strcat(s, "!");
+    strcat(s, ", {");
+    print_arm_rlist(s, rlist);
+    strcat(s, "}");
+    if (S) strcat(s, "^");
+}
+
+int arm_load_store_multiple(uint32_t op) {
+    bool P = BIT(op, 24);
+    bool U = BIT(op, 23);
+    bool S = BIT(op, 22);
+    bool W = BIT(op, 21);
+    bool L = BIT(op, 20);
+    uint32_t Rn = BITS(op, 16, 19);
+    uint32_t rlist = BITS(op, 0, 15);
 
     uint32_t count = bits_popcount(rlist);
     if (rlist == 0) {  // Empty rlist
@@ -351,9 +487,20 @@ int arm_load_store_multiple(void) {
     return 1;
 }
 
-int arm_branch(void) {
-    bool L = BIT(arm_op, 24);
-    uint32_t imm = BITS(arm_op, 0, 23);
+void arm_branch_disasm(uint32_t address, uint32_t op, char *s) {
+    bool L = BIT(op, 24);
+    uint32_t imm = BITS(op, 0, 23);
+    ZERO_EXTEND(imm, 23);
+
+    strcpy(s, L ? "bl" : "b");
+    print_arm_condition(s, op);
+    strcat(s, " ");
+    print_address(s, address + 8 + (imm << 2));
+}
+
+int arm_branch(uint32_t op) {
+    bool L = BIT(op, 24);
+    uint32_t imm = BITS(op, 0, 23);
     ZERO_EXTEND(imm, 23);
 
     if (L) r[REG_LR] = r[REG_PC] - 4;
@@ -363,7 +510,18 @@ int arm_branch(void) {
     return 1;
 }
 
-int arm_software_interrupt(void) {
+void arm_software_interrupt_disasm(uint32_t address, uint32_t op, char *s) {
+    UNUSED(address);
+
+    strcpy(s, "swi");
+    print_arm_condition(s, op);
+    strcat(s, " ");
+    print_address(s, BITS(op, 0, 23));
+}
+
+int arm_software_interrupt(uint32_t op) {
+    UNUSED(op);
+
     r14_svc = r[REG_PC] - SIZEOF_INSTR;  // ARM: PC + 4, Thumb: PC + 2
     spsr_svc = cpsr;
     branch_taken = true;
@@ -383,13 +541,38 @@ int arm_hardware_interrupt(void) {
     return 1;
 }
 
-int arm_multiply(void) {
-    bool A = BIT(arm_op, 21);
-    bool S = BIT(arm_op, 20);
-    uint32_t Rd = BITS(arm_op, 16, 19);
-    uint32_t Rn = BITS(arm_op, 12, 15);
-    uint32_t Rs = BITS(arm_op, 8, 11);
-    uint32_t Rm = BITS(arm_op, 0, 3);
+void arm_multiply_disasm(uint32_t address, uint32_t op, char *s) {
+    UNUSED(address);
+
+    bool A = BIT(op, 21);
+    bool S = BIT(op, 20);
+    uint32_t Rd = BITS(op, 16, 19);
+    uint32_t Rn = BITS(op, 12, 15);
+    uint32_t Rs = BITS(op, 8, 11);
+    uint32_t Rm = BITS(op, 0, 3);
+
+    strcpy(s, A ? "mla" : "mul");
+    if (S) strcat(s, "s");
+    print_arm_condition(s, op);
+    strcat(s, " ");
+    print_register(s, Rd);
+    strcat(s, ", ");
+    print_register(s, Rm);
+    strcat(s, ", ");
+    print_register(s, Rs);
+    if (A) {
+        strcat(s, ", ");
+        print_register(s, Rn);
+    }
+}
+
+int arm_multiply(uint32_t op) {
+    bool A = BIT(op, 21);
+    bool S = BIT(op, 20);
+    uint32_t Rd = BITS(op, 16, 19);
+    uint32_t Rn = BITS(op, 12, 15);
+    uint32_t Rs = BITS(op, 8, 11);
+    uint32_t Rm = BITS(op, 0, 3);
 
     if (!A) assert(Rn == 0);
     assert(Rd != REG_PC && Rm != REG_PC && Rs != REG_PC);
@@ -406,14 +589,42 @@ int arm_multiply(void) {
     return 1;
 }
 
-int arm_multiply_long(void) {
-    bool U = BIT(arm_op, 22);
-    bool A = BIT(arm_op, 21);
-    bool S = BIT(arm_op, 20);
-    uint32_t RdHi = BITS(arm_op, 16, 19);
-    uint32_t RdLo = BITS(arm_op, 12, 15);
-    uint32_t Rs = BITS(arm_op, 8, 11);
-    uint32_t Rm = BITS(arm_op, 0, 3);
+void arm_multiply_long_disasm(uint32_t address, uint32_t op, char *s) {
+    UNUSED(address);
+
+    bool U = BIT(op, 22);
+    bool A = BIT(op, 21);
+    bool S = BIT(op, 20);
+    uint32_t RdHi = BITS(op, 16, 19);
+    uint32_t RdLo = BITS(op, 12, 15);
+    uint32_t Rs = BITS(op, 8, 11);
+    uint32_t Rm = BITS(op, 0, 3);
+
+    if (U) {
+        strcpy(s, A ? "smlal" : "smull");
+    } else {
+        strcpy(s, A ? "umlal" : "umull");
+    }
+    if (S) strcat(s, "s");
+    print_arm_condition(s, op);
+    strcat(s, " ");
+    print_register(s, RdLo);
+    strcat(s, ", ");
+    print_register(s, RdHi);
+    strcat(s, ", ");
+    print_register(s, Rm);
+    strcat(s, ", ");
+    print_register(s, Rs);
+}
+
+int arm_multiply_long(uint32_t op) {
+    bool U = BIT(op, 22);
+    bool A = BIT(op, 21);
+    bool S = BIT(op, 20);
+    uint32_t RdHi = BITS(op, 16, 19);
+    uint32_t RdLo = BITS(op, 12, 15);
+    uint32_t Rs = BITS(op, 8, 11);
+    uint32_t Rm = BITS(op, 0, 3);
 
     assert(RdHi != REG_PC && RdLo != REG_PC && Rm != REG_PC && Rs != REG_PC);
     assert(RdHi != RdLo);
@@ -437,17 +648,21 @@ int arm_multiply_long(void) {
     return 1;
 }
 
-int arm_load_store_halfword_register(void) {
-    bool P = BIT(arm_op, 24);
-    bool U = BIT(arm_op, 23);
-    bool I = BIT(arm_op, 22);
-    bool W = BIT(arm_op, 21);
-    bool L = BIT(arm_op, 20);
-    uint32_t Rn = BITS(arm_op, 16, 19);
-    uint32_t Rd = BITS(arm_op, 12, 15);
-    uint32_t sbz = BITS(arm_op, 8, 11);
-    uint32_t opc = BITS(arm_op, 4, 7);
-    uint32_t Rm = BITS(arm_op, 0, 3);
+void arm_load_store_halfword_register_disasm(uint32_t address, uint32_t op, char *s) {
+    strcpy(s, "???");
+}
+
+int arm_load_store_halfword_register(uint32_t op) {
+    bool P = BIT(op, 24);
+    bool U = BIT(op, 23);
+    bool I = BIT(op, 22);
+    bool W = BIT(op, 21);
+    bool L = BIT(op, 20);
+    uint32_t Rn = BITS(op, 16, 19);
+    uint32_t Rd = BITS(op, 12, 15);
+    uint32_t sbz = BITS(op, 8, 11);
+    uint32_t opc = BITS(op, 4, 7);
+    uint32_t Rm = BITS(op, 0, 3);
 
     bool T = !P && W;
     assert(!T);
@@ -472,16 +687,20 @@ int arm_load_store_halfword_register(void) {
     return 1;
 }
 
-int arm_load_store_halfword_immediate(void) {
-    bool P = BIT(arm_op, 24);
-    bool U = BIT(arm_op, 23);
-    bool I = BIT(arm_op, 22);
-    bool W = BIT(arm_op, 21);
-    bool L = BIT(arm_op, 20);
-    uint32_t Rn = BITS(arm_op, 16, 19);
-    uint32_t Rd = BITS(arm_op, 12, 15);
-    uint32_t opc = BITS(arm_op, 4, 7);
-    uint32_t imm = BITS(arm_op, 8, 11) << 4 | BITS(arm_op, 0, 3);
+void arm_load_store_halfword_immediate_disasm(uint32_t address, uint32_t op, char *s) {
+    strcpy(s, "???");
+}
+
+int arm_load_store_halfword_immediate(uint32_t op) {
+    bool P = BIT(op, 24);
+    bool U = BIT(op, 23);
+    bool I = BIT(op, 22);
+    bool W = BIT(op, 21);
+    bool L = BIT(op, 20);
+    uint32_t Rn = BITS(op, 16, 19);
+    uint32_t Rd = BITS(op, 12, 15);
+    uint32_t opc = BITS(op, 4, 7);
+    uint32_t imm = BITS(op, 8, 11) << 4 | BITS(op, 0, 3);
 
     bool T = !P && W;
     assert(!T);
@@ -504,17 +723,21 @@ int arm_load_store_halfword_immediate(void) {
     return 1;
 }
 
-int arm_load_signed_halfword_or_signed_byte_register(void) {
-    bool P = BIT(arm_op, 24);
-    bool U = BIT(arm_op, 23);
-    bool I = BIT(arm_op, 22);
-    bool W = BIT(arm_op, 21);
-    bool L = BIT(arm_op, 20);
-    uint32_t Rn = BITS(arm_op, 16, 19);
-    uint32_t Rd = BITS(arm_op, 12, 15);
-    uint32_t sbz = BITS(arm_op, 8, 11);
-    uint32_t opc = BITS(arm_op, 4, 7);
-    uint32_t Rm = BITS(arm_op, 0, 3);
+void arm_load_signed_halfword_or_signed_byte_register_disasm(uint32_t address, uint32_t op, char *s) {
+    strcpy(s, "???");
+}
+
+int arm_load_signed_halfword_or_signed_byte_register(uint32_t op) {
+    bool P = BIT(op, 24);
+    bool U = BIT(op, 23);
+    bool I = BIT(op, 22);
+    bool W = BIT(op, 21);
+    bool L = BIT(op, 20);
+    uint32_t Rn = BITS(op, 16, 19);
+    uint32_t Rd = BITS(op, 12, 15);
+    uint32_t sbz = BITS(op, 8, 11);
+    uint32_t opc = BITS(op, 4, 7);
+    uint32_t Rm = BITS(op, 0, 3);
 
     bool T = !P && W;
     assert(!T);
@@ -548,16 +771,20 @@ int arm_load_signed_halfword_or_signed_byte_register(void) {
     return 1;
 }
 
-int arm_load_signed_halfword_or_signed_byte_immediate(void) {
-    bool P = BIT(arm_op, 24);
-    bool U = BIT(arm_op, 23);
-    bool I = BIT(arm_op, 22);
-    bool W = BIT(arm_op, 21);
-    bool L = BIT(arm_op, 20);
-    uint32_t Rn = BITS(arm_op, 16, 19);
-    uint32_t Rd = BITS(arm_op, 12, 15);
-    uint32_t opc = BITS(arm_op, 4, 7);
-    uint32_t imm = BITS(arm_op, 8, 11) << 4 | BITS(arm_op, 0, 3);
+void arm_load_signed_halfword_or_signed_byte_immediate_disasm(uint32_t address, uint32_t op, char *s) {
+    strcpy(s, "???");
+}
+
+int arm_load_signed_halfword_or_signed_byte_immediate(uint32_t op) {
+    bool P = BIT(op, 24);
+    bool U = BIT(op, 23);
+    bool I = BIT(op, 22);
+    bool W = BIT(op, 21);
+    bool L = BIT(op, 20);
+    uint32_t Rn = BITS(op, 16, 19);
+    uint32_t Rd = BITS(op, 12, 15);
+    uint32_t opc = BITS(op, 4, 7);
+    uint32_t imm = BITS(op, 8, 11) << 4 | BITS(op, 0, 3);
 
     bool T = !P && W;
     assert(!T);
@@ -589,13 +816,42 @@ int arm_load_signed_halfword_or_signed_byte_immediate(void) {
     return 1;
 }
 
-int arm_special_data_processing_register(void) {
-    bool R = BIT(arm_op, 22);
-    bool b21 = BIT(arm_op, 21);
-    uint32_t mask_type = BITS(arm_op, 16, 19);
-    uint32_t Rd = BITS(arm_op, 12, 15);
-    uint32_t Rm = BITS(arm_op, 0, 3);
-    uint32_t sbz = BITS(arm_op, 4, 11);
+void arm_special_data_processing_register_disasm(uint32_t address, uint32_t op, char *s) {
+    UNUSED(address);
+
+    bool R = BIT(op, 22);
+    bool b21 = BIT(op, 21);
+    uint32_t mask_type = BITS(op, 16, 19);
+    uint32_t Rd = BITS(op, 12, 15);
+    uint32_t Rm = BITS(op, 0, 3);
+
+    strcpy(s, b21 ? "msr" : "mrs");
+    print_arm_condition(s, op);
+    strcat(s, " ");
+    if (b21) {
+        strcat(s, R ? "spsr" : "cpsr");
+        strcat(s, "_");
+        if (mask_type == 0) strcat(s, "none");
+        if (mask_type & 8) strcat(s, "f");  // Flags
+        if (mask_type & 4) strcat(s, "s");  // Status
+        if (mask_type & 2) strcat(s, "x");  // Extension
+        if (mask_type & 1) strcat(s, "c");  // Control
+        strcat(s, ", ");
+        print_register(s, Rm);
+    } else {
+        print_register(s, Rd);
+        strcat(s, ", ");
+        strcat(s, R ? "spsr" : "cpsr");
+    }
+}
+
+int arm_special_data_processing_register(uint32_t op) {
+    bool R = BIT(op, 22);
+    bool b21 = BIT(op, 21);
+    uint32_t mask_type = BITS(op, 16, 19);
+    uint32_t Rd = BITS(op, 12, 15);
+    uint32_t Rm = BITS(op, 0, 3);
+    uint32_t sbz = BITS(op, 4, 11);
 
     if (b21) {
         assert(Rd == 0xf);
@@ -607,13 +863,8 @@ int arm_special_data_processing_register(void) {
 
     if (b21) {
         uint32_t mask = 0;
-        switch (mask_type) {
-            case 1: mask = 0x000000ff; break;
-            case 8: mask = 0xf0000000; break;
-            case 9: mask = 0xf00000ff; break;
-            case 0xf: mask = 0xf00000ff; break;
-            default: assert(false); break;
-        }
+        if (mask_type & 8) mask |= 0xf0000000;
+        if (mask_type & 1) mask |= 0x000000ff;
         if (R) {
             write_spsr((read_spsr() & ~mask) | (r[Rm] & mask));
         } else {
@@ -631,23 +882,40 @@ int arm_special_data_processing_register(void) {
     return 1;
 }
 
-int arm_special_data_processing_immediate(void) {
-    bool R = BIT(arm_op, 22);
-    uint32_t mask_type = BITS(arm_op, 16, 19);
-    uint32_t sbo = BITS(arm_op, 12, 15);
-    uint32_t rot = BITS(arm_op, 8, 11);
-    uint32_t imm = ROR(BITS(arm_op, 0, 7), 2 * rot);
+void arm_special_data_processing_immediate_disasm(uint32_t address, uint32_t op, char *s) {
+    UNUSED(address);
+
+    bool R = BIT(op, 22);
+    uint32_t mask_type = BITS(op, 16, 19);
+    uint32_t rot = BITS(op, 8, 11);
+    uint32_t imm = ROR(BITS(op, 0, 7), 2 * rot);
+
+    strcpy(s, "msr");
+    print_arm_condition(s, op);
+    strcat(s, " ");
+    strcat(s, R ? "spsr" : "cpsr");
+    strcat(s, "_");
+    if (mask_type == 0) strcat(s, "none");
+    if (mask_type & 8) strcat(s, "f");  // Flags
+    if (mask_type & 4) strcat(s, "s");  // Status
+    if (mask_type & 2) strcat(s, "x");  // Extension
+    if (mask_type & 1) strcat(s, "c");  // Control
+    strcat(s, ", ");
+    print_immediate(s, imm);
+}
+
+int arm_special_data_processing_immediate(uint32_t op) {
+    bool R = BIT(op, 22);
+    uint32_t mask_type = BITS(op, 16, 19);
+    uint32_t sbo = BITS(op, 12, 15);
+    uint32_t rot = BITS(op, 8, 11);
+    uint32_t imm = ROR(BITS(op, 0, 7), 2 * rot);
 
     assert(sbo == 0xf);
 
     uint32_t mask = 0;
-    switch (mask_type) {
-        case 0: mask = 0x00000000; break;
-        case 1: mask = 0x000000ff; break;
-        case 8: mask = 0xf0000000; break;
-        case 9: mask = 0xf00000ff; break;
-        default: assert(false); break;
-    }
+    if (mask_type & 8) mask |= 0xf0000000;
+    if (mask_type & 1) mask |= 0x000000ff;
     if (R) {
         write_spsr((read_spsr() & ~mask) | (imm & mask));
     } else {
@@ -657,12 +925,32 @@ int arm_special_data_processing_immediate(void) {
     return 1;
 }
 
-int arm_swap(void) {
-    bool B = BIT(arm_op, 22);
-    uint32_t Rn = BITS(arm_op, 16, 19);
-    uint32_t Rd = BITS(arm_op, 12, 15);
-    uint32_t sbz = BITS(arm_op, 8, 11);
-    uint32_t Rm = BITS(arm_op, 0, 3);
+void arm_swap_disasm(uint32_t address, uint32_t op, char *s) {
+    UNUSED(address);
+
+    bool B = BIT(op, 22);
+    uint32_t Rn = BITS(op, 16, 19);
+    uint32_t Rd = BITS(op, 12, 15);
+    uint32_t Rm = BITS(op, 0, 3);
+
+    strcpy(s, "swp");
+    if (B) strcat(s, "b");
+    print_arm_condition(s, op);
+    strcat(s, " ");
+    print_register(s, Rd);
+    strcat(s, ", ");
+    print_register(s, Rm);
+    strcat(s, ", [");
+    print_register(s, Rn);
+    strcat(s, "]");
+}
+
+int arm_swap(uint32_t op) {
+    bool B = BIT(op, 22);
+    uint32_t Rn = BITS(op, 16, 19);
+    uint32_t Rd = BITS(op, 12, 15);
+    uint32_t sbz = BITS(op, 8, 11);
+    uint32_t Rm = BITS(op, 0, 3);
 
     assert(sbz == 0);
 
@@ -680,9 +968,20 @@ int arm_swap(void) {
     return 1;
 }
 
-int arm_branch_and_exchange(void) {
-    uint32_t sbo = BITS(arm_op, 8, 19);
-    uint32_t Rm = BITS(arm_op, 0, 3);
+void arm_branch_and_exchange_disasm(uint32_t address, uint32_t op, char *s) {
+    UNUSED(address);
+
+    uint32_t Rm = BITS(op, 0, 3);
+
+    strcpy(s, "bx");
+    print_arm_condition(s, op);
+    strcat(s, " ");
+    print_register(s, Rm);
+}
+
+int arm_branch_and_exchange(uint32_t op) {
+    uint32_t sbo = BITS(op, 8, 19);
+    uint32_t Rm = BITS(op, 0, 3);
 
     assert(sbo == 0xfff);
 
@@ -692,6 +991,59 @@ int arm_branch_and_exchange(void) {
     } else {
         r[REG_PC] = r[Rm] & ~3;
     }
+    branch_taken = true;
+
+    return 1;
+}
+
+void arm_coprocessor_load_store_disasm(uint32_t address, uint32_t op, char *s) {
+    UNUSED(address);
+
+    strcpy(s, (op & 0x100000) ? "ldc" : "stc");
+    print_arm_condition(s, op);
+}
+
+int arm_coprocessor_load_store(uint32_t op) {
+    UNUSED(op);
+
+    assert(false);
+    return 1;
+}
+
+void arm_coprocessor_data_processing_disasm(uint32_t address, uint32_t op, char *s) {
+    UNUSED(address);
+
+    if (op & 0x100) {
+        strcpy(s, (op & 0x100000) ? "mrc" : "mcr");
+    } else {
+        strcpy(s, "cdp");
+    }
+    print_arm_condition(s, op);
+}
+
+int arm_coprocessor_data_processing(uint32_t op) {
+    UNUSED(op);
+
+    assert(false);
+    return 1;
+}
+
+void arm_undefined_instruction_disasm(uint32_t address, uint32_t op, char *s) {
+    UNUSED(address);
+    UNUSED(op);
+
+    strcpy(s, "undefined");
+}
+
+int arm_undefined_instruction(uint32_t op) {
+    UNUSED(op);
+
+    assert(false);
+
+    r14_und = r[REG_PC] - SIZEOF_INSTR;  // ARM: PC + 4, Thumb: PC + 2
+    spsr_und = cpsr;
+    write_cpsr((cpsr & ~(PSR_T | PSR_MODE)) | PSR_I | PSR_MODE_UND);
+    r[REG_PC] = VEC_UNDEF;
     branch_taken = true;
 
     return 1;

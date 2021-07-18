@@ -6,8 +6,6 @@
 
 #include "cpu.h"
 
-uint64_t instruction_count = 0;
-
 uint32_t r[16];
 uint32_t r8_usr, r9_usr, r10_usr, r11_usr, r12_usr, r13_usr, r14_usr;
 uint32_t r8_fiq, r9_fiq, r10_fiq, r11_fiq, r12_fiq, r13_fiq, r14_fiq;
@@ -21,11 +19,13 @@ bool branch_taken;
 
 uint32_t arm_op;
 uint32_t arm_pipeline[2];
-int (*arm_lookup[4096])(void);
+int (*arm_lookup[4096])(uint32_t);
+void (*arm_lookup_disasm[4096])(uint32_t, uint32_t, char *);
 
 uint16_t thumb_op;
 uint16_t thumb_pipeline[2];
-int (*thumb_lookup[256])(void);
+int (*thumb_lookup[256])(uint16_t);
+void (*thumb_lookup_disasm[256])(uint32_t, uint16_t, char *);
 
 void arm_init_registers(bool skip_bios) {
     if (skip_bios) {
@@ -205,22 +205,15 @@ void write_spsr(uint32_t psr) {
     }
 }
 
-int arm_undefined_instruction(void) {
-    assert(false);
-
-    r14_und = r[REG_PC] - SIZEOF_INSTR;  // ARM: PC + 4, Thumb: PC + 2
-    spsr_und = cpsr;
-    write_cpsr((cpsr & ~(PSR_T | PSR_MODE)) | PSR_I | PSR_MODE_UND);
-    r[REG_PC] = VEC_UNDEF;
-    branch_taken = true;
-
-    return 1;
+uint32_t get_pc(void) {
+    return r[15] - (branch_taken ? 0 : 2 * SIZEOF_INSTR);
 }
 
-int thumb_undefined_instruction(void) {
-    assert(false);
-
-    return arm_undefined_instruction();
+void arm_disasm(uint32_t address, uint32_t op, char *s) {
+    uint32_t index = ((op >> 4) & 0xf) | ((op >> 16) & 0xff0);
+    void (*handler)(uint32_t, uint32_t, char *) = arm_lookup_disasm[index];
+    assert(handler != NULL);
+    (*handler)(address, op, s);
 }
 
 int arm_step(void) {
@@ -240,9 +233,9 @@ int arm_step(void) {
     int cycles = 1;
     if (condition_passed(cond)) {
         uint32_t index = ((arm_op >> 4) & 0xf) | ((arm_op >> 16) & 0xff0);
-        int (*handler)(void) = arm_lookup[index];
+        int (*handler)(uint32_t) = arm_lookup[index];
         assert(handler != NULL);
-        cycles = (*handler)();
+        cycles = (*handler)(arm_op);
     }
 
     if (!branch_taken) {
@@ -250,6 +243,13 @@ int arm_step(void) {
     }
 
     return cycles;
+}
+
+void thumb_disasm(uint32_t address, uint16_t op, char *s) {
+    uint16_t index = (op >> 8) & 0xff;
+    void (*handler)(uint32_t, uint16_t, char *) = thumb_lookup_disasm[index];
+    assert(handler != NULL);
+    (*handler)(address, op, s);
 }
 
 int thumb_step(void) {
@@ -266,9 +266,9 @@ int thumb_step(void) {
     }
 
     uint16_t index = (thumb_op >> 8) & 0xff;
-    int (*handler)(void) = thumb_lookup[index];
+    int (*handler)(uint16_t) = thumb_lookup[index];
     assert(handler != NULL);
-    int cycles = (*handler)();
+    int cycles = (*handler)(thumb_op);
 
     if (!branch_taken) {
         r[15] += 2;
@@ -277,7 +277,7 @@ int thumb_step(void) {
     return cycles;
 }
 
-void lookup_bind(int (**lookup)(void), const char *mask, int (*f)(void)) {
+void lookup_bind(void (**lookup)(void), const char *mask, void (*f)(void)) {
     uint32_t n = 0;
     uint32_t m = 0;
     for (const char *p = mask; *p != '\0'; p++) {
@@ -297,66 +297,217 @@ void lookup_bind(int (**lookup)(void), const char *mask, int (*f)(void)) {
     }
 }
 
-void arm_bind(const char *mask, int (*f)(void)) {
-    lookup_bind(arm_lookup, mask, f);
+void arm_bind(const char *mask, int (*execute)(uint32_t), void (*disasm)(uint32_t, uint32_t, char *)) {
+    lookup_bind((void (**)()) arm_lookup, mask, (void (*)()) execute);
+    lookup_bind((void (**)()) arm_lookup_disasm, mask, (void (*)()) disasm);
 }
 
-void thumb_bind(const char *mask, int (*f)(void)) {
-    lookup_bind(thumb_lookup, mask, f);
+void thumb_bind(const char *mask, int (*execute)(uint16_t), void (*disasm)(uint32_t, uint16_t, char *)) {
+    lookup_bind((void (**)()) thumb_lookup, mask, (void (*)()) execute);
+    lookup_bind((void (**)()) thumb_lookup_disasm, mask, (void (*)()) disasm);
 }
 
 void arm_init_lookup(void) {
     memset(arm_lookup, 0, sizeof(void *) * 4096);
 
-    arm_bind("000xxxxxxxxx", arm_data_processing_register);
-    arm_bind("001xxxxxxxxx", arm_data_processing_immediate);
-    arm_bind("010xxxxxxxxx", arm_load_store_word_or_byte_immediate);
-    arm_bind("011xxxxxxxx0", arm_load_store_word_or_byte_register);
-    arm_bind("011xxxxxxxx1", arm_undefined_instruction);
-    arm_bind("100xxxxxxxxx", arm_load_store_multiple);
-    arm_bind("101xxxxxxxxx", arm_branch);
-    //arm_bind("110xxxxxxxxx", arm_coprocessor_load_store);
-    //arm_bind("1110xxxxxxxx", arm_coprocessor_data_processing);
-    arm_bind("1111xxxxxxxx", arm_software_interrupt);
-    arm_bind("00010x00xxxx", arm_special_data_processing_register);  // must be before ldrh/strh
-    arm_bind("00010x10xxx0", arm_special_data_processing_register);
-    arm_bind("000000xx1001", arm_multiply);
-    arm_bind("00001xxx1001", arm_multiply_long);
-    arm_bind("000xx0xx1011", arm_load_store_halfword_register);
-    arm_bind("000xx1xx1011", arm_load_store_halfword_immediate);
-    arm_bind("000xx0xx11x1", arm_load_signed_halfword_or_signed_byte_register);
-    arm_bind("000xx1xx11x1", arm_load_signed_halfword_or_signed_byte_immediate);
-    arm_bind("00010x001001", arm_swap);
-    arm_bind("000100100001", arm_branch_and_exchange);
-    //arm_bind("00010x10xxx1", arm_branch_and_exchange?);
-    arm_bind("00110010xxxx", arm_special_data_processing_immediate);
-    arm_bind("00110110xxxx", arm_special_data_processing_immediate);
+#define BIND(mask, f) arm_bind(mask, f, f##_disasm)
+
+    BIND("000xxxxxxxxx", arm_data_processing_register);
+    BIND("001xxxxxxxxx", arm_data_processing_immediate);
+    BIND("010xxxxxxxxx", arm_load_store_word_or_byte_immediate);
+    BIND("011xxxxxxxx0", arm_load_store_word_or_byte_register);
+    BIND("011xxxxxxxx1", arm_undefined_instruction);
+    BIND("100xxxxxxxxx", arm_load_store_multiple);
+    BIND("101xxxxxxxxx", arm_branch);
+    BIND("110xxxxxxxxx", arm_coprocessor_load_store);
+    BIND("1110xxxxxxxx", arm_coprocessor_data_processing);
+    BIND("1111xxxxxxxx", arm_software_interrupt);
+
+    BIND("00010x00xxxx", arm_special_data_processing_register);  // must be before ldrh/strh
+    BIND("00010x10xxx0", arm_special_data_processing_register);
+    BIND("000000xx1001", arm_multiply);
+    BIND("00001xxx1001", arm_multiply_long);
+    BIND("000xx0xx1011", arm_load_store_halfword_register);
+    BIND("000xx1xx1011", arm_load_store_halfword_immediate);
+    BIND("000xx0xx11x1", arm_load_signed_halfword_or_signed_byte_register);
+    BIND("000xx1xx11x1", arm_load_signed_halfword_or_signed_byte_immediate);
+    BIND("00010x001001", arm_swap);
+    BIND("000100100001", arm_branch_and_exchange);
+  //BIND("00010x10xxx1", arm_branch_and_exchange);
+    BIND("00110x10xxxx", arm_special_data_processing_immediate);
+
+#undef BIND
 }
 
 void thumb_init_lookup(void) {
     memset(thumb_lookup, 0, sizeof(void *) * 256);
 
-    thumb_bind("000xxxxx", thumb_shift_by_immediate);
-    thumb_bind("000110xx", thumb_add_or_subtract_register);
-    thumb_bind("000111xx", thumb_add_or_subtract_immediate);
-    thumb_bind("001xxxxx", thumb_add_subtract_compare_or_move_immediate);
-    thumb_bind("010000xx", thumb_data_processing_register);
-    thumb_bind("010001xx", thumb_special_data_processing);
-    thumb_bind("01000111", thumb_branch_and_exchange);
-    thumb_bind("01001xxx", thumb_load_from_literal_pool);
-    thumb_bind("0101xxxx", thumb_load_store_register);
-    thumb_bind("011xxxxx", thumb_load_store_word_or_byte_immediate);
-    thumb_bind("1000xxxx", thumb_load_store_halfword_immediate);
-    thumb_bind("1001xxxx", thumb_load_store_to_or_from_stack);
-    thumb_bind("1010xxxx", thumb_add_to_sp_or_pc);
-    thumb_bind("1011x0xx", thumb_adjust_stack_pointer);
-    thumb_bind("1011x1xx", thumb_push_or_pop_register_list);
-    thumb_bind("1100xxxx", thumb_load_store_multiple);
-    thumb_bind("1101xxxx", thumb_conditional_branch);
-    thumb_bind("11011110", thumb_undefined_instruction);
-    thumb_bind("11011111", thumb_software_interrupt);
-    thumb_bind("11100xxx", thumb_unconditional_branch);
-    thumb_bind("11101xxx", thumb_undefined_instruction);
-    thumb_bind("11110xxx", thumb_branch_with_link_prefix);
-    thumb_bind("11111xxx", thumb_branch_with_link_suffix);
+#define BIND(mask, f) thumb_bind(mask, f, f##_disasm)
+
+    BIND("000xxxxx", thumb_shift_by_immediate);
+    BIND("000110xx", thumb_add_or_subtract_register);
+    BIND("000111xx", thumb_add_or_subtract_immediate);
+    BIND("001xxxxx", thumb_add_subtract_compare_or_move_immediate);
+    BIND("010000xx", thumb_data_processing_register);
+    BIND("010001xx", thumb_special_data_processing);
+    BIND("01000111", thumb_branch_and_exchange);
+    BIND("01001xxx", thumb_load_from_literal_pool);
+    BIND("0101xxxx", thumb_load_store_register);
+    BIND("011xxxxx", thumb_load_store_word_or_byte_immediate);
+    BIND("1000xxxx", thumb_load_store_halfword_immediate);
+    BIND("1001xxxx", thumb_load_store_to_or_from_stack);
+    BIND("1010xxxx", thumb_add_to_sp_or_pc);
+    BIND("1011x0xx", thumb_adjust_stack_pointer);
+    BIND("1011x1xx", thumb_push_or_pop_register_list);
+    BIND("1100xxxx", thumb_load_store_multiple);
+    BIND("1101xxxx", thumb_conditional_branch);
+    BIND("11011110", thumb_undefined_instruction);
+    BIND("11011111", thumb_software_interrupt);
+    BIND("11100xxx", thumb_unconditional_branch);
+    BIND("11101xxx", thumb_undefined_instruction);
+    BIND("11110xxx", thumb_branch_with_link_prefix);
+    BIND("11111xxx", thumb_branch_with_link_suffix);
+
+#undef BIND
+}
+
+void print_arm_condition(char *s, uint32_t op) {
+    switch (BITS(op, 28, 31)) {
+        case COND_EQ: strcat(s, "eq"); break;
+        case COND_NE: strcat(s, "ne"); break;
+        case COND_CS: strcat(s, "cs"); break;
+        case COND_CC: strcat(s, "cc"); break;
+        case COND_MI: strcat(s, "mi"); break;
+        case COND_PL: strcat(s, "pl"); break;
+        case COND_VS: strcat(s, "vs"); break;
+        case COND_VC: strcat(s, "vc"); break;
+        case COND_HI: strcat(s, "hi"); break;
+        case COND_LS: strcat(s, "ls"); break;
+        case COND_GE: strcat(s, "ge"); break;
+        case COND_LT: strcat(s, "lt"); break;
+        case COND_GT: strcat(s, "gt"); break;
+        case COND_LE: strcat(s, "le"); break;
+    }
+}
+
+void print_register(char *s, uint32_t i) {
+    char temp[4];
+
+    switch (i) {
+        case 13: strcpy(temp, "sp"); break;
+        case 14: strcpy(temp, "lr"); break;
+        case 15: strcpy(temp, "pc"); break;
+        default: sprintf(temp, "r%d", i); break;
+    }
+    strcat(s, temp);
+}
+
+void print_immediate(char *s, uint32_t i) {
+    char temp[12];
+
+    if (i > 9) {
+        sprintf(temp, "#0x%X", i);
+    } else {
+        sprintf(temp, "#%d", i);
+    }
+    strcat(s, temp);
+}
+
+void print_address(char *s, uint32_t i) {
+    char temp[11];
+
+    sprintf(temp, "0x%08X", i);
+    strcat(s, temp);
+}
+
+static void print_shift_amount(char *s, uint32_t i) {
+    char temp[12];
+
+    sprintf(temp, "#%d", i);
+    strcat(s, temp);
+}
+
+void print_arm_shift(char *s, uint32_t shop, uint32_t shamt, uint32_t shreg, uint32_t Rs) {
+    switch (shop) {
+        case SHIFT_LSL:
+            if (shreg) {
+                strcat(s, ", lsl ");
+                print_register(s, Rs);
+            } else if (shamt != 0) {
+                strcat(s, ", lsl ");
+                print_shift_amount(s, shamt);
+            }
+            break;
+
+        case SHIFT_LSR:
+            strcat(s, ", lsr ");
+            if (shreg) {
+                print_register(s, Rs);
+            } else {
+                print_shift_amount(s, shamt);
+            }
+            break;
+
+        case SHIFT_ASR:
+            strcat(s, ", asr ");
+            if (shreg) {
+                print_register(s, Rs);
+            } else {
+                print_shift_amount(s, shamt);
+            }
+            break;
+
+        case SHIFT_ROR:
+            if (shreg) {
+                strcat(s, ", ror ");
+                print_register(s, Rs);
+            } else if (shamt != 0) {
+                strcat(s, ", ror ");
+                print_shift_amount(s, shamt);
+            } else {
+                strcat(s, ", rrx");
+            }
+            break;
+
+        default:
+            assert(false);
+            break;
+    }
+}
+
+static bool print_rlist(char *s, uint32_t rlist, uint32_t max) {
+    bool first = true;
+    uint32_t i = 0;
+    while (i < max) {
+        if (rlist & (1 << i)) {
+            uint32_t j = i + 1;
+            while (rlist & (1 << j)) j++;
+            if (j == i + 1) {
+                if (!first) strcat(s, ",");
+                print_register(s, i);
+            } else if (j == i + 2) {
+                if (!first) strcat(s, ",");
+                print_register(s, i);
+                strcat(s, ",");
+                print_register(s, j - 1);
+            } else {
+                if (!first) strcat(s, ",");
+                print_register(s, i);
+                strcat(s, "-");
+                print_register(s, j - 1);
+            }
+            i = j;
+            first = false;
+        }
+        i++;
+    }
+    return first;
+}
+
+bool print_arm_rlist(char *s, uint32_t rlist) {
+    return print_rlist(s, rlist, 16);
+}
+
+bool print_thumb_rlist(char *s, uint32_t rlist) {
+    return print_rlist(s, rlist, 8);
 }

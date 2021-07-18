@@ -45,8 +45,7 @@ using namespace gl;
 #include "algorithms.h"
 #include "cpu.h"
 
-#define UNUSED(x) (void)(x)
-
+bool single_step = false;
 int ppu_cycles = 0;
 int timer_cycles = 0;
 bool halted = false;
@@ -650,7 +649,7 @@ uint8_t io_read_byte(uint32_t address) {
         case REG_WAITCNT + 1: return ioreg.waitcnt.b.b1;
         case REG_IME + 0: return ioreg.ime.b.b0;
         case REG_IME + 1: return ioreg.ime.b.b1;
-        case REG_POSTFLG: return ioreg.postflg;
+        case REG_POSTFLG: return 0;  // ioreg.postflg;
         case REG_HALTCNT: return 0;
 
         default:
@@ -2372,11 +2371,7 @@ void gba_dma_update(uint32_t current_timing) {
 
 void gba_emulate(void) {
     while (true) {
-        gba_timer_update();
-        gba_ppu_update();
-        if (ppu_cycles == 0) break;
-
-        int cpu_cycles = 1;
+        int cpu_cycles = 0;
 
         if (!halted) {
             if (FLAG_T()) {
@@ -2385,13 +2380,16 @@ void gba_emulate(void) {
                 cpu_cycles = arm_step();
             }
             assert(cpu_cycles == 1);
-            instruction_count++;
         }
 
         if (!branch_taken && (cpsr & PSR_I) == 0 && ioreg.ime.w != 0 && (ioreg.irq.w & ioreg.ie.w) != 0) {
             arm_hardware_interrupt();
             halted = false;
         }
+
+        gba_timer_update();
+        gba_ppu_update();
+        if (ppu_cycles == 0 || (single_step && cpu_cycles > 0)) break;
     }
 }
 
@@ -2453,7 +2451,7 @@ int main(int argc, char **argv) {
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
     SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
     SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
-    SDL_Window *window = SDL_CreateWindow("ygba", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720, window_flags);
+    SDL_Window *window = SDL_CreateWindow("ygba", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 800, window_flags);
     if (window == NULL) {
         SDL_Log("Failed to create window: %s", SDL_GetError());
         exit(EXIT_FAILURE);
@@ -2538,7 +2536,8 @@ int main(int argc, char **argv) {
 
     // Our state
     bool show_demo_window = false;
-    bool show_another_window = false;
+    bool show_debugger_window = true;
+    bool show_memory_window = false;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
     // Main loop
@@ -2582,7 +2581,9 @@ int main(int argc, char **argv) {
 
             ImGui::Text("This is some useful text.");  // Display some text (you can use format strings too)
             ImGui::Checkbox("Demo Window", &show_demo_window);  // Edit bools storing our window open/close state
-            ImGui::Checkbox("Another Window", &show_another_window);
+            ImGui::Checkbox("Debugger Window", &show_debugger_window);
+            ImGui::SameLine();
+            ImGui::Checkbox("Memory Window", &show_memory_window);
 
             ImGui::SliderFloat("float", &f, 0.0f, 1.0f);  // Edit 1 float using a slider from 0.0f to 1.0f
             ImGui::ColorEdit3("clear color", (float *) &clear_color);  // Edit 3 floats representing a color
@@ -2594,16 +2595,6 @@ int main(int argc, char **argv) {
             ImGui::Text("counter = %d", counter);
 
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
-            ImGui::End();
-        }
-
-        // 3. Show another simple window.
-        if (show_another_window) {
-            ImGui::Begin("Another Window", &show_another_window);  // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
-            ImGui::Text("Hello from another window!");
-            if (ImGui::Button("Close Me")) {
-                show_another_window = false;
-            }
             ImGui::End();
         }
 
@@ -2646,6 +2637,7 @@ int main(int argc, char **argv) {
         static bool paused = false;
         if (!paused) {
             gba_emulate();
+            if (single_step) paused = true;
         }
 
         glBindTexture(GL_TEXTURE_2D, screen_texture);
@@ -2654,13 +2646,79 @@ int main(int argc, char **argv) {
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, SCREEN_WIDTH, SCREEN_HEIGHT, 0, GL_RGBA, GL_UNSIGNED_BYTE, screen_pixels);
         glBindTexture(GL_TEXTURE_2D, 0);
 
+        // Debugger
+        static char cpsr_flag_text[8];
+        static char cpsr_mode_text[7];
+        static char disasm_text[256];
+        if (show_debugger_window) {
+            ImGui::Begin("Debugger", &show_debugger_window);
+            ImGui::Text(" r0: %08X   r1: %08X   r2: %08X   r3: %08X", r[0], r[1], r[2], r[3]);
+            ImGui::Text(" r4: %08X   r5: %08X   r6: %08X   r7: %08X", r[4], r[5], r[6], r[7]);
+            ImGui::Text(" r8: %08X   r9: %08X  r10: %08X  r11: %08X", r[8], r[9], r[10], r[11]);
+            ImGui::Text("r12: %08X  r13: %08X  r14: %08X  r15: %08X", r[12], r[13], r[14], get_pc());
+            cpsr_flag_text[0] = (cpsr & PSR_N ? 'N' : '-');
+            cpsr_flag_text[1] = (cpsr & PSR_Z ? 'Z' : '-');
+            cpsr_flag_text[2] = (cpsr & PSR_C ? 'C' : '-');
+            cpsr_flag_text[3] = (cpsr & PSR_V ? 'V' : '-');
+            cpsr_flag_text[4] = (cpsr & PSR_I ? 'I' : '-');
+            cpsr_flag_text[5] = (cpsr & PSR_F ? 'F' : '-');
+            cpsr_flag_text[6] = (cpsr & PSR_T ? 'T' : '-');
+            cpsr_flag_text[7] = '\0';
+            switch (cpsr & PSR_MODE) {
+                case PSR_MODE_USR: strcpy(cpsr_mode_text, "User"); break;
+                case PSR_MODE_FIQ: strcpy(cpsr_mode_text, "FIQ"); break;
+                case PSR_MODE_IRQ: strcpy(cpsr_mode_text, "IRQ"); break;
+                case PSR_MODE_SVC: strcpy(cpsr_mode_text, "SVC"); break;
+                case PSR_MODE_ABT: strcpy(cpsr_mode_text, "Abort"); break;
+                case PSR_MODE_UND: strcpy(cpsr_mode_text, "Undef"); break;
+                case PSR_MODE_SYS: strcpy(cpsr_mode_text, "System"); break;
+            }
+            ImGui::Text("cpsr: %08X [%s] %s", cpsr, cpsr_flag_text, cpsr_mode_text);
+            if (ImGui::Button("Run")) {
+                paused = false;
+                single_step = false;
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Step")) {
+                paused = false;
+                single_step = true;
+            }
+            if (ImGui::BeginTable("disassembly", 3, ImGuiTableFlags_Borders | ImGuiTableFlags_Resizable)) {
+                uint32_t pc = get_pc();
+                for (int i = 0; i < 10; i++) {
+                    uint32_t address = pc + i * SIZEOF_INSTR;
+                    ImGui::TableNextRow();
+                    ImGui::TableNextColumn();
+                    ImGui::Text("%08X", address);
+                    if (FLAG_T()) {
+                        uint16_t op = memory_read_halfword(address);
+                        ImGui::TableNextColumn();
+                        ImGui::Text("%04X", op);
+                        ImGui::TableNextColumn();
+                        thumb_disasm(address, op, disasm_text);
+                    } else {
+                        uint32_t op = memory_read_word(address);
+                        ImGui::TableNextColumn();
+                        ImGui::Text("%08X", op);
+                        ImGui::TableNextColumn();
+                        arm_disasm(address, op, disasm_text);
+                    }
+                    ImGui::Text(disasm_text);
+                }
+                ImGui::EndTable();
+            }
+            ImGui::End();
+        }
+
         // Memory
-        /*
         static MemoryEditor mem_edit;
         mem_edit.ReadFn = [](const uint8_t *data, size_t off) { UNUSED(data); return memory_read_byte(off); };
         mem_edit.WriteFn = [](uint8_t *data, size_t off, uint8_t d) { UNUSED(data); memory_write_byte(off, d); };
-        mem_edit.DrawWindow("Memory Editor", NULL, 0x10000000);
-        */
+        if (show_memory_window) {
+            ImGui::Begin("Memory", &show_memory_window);
+            mem_edit.DrawContents(NULL, 0x10000000);
+            ImGui::End();
+        }
 
         // Screen
         ImGui::Begin("Screen");
@@ -2679,7 +2737,6 @@ int main(int argc, char **argv) {
         ImGui::Checkbox("Has Flash", &has_flash);
         ImGui::Checkbox("Has SRAM", &has_sram);
         ImGui::Checkbox("Skip BIOS", &skip_bios);
-        //ImGui::Checkbox("Paused", &paused);
 
         static bool sync_to_video = false;
         ImGui::Checkbox("Sync to video", &sync_to_video);
@@ -2688,11 +2745,6 @@ int main(int argc, char **argv) {
         static bool mute_audio = false;
         ImGui::Checkbox("Mute audio", &mute_audio);
         SDL_PauseAudioDevice(audio_device, mute_audio ? 1 : 0);
-
-        ImGui::Text("R13: %08X", r[13]);
-        ImGui::Text("R14: %08X", r[14]);
-        ImGui::Text("R15: %08X", r[15] - (branch_taken ? 0 : 2 * SIZEOF_INSTR));
-        ImGui::Text("T: %d", FLAG_T());
 
         ImGui::Text("DMA1SAD: %08X", ioreg.dma[1].sad.dw);
         ImGui::Text("DMA2SAD: %08X", ioreg.dma[2].sad.dw);
