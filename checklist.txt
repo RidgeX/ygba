@@ -17,7 +17,7 @@
         [x] tstp/teqp/cmpp/cmnp (ARMv2 mode change)
         [x] ldm/stm empty register list
         [x] ldm/stm writeback and Rn in register list
-        [ ] bx to ARM unaligned address
+        [x] bx to ARM unaligned address
     [x] Reset
     [x] Undefined instructions
     [x] Software interrupts
@@ -82,11 +82,11 @@
     [ ] Accurate timings based on instruction, type of memory accessed, WAITCNT register
     [ ] Cartridge prefetch
 [x] Drag and drop ROM file
-[ ] Debugging user interface
-    [ ] Registers
-    [ ] Disassembly
-    [ ] Memory viewer
-    [ ] Single step
+[x] Debugging user interface
+    [x] Registers
+    [x] Disassembly
+    [x] Memory viewer
+    [x] Single step
     [ ] Breakpoints
 [ ] GDB remote debug protocol
 [ ] Rotate screen for vertically held gameplay
