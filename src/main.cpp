@@ -2178,12 +2178,13 @@ void gba_ppu_update(void) {
         ioreg.vcount.w = (ioreg.vcount.w + 1) % 228;
         if (ioreg.vcount.w == 227) {
             ioreg.dispstat.w &= ~DSTAT_IN_VBL;
+        } else if (ioreg.vcount.w == 161) {
+            if ((ioreg.dispstat.w & DSTAT_VBL_IRQ) != 0) {
+                ioreg.irq.w |= INT_VBLANK;
+            }
         } else if (ioreg.vcount.w == 160) {
             if ((ioreg.dispstat.w & DSTAT_IN_VBL) == 0) {
                 ioreg.dispstat.w |= DSTAT_IN_VBL;
-                if ((ioreg.dispstat.w & DSTAT_VBL_IRQ) != 0) {
-                    ioreg.irq.w |= INT_VBLANK;
-                }
                 gba_dma_update(DMA_AT_VBLANK);
             }
         }
