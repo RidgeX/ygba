@@ -418,8 +418,10 @@ struct {
     uint8_t haltcnt;
 } ioreg;
 
-void gba_audio_callback(void *userdata, uint8_t *stream, int len) {
+void gba_audio_callback(void *userdata, uint8_t *stream_u8, int len_u8) {
     UNUSED(userdata);
+    int16_t *stream = (int16_t *) stream_u8;
+    int len = len_u8 / 2;
 
     uint16_t a_control = ((ioreg.io_soundcnt_h & (1 << 10)) != 0 ? ioreg.timer[1].control.w : ioreg.timer[0].control.w);
     uint16_t b_control = ((ioreg.io_soundcnt_h & (1 << 14)) != 0 ? ioreg.timer[1].control.w : ioreg.timer[0].control.w);
@@ -434,30 +436,32 @@ void gba_audio_callback(void *userdata, uint8_t *stream, int len) {
     static int b_hold = 0;
 
     for (int i = 0; i < len; i += 2) {
-        uint8_t a = 0;
-        if (a_control & (1 << 7)) {
-            a = ioreg.fifo_a[ioreg.fifo_a_r];
+        int16_t a = 0;
+        if (BIT(a_control, 7)) {
+            a = (int8_t) ioreg.fifo_a[ioreg.fifo_a_r];
             a_hold = (a_hold + 1) % a_hold_amount;
             if (a_hold == 0) {
                 ioreg.fifo_a_r = (ioreg.fifo_a_r + 1) % FIFO_SIZE;
             }
         }
 
-        uint8_t b = 0;
-        if (b_control & (1 << 7)) {
-            b = ioreg.fifo_b[ioreg.fifo_b_r];
+        int16_t b = 0;
+        if (BIT(b_control, 7)) {
+            b = (int8_t) ioreg.fifo_b[ioreg.fifo_b_r];
             b_hold = (b_hold + 1) % b_hold_amount;
             if (b_hold == 0) {
                 ioreg.fifo_b_r = (ioreg.fifo_b_r + 1) % FIFO_SIZE;
             }
         }
 
-        stream[i] = 0;
-        stream[i + 1] = 0;
-        if ((ioreg.io_soundcnt_h & (1 << 8)) != 0) stream[i + 1] += a;
-        if ((ioreg.io_soundcnt_h & (1 << 9)) != 0) stream[i] += a;
-        if ((ioreg.io_soundcnt_h & (1 << 12)) != 0) stream[i + 1] += b;
-        if ((ioreg.io_soundcnt_h & (1 << 13)) != 0) stream[i] += b;
+        int16_t left = 0;
+        int16_t right = 0;
+        if (BIT(ioreg.io_soundcnt_h, 8)) right += a;
+        if (BIT(ioreg.io_soundcnt_h, 9)) left += a;
+        if (BIT(ioreg.io_soundcnt_h, 12)) right += b;
+        if (BIT(ioreg.io_soundcnt_h, 13)) left += b;
+        stream[i] = left << 7;
+        stream[i + 1] = right << 7;
     }
 }
 
@@ -475,7 +479,7 @@ SDL_AudioDeviceID gba_audio_init(void) {
     SDL_AudioSpec want;
     memset(&want, 0, sizeof(want));
     want.freq = 48000;
-    want.format = AUDIO_S8;
+    want.format = AUDIO_S16;
     want.channels = 2;
     want.samples = FIFO_SIZE;
     want.callback = gba_audio_callback;
