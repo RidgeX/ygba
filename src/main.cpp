@@ -111,7 +111,7 @@ uint32_t game_rom_size;
 uint32_t game_rom_mask;
 uint8_t backup_eeprom[0x2000];
 uint8_t backup_flash[0x20000];
-uint8_t backup_sram[0x10000];
+uint8_t backup_sram[0x8000];
 
 #define DCNT_GB         (1 << 3)
 #define DCNT_PAGE       (1 << 4)
@@ -1358,7 +1358,7 @@ uint8_t backup_read_byte(uint32_t address) {
         }
         return backup_flash[flash_bank * 0x10000 + address];
     } else if (has_sram) {
-        return backup_sram[address];
+        return backup_sram[address & 0x7fff];
     }
 #ifdef LOG_BAD_MEMORY_ACCESS
     printf("backup_read_byte(0x%08x);\n", address);
@@ -1434,7 +1434,7 @@ void backup_write_byte(uint32_t address, uint8_t value) {
         }
         return;
     } else if (has_sram) {
-        backup_sram[address] = value;
+        backup_sram[address & 0x7fff] = value;
         return;
     }
 #ifdef LOG_BAD_MEMORY_ACCESS
@@ -1565,6 +1565,8 @@ uint8_t memory_read_byte(uint32_t address) {
         return object_ram[address & 0x3ff];
     }    
     if (address >= 0x08000000 && address < 0x0e000000) {
+        address &= 0x1ffffff;
+        if (address > game_rom_mask) return (uint8_t)((address >> 1) >> 8 * (address & 1));
         return game_rom[address & game_rom_mask];
     }
     if (address >= 0x0e000000 && address < 0x10000000) {
@@ -1647,6 +1649,8 @@ uint16_t memory_read_halfword(uint32_t address) {
         if (has_eeprom && game_rom_size <= 0x1000000 && address >= 0x0d000000) {
             return eeprom_read_bit();
         }
+        address &= 0x1fffffe;
+        if (address > game_rom_mask) return (uint16_t)(address >> 1);
         return *(uint16_t *)&game_rom[address & (game_rom_mask & ~1)];
     }
     if (address >= 0x0e000000 && address < 0x10000000) {
@@ -1729,6 +1733,8 @@ uint32_t memory_read_word(uint32_t address) {
         return *(uint32_t *)&object_ram[address & 0x3fc];
     }
     if (address >= 0x08000000 && address < 0x0e000000) {
+        address &= 0x1fffffc;
+        if (address > game_rom_mask) return (address >> 1) | ((address | 2) >> 1) << 16;
         return *(uint32_t *)&game_rom[address & (game_rom_mask & ~3)];
     }
     if (address >= 0x0e000000 && address < 0x10000000) {
