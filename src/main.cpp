@@ -46,8 +46,7 @@ using namespace gl;
 #include "cpu.h"
 
 bool single_step = false;
-int ppu_cycles = 0;
-int timer_cycles = 0;
+uint32_t ppu_cycles = 0;
 bool halted = false;
 uint32_t last_bios_access = 0xe4;
 bool skip_bios = false;
@@ -147,6 +146,15 @@ uint8_t backup_sram[0x8000];
 #define DMA_AT_REFRESH  3
 #define DMA_IRQ         (1 << 30)
 #define DMA_ENABLE      (1 << 31)
+
+#define TM_FREQ_1       0
+#define TM_FREQ_64      1
+#define TM_FREQ_256     2
+#define TM_FREQ_1024    3
+#define TM_CASCADE      (1 << 2)
+#define TM_IRQ          (1 << 6)
+#define TM_ENABLE       (1 << 7)
+#define TM_FREQ_MASK    3
 
 #define INT_VBLANK      (1 << 0)
 #define INT_HBLANK      (1 << 1)
@@ -379,8 +387,10 @@ struct {
 
     // Timer Registers
     struct {
-        io_union16 counter, reload;
+        io_union16 counter;
+        io_union16 reload;
         io_union16 control;
+        uint32_t elapsed;
     } timer[4];
 
     // Serial Communication (1)
@@ -492,6 +502,11 @@ void gba_check_keypad_interrupt(void) {
             }
         }
     }
+}
+
+void gba_timer_reset(int i) {
+    ioreg.timer[i].counter.w = ioreg.timer[i].reload.w;
+    ioreg.timer[i].elapsed = 0;
 }
 
 uint32_t open_bus(void) {
@@ -865,19 +880,19 @@ void io_write_byte(uint32_t address, uint8_t value) {
 
         case REG_TM0CNT_L + 0: ioreg.timer[0].reload.b.b0 = value; break;
         case REG_TM0CNT_L + 1: ioreg.timer[0].reload.b.b1 = value; break;
-        case REG_TM0CNT_H + 0: ioreg.timer[0].control.b.b0 = value & 0xc7; if (value & 0x80) { ioreg.timer[0].counter.w = ioreg.timer[0].reload.w; } break;
+        case REG_TM0CNT_H + 0: if (!(ioreg.timer[0].control.b.b0 & 0x80) && (value & 0x80)) { gba_timer_reset(0); } ioreg.timer[0].control.b.b0 = value & 0xc7; break;
         case REG_TM0CNT_H + 1: ioreg.timer[0].control.b.b1 = value & 0x00; break;
         case REG_TM1CNT_L + 0: ioreg.timer[1].reload.b.b0 = value; break;
         case REG_TM1CNT_L + 1: ioreg.timer[1].reload.b.b1 = value; break;
-        case REG_TM1CNT_H + 0: ioreg.timer[1].control.b.b0 = value & 0xc7; if (value & 0x80) { ioreg.timer[1].counter.w = ioreg.timer[1].reload.w; } break;
+        case REG_TM1CNT_H + 0: if (!(ioreg.timer[1].control.b.b0 & 0x80) && (value & 0x80)) { gba_timer_reset(1); } ioreg.timer[1].control.b.b0 = value & 0xc7; break;
         case REG_TM1CNT_H + 1: ioreg.timer[1].control.b.b1 = value & 0x00; break;
         case REG_TM2CNT_L + 0: ioreg.timer[2].reload.b.b0 = value; break;
         case REG_TM2CNT_L + 1: ioreg.timer[2].reload.b.b1 = value; break;
-        case REG_TM2CNT_H + 0: ioreg.timer[2].control.b.b0 = value & 0xc7; if (value & 0x80) { ioreg.timer[2].counter.w = ioreg.timer[2].reload.w; } break;
+        case REG_TM2CNT_H + 0: if (!(ioreg.timer[2].control.b.b0 & 0x80) && (value & 0x80)) { gba_timer_reset(2); } ioreg.timer[2].control.b.b0 = value & 0xc7; break;
         case REG_TM2CNT_H + 1: ioreg.timer[2].control.b.b1 = value & 0x00; break;
         case REG_TM3CNT_L + 0: ioreg.timer[3].reload.b.b0 = value; break;
         case REG_TM3CNT_L + 1: ioreg.timer[3].reload.b.b1 = value; break;
-        case REG_TM3CNT_H + 0: ioreg.timer[3].control.b.b0 = value & 0xc7; if (value & 0x80) { ioreg.timer[3].counter.w = ioreg.timer[3].reload.w; } break;
+        case REG_TM3CNT_H + 0: if (!(ioreg.timer[3].control.b.b0 & 0x80) && (value & 0x80)) { gba_timer_reset(3); } ioreg.timer[3].control.b.b0 = value & 0xc7; break;
         case REG_TM3CNT_H + 1: ioreg.timer[3].control.b.b1 = value & 0x00; break;
 
         //case REG_SIOMULTI0 + 0:
@@ -1123,13 +1138,13 @@ void io_write_halfword(uint32_t address, uint16_t value) {
         case REG_DMA3CNT_H: ioreg.dma[3].cnt.w.w1 = value & 0xffe0; if (value & 0x8000) { gba_dma_update(DMA_NOW); } break;
 
         case REG_TM0CNT_L: ioreg.timer[0].reload.w = value; break;
-        case REG_TM0CNT_H: ioreg.timer[0].control.w = value & 0x00c7; if (value & 0x80) { ioreg.timer[0].counter.w = ioreg.timer[0].reload.w; } break;
+        case REG_TM0CNT_H: if (!(ioreg.timer[0].control.w & 0x80) && (value & 0x80)) { gba_timer_reset(0); } ioreg.timer[0].control.w = value & 0x00c7; break;
         case REG_TM1CNT_L: ioreg.timer[1].reload.w = value; break;
-        case REG_TM1CNT_H: ioreg.timer[1].control.w = value & 0x00c7; if (value & 0x80) { ioreg.timer[1].counter.w = ioreg.timer[1].reload.w; } break;
+        case REG_TM1CNT_H: if (!(ioreg.timer[1].control.w & 0x80) && (value & 0x80)) { gba_timer_reset(1); } ioreg.timer[1].control.w = value & 0x00c7; break;
         case REG_TM2CNT_L: ioreg.timer[2].reload.w = value; break;
-        case REG_TM2CNT_H: ioreg.timer[2].control.w = value & 0x00c7; if (value & 0x80) { ioreg.timer[2].counter.w = ioreg.timer[2].reload.w; } break;
+        case REG_TM2CNT_H: if (!(ioreg.timer[2].control.w & 0x80) && (value & 0x80)) { gba_timer_reset(2); } ioreg.timer[2].control.w = value & 0x00c7; break;
         case REG_TM3CNT_L: ioreg.timer[3].reload.w = value; break;
-        case REG_TM3CNT_H: ioreg.timer[3].control.w = value & 0x00c7; if (value & 0x80) { ioreg.timer[3].counter.w = ioreg.timer[3].reload.w; } break;
+        case REG_TM3CNT_H: if (!(ioreg.timer[3].control.w & 0x80) && (value & 0x80)) { gba_timer_reset(3); } ioreg.timer[3].control.w = value & 0x00c7; break;
 
         //case REG_SIOMULTI0:
         //case REG_SIOMULTI1:
@@ -1281,10 +1296,10 @@ void io_write_word(uint32_t address, uint32_t value) {
         case REG_DMA3DAD_L: ioreg.dma[3].dad.dw = value & 0x0fffffff; break;
         case REG_DMA3CNT_L: ioreg.dma[3].cnt.dw = value & 0xffe0ffff; if (value & 0x80000000) { gba_dma_update(DMA_NOW); } break;
 
-        case REG_TM0CNT_L: ioreg.timer[0].reload.w = value & 0xffff; ioreg.timer[0].control.w = (value >> 16) & 0x00c7; if ((value >> 16) & 0x80) { ioreg.timer[0].counter.w = ioreg.timer[0].reload.w; } break;
-        case REG_TM1CNT_L: ioreg.timer[1].reload.w = value & 0xffff; ioreg.timer[1].control.w = (value >> 16) & 0x00c7; if ((value >> 16) & 0x80) { ioreg.timer[1].counter.w = ioreg.timer[1].reload.w; } break;
-        case REG_TM2CNT_L: ioreg.timer[2].reload.w = value & 0xffff; ioreg.timer[2].control.w = (value >> 16) & 0x00c7; if ((value >> 16) & 0x80) { ioreg.timer[2].counter.w = ioreg.timer[2].reload.w; } break;
-        case REG_TM3CNT_L: ioreg.timer[3].reload.w = value & 0xffff; ioreg.timer[3].control.w = (value >> 16) & 0x00c7; if ((value >> 16) & 0x80) { ioreg.timer[3].counter.w = ioreg.timer[3].reload.w; } break;
+        case REG_TM0CNT_L: ioreg.timer[0].reload.w = value & 0xffff; if (!(ioreg.timer[0].control.w & 0x80) && ((value >> 16) & 0x80)) { gba_timer_reset(0); } ioreg.timer[0].control.w = (value >> 16) & 0x00c7; break;
+        case REG_TM1CNT_L: ioreg.timer[1].reload.w = value & 0xffff; if (!(ioreg.timer[1].control.w & 0x80) && ((value >> 16) & 0x80)) { gba_timer_reset(1); } ioreg.timer[1].control.w = (value >> 16) & 0x00c7; break;
+        case REG_TM2CNT_L: ioreg.timer[2].reload.w = value & 0xffff; if (!(ioreg.timer[2].control.w & 0x80) && ((value >> 16) & 0x80)) { gba_timer_reset(2); } ioreg.timer[2].control.w = (value >> 16) & 0x00c7; break;
+        case REG_TM3CNT_L: ioreg.timer[3].reload.w = value & 0xffff; if (!(ioreg.timer[3].control.w & 0x80) && ((value >> 16) & 0x80)) { gba_timer_reset(3); } ioreg.timer[3].control.w = (value >> 16) & 0x00c7; break;
 
         //case REG_SIOMULTI0:
         //case REG_SIOMULTI2:
@@ -1844,7 +1859,6 @@ void gba_reset(bool keep_backup) {
     branch_taken = true;
 
     ppu_cycles = 0;
-    timer_cycles = 0;
     halted = false;
     last_bios_access = 0xe4;
 
@@ -2235,51 +2249,50 @@ void gba_ppu_update(void) {
     }
 }
 
-void gba_timer_update(void) {
-    ioreg.fifo_a_refill = false;
-    ioreg.fifo_b_refill = false;
-    timer_cycles = (timer_cycles + 1) % 1024;
-    bool last_increment = false;
+void gba_timer_update(uint32_t cycles) {
+    bool overflow = false;
+
     for (int i = 0; i < 4; i++) {
         uint16_t *counter = &ioreg.timer[i].counter.w;
         uint16_t *reload = &ioreg.timer[i].reload.w;
         uint16_t *control = &ioreg.timer[i].control.w;
+        uint32_t *elapsed = &ioreg.timer[i].elapsed;
 
-        if (*control & (1 << 7)) {
-            bool increment = false;
-            if (*control & (1 << 2)) {
-                increment = last_increment;
-            } else {
-                uint32_t prescaler = *control & 3;
-                switch (prescaler) {
-                    case 0: increment = true; break;
-                    case 1: increment = (ppu_cycles % 64) == 0; break;
-                    case 2: increment = (ppu_cycles % 256) == 0; break;
-                    case 3: increment = (ppu_cycles % 1024) == 0; break;
-                    default: abort();
-                }
+        if (!(*control & TM_ENABLE)) {
+            overflow = false;
+            continue;
+        }
+
+        uint32_t increment = 0;
+        if (*control & TM_CASCADE) {
+            increment = (overflow ? 1 : 0);
+        } else {
+            *elapsed += cycles;
+            uint32_t freq = 1;
+            switch (*control & TM_FREQ_MASK) {
+                case TM_FREQ_1: freq = 1; break;
+                case TM_FREQ_64: freq = 64; break;
+                case TM_FREQ_256: freq = 256; break;
+                case TM_FREQ_1024: freq = 1024; break;
             }
-            if (increment) {
-                *counter = *counter + 1;
-                if (*counter == 0) {
-                    *counter = *reload;
-                    if ((*control & (1 << 6)) != 0) {
-                        ioreg.irq.w |= 1 << (3 + i);
-                    }
-                    if (i == 0) {
-                        if ((ioreg.io_soundcnt_h & (1 << 10)) == 0) ioreg.fifo_a_refill = true;
-                        if ((ioreg.io_soundcnt_h & (1 << 14)) == 0) ioreg.fifo_b_refill = true;
-                    } else if (i == 1) {
-                        if ((ioreg.io_soundcnt_h & (1 << 10)) != 0) ioreg.fifo_a_refill = true;
-                        if ((ioreg.io_soundcnt_h & (1 << 14)) != 0) ioreg.fifo_b_refill = true;
-                    }
-                    if (ioreg.fifo_a_refill || ioreg.fifo_b_refill) {
-                        gba_dma_update(DMA_AT_REFRESH);
-                    }
-                    last_increment = true;
-                } else {
-                    last_increment = false;
-                }
+            if (*elapsed >= freq) {
+                increment = *elapsed / freq;
+                *elapsed = *elapsed % freq;
+            }
+        }
+
+        uint16_t last_counter = *counter;
+        *counter += increment;
+        overflow = *counter < last_counter;
+        if (overflow) {
+            *counter += *reload;
+            ioreg.fifo_a_refill = BIT(ioreg.io_soundcnt_h, 10) == i;
+            ioreg.fifo_b_refill = BIT(ioreg.io_soundcnt_h, 14) == i;
+            if (ioreg.fifo_a_refill || ioreg.fifo_b_refill) {
+                gba_dma_update(DMA_AT_REFRESH);
+            }
+            if (*control & TM_IRQ) {
+                ioreg.irq.w |= 1 << (3 + i);
             }
         }
     }
@@ -2410,7 +2423,7 @@ void gba_emulate(void) {
             halted = false;
         }
 
-        gba_timer_update();
+        gba_timer_update(1);
         gba_ppu_update();
         if (ppu_cycles == 0 || (single_step && cpu_cycles > 0)) break;
     }
