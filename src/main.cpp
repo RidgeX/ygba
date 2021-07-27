@@ -478,6 +478,22 @@ SDL_AudioDeviceID gba_audio_init(void) {
     return audio_device;
 }
 
+void gba_check_keypad_interrupt(void) {
+    if (ioreg.keycnt.w & 0x4000) {
+        uint16_t held = ~ioreg.keyinput.w & 0x3ff;
+        uint16_t mask = ioreg.keycnt.w & 0x3ff;
+        if (ioreg.keycnt.w & 0x8000) {
+            if ((held & mask) == mask) {  // All keys held
+                ioreg.irq.w |= INT_BUTTON;
+            }
+        } else {
+            if (held & mask) {  // Any key held
+                ioreg.irq.w |= INT_BUTTON;
+            }
+        }
+    }
+}
+
 uint32_t open_bus(void) {
     if (FLAG_T()) {
         return thumb_pipeline[1] | thumb_pipeline[1] << 16;
@@ -621,8 +637,8 @@ uint8_t io_read_byte(uint32_t address) {
         case REG_SIOMLT_SEND + 0: return ioreg.siomlt_send.b.b0;
         case REG_SIOMLT_SEND + 1: return ioreg.siomlt_send.b.b1;
 
-        case REG_KEYINPUT + 0: return ioreg.keyinput.b.b0;
-        case REG_KEYINPUT + 1: return ioreg.keyinput.b.b1;
+        case REG_KEYINPUT + 0: gba_check_keypad_interrupt(); return ioreg.keyinput.b.b0;
+        case REG_KEYINPUT + 1: gba_check_keypad_interrupt(); return ioreg.keyinput.b.b1;
         case REG_KEYCNT + 0: return ioreg.keycnt.b.b0;
         case REG_KEYCNT + 1: return ioreg.keycnt.b.b1;
 
@@ -877,8 +893,8 @@ void io_write_byte(uint32_t address, uint8_t value) {
         //case REG_SIOMLT_SEND + 0:
         //case REG_SIOMLT_SEND + 1:
 
-        case REG_KEYCNT + 0: ioreg.keycnt.b.b0 = value; break;
-        case REG_KEYCNT + 1: ioreg.keycnt.b.b1 = value & 0xc3; break;
+        case REG_KEYCNT + 0: ioreg.keycnt.b.b0 = value; gba_check_keypad_interrupt(); break;
+        case REG_KEYCNT + 1: ioreg.keycnt.b.b1 = value & 0xc3; gba_check_keypad_interrupt(); break;
 
         case REG_RCNT + 0: ioreg.rcnt.b.b0 = value; break;
         case REG_RCNT + 1: ioreg.rcnt.b.b1 = value & 0xc1; break;
@@ -984,7 +1000,7 @@ uint16_t io_read_halfword(uint32_t address) {
         case REG_SIOCNT: return ioreg.siocnt.w;
         case REG_SIOMLT_SEND: return ioreg.siomlt_send.w;
 
-        case REG_KEYINPUT: return ioreg.keyinput.w;
+        case REG_KEYINPUT: gba_check_keypad_interrupt(); return ioreg.keyinput.w;
         case REG_KEYCNT: return ioreg.keycnt.w;
 
         case REG_RCNT: return ioreg.rcnt.w;
@@ -1122,7 +1138,7 @@ void io_write_halfword(uint32_t address, uint16_t value) {
         //case REG_SIOCNT:
         //case REG_SIOMLT_SEND:
 
-        case REG_KEYCNT: ioreg.keycnt.w = value & 0xc3ff; break;
+        case REG_KEYCNT: ioreg.keycnt.w = value & 0xc3ff; gba_check_keypad_interrupt(); break;
 
         case REG_RCNT: ioreg.rcnt.w = value & 0xc1ff; break;
         //case REG_JOYCNT:
@@ -1186,7 +1202,7 @@ uint32_t io_read_word(uint32_t address) {
         case REG_SIOMULTI2: return ioreg.siomulti[2].w | ioreg.siomulti[3].w << 16;
         case REG_SIOCNT: return ioreg.siocnt.w | ioreg.siomlt_send.w << 16;
 
-        case REG_KEYINPUT: return ioreg.keyinput.w | ioreg.keycnt.w << 16;
+        case REG_KEYINPUT: gba_check_keypad_interrupt(); return ioreg.keyinput.w | ioreg.keycnt.w << 16;
 
         case REG_RCNT: return ioreg.rcnt.w;
         case REG_JOYCNT: return ioreg.joycnt.w;
@@ -1274,7 +1290,7 @@ void io_write_word(uint32_t address, uint32_t value) {
         //case REG_SIOMULTI2:
         //case REG_SIOCNT:
 
-        case REG_KEYINPUT: ioreg.keycnt.w = (value >> 16) & 0xc3ff; break;
+        case REG_KEYINPUT: ioreg.keycnt.w = (value >> 16) & 0xc3ff; gba_check_keypad_interrupt(); break;
 
         case REG_RCNT: ioreg.rcnt.w = value & 0xc1ff; break;
         //case REG_JOYCNT:
