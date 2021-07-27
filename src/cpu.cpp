@@ -210,7 +210,7 @@ uint32_t get_pc(void) {
 }
 
 void arm_disasm(uint32_t address, uint32_t op, char *s) {
-    uint32_t index = ((op >> 4) & 0xf) | ((op >> 16) & 0xff0);
+    uint32_t index = BITS(op, 20, 27) << 4 | BITS(op, 4, 7);
     void (*handler)(uint32_t, uint32_t, char *) = arm_lookup_disasm[index];
     assert(handler != NULL);
     (*handler)(address, op, s);
@@ -229,10 +229,10 @@ int arm_step(void) {
         arm_pipeline[1] = memory_read_word(r[15]);
     }
 
-    uint32_t cond = (arm_op >> 28) & 0xf;
+    uint32_t cond = BITS(arm_op, 28, 31);
     int cycles = 1;
     if (condition_passed(cond)) {
-        uint32_t index = ((arm_op >> 4) & 0xf) | ((arm_op >> 16) & 0xff0);
+        uint32_t index = BITS(arm_op, 20, 27) << 4 | BITS(arm_op, 4, 7);
         int (*handler)(uint32_t) = arm_lookup[index];
         assert(handler != NULL);
         cycles = (*handler)(arm_op);
@@ -246,7 +246,7 @@ int arm_step(void) {
 }
 
 void thumb_disasm(uint32_t address, uint16_t op, char *s) {
-    uint16_t index = (op >> 8) & 0xff;
+    uint16_t index = BITS(op, 8, 15);
     void (*handler)(uint32_t, uint16_t, char *) = thumb_lookup_disasm[index];
     assert(handler != NULL);
     (*handler)(address, op, s);
@@ -265,7 +265,7 @@ int thumb_step(void) {
         thumb_pipeline[1] = memory_read_halfword(r[15]);
     }
 
-    uint16_t index = (thumb_op >> 8) & 0xff;
+    uint16_t index = BITS(thumb_op, 8, 15);
     int (*handler)(uint16_t) = thumb_lookup[index];
     assert(handler != NULL);
     int cycles = (*handler)(thumb_op);
@@ -479,9 +479,9 @@ static bool print_rlist(char *s, uint32_t rlist, uint32_t max) {
     bool first = true;
     uint32_t i = 0;
     while (i < max) {
-        if (rlist & (1 << i)) {
+        if (BIT(rlist, i)) {
             uint32_t j = i + 1;
-            while (rlist & (1 << j)) j++;
+            while (BIT(rlist, j)) j++;
             if (j == i + 1) {
                 if (!first) strcat(s, ",");
                 print_register(s, i);

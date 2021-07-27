@@ -1826,12 +1826,12 @@ void gba_reset(bool keep_backup) {
     halted = false;
     last_bios_access = 0xe4;
 
+    ioreg.dispcnt.w = 0x80;
+    ioreg.bg_affine[0].dx.w = 0x100;
+    ioreg.bg_affine[0].dmy.w = 0x100;
+    ioreg.bg_affine[1].dx.w = 0x100;
+    ioreg.bg_affine[1].dmy.w = 0x100;
     if (skip_bios) {
-        ioreg.dispcnt.w = 0x80;
-        ioreg.bg_affine[0].dx.w = 0x100;
-        ioreg.bg_affine[0].dmy.w = 0x100;
-        ioreg.bg_affine[1].dx.w = 0x100;
-        ioreg.bg_affine[1].dmy.w = 0x100;
         ioreg.rcnt.w = 0x8000;
     }
 }
@@ -2409,7 +2409,6 @@ int main(int argc, char **argv) {
     load_bios();
 
     if (argc == 2) {
-        skip_bios = true;
         gba_load(argv[1]);
     } else {
         gba_reset(false);
@@ -2649,7 +2648,7 @@ int main(int argc, char **argv) {
 
         // Debugger
         static char cpsr_flag_text[8];
-        static char cpsr_mode_text[7];
+        static char cpsr_mode_text[11];
         static char disasm_text[256];
         if (show_debugger_window) {
             ImGui::Begin("Debugger", &show_debugger_window);
@@ -2669,10 +2668,11 @@ int main(int argc, char **argv) {
                 case PSR_MODE_USR: strcpy(cpsr_mode_text, "User"); break;
                 case PSR_MODE_FIQ: strcpy(cpsr_mode_text, "FIQ"); break;
                 case PSR_MODE_IRQ: strcpy(cpsr_mode_text, "IRQ"); break;
-                case PSR_MODE_SVC: strcpy(cpsr_mode_text, "SVC"); break;
+                case PSR_MODE_SVC: strcpy(cpsr_mode_text, "Supervisor"); break;
                 case PSR_MODE_ABT: strcpy(cpsr_mode_text, "Abort"); break;
-                case PSR_MODE_UND: strcpy(cpsr_mode_text, "Undef"); break;
+                case PSR_MODE_UND: strcpy(cpsr_mode_text, "Undefined"); break;
                 case PSR_MODE_SYS: strcpy(cpsr_mode_text, "System"); break;
+                default: strcpy(cpsr_mode_text, "Illegal"); break;
             }
             ImGui::Text("cpsr: %08X [%s] %s", cpsr, cpsr_flag_text, cpsr_mode_text);
             if (ImGui::Button("Run")) {
