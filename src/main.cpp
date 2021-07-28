@@ -418,6 +418,14 @@ struct {
     uint8_t haltcnt;
 } ioreg;
 
+int8_t cubic_interpolate(int8_t *history, double mu) {
+    double A = history[3] - history[2] - history[0] + history[1];
+    double B = history[0] - history[1] - A;
+    double C = history[2] - history[0];
+    double D = history[1];
+    return A * mu * mu * mu + B * mu * mu + C * mu + D;
+}
+
 void gba_audio_callback(void *userdata, uint8_t *stream_u8, int len_u8) {
     UNUSED(userdata);
     int16_t *stream = (int16_t *) stream_u8;
@@ -434,11 +442,17 @@ void gba_audio_callback(void *userdata, uint8_t *stream_u8, int len_u8) {
     int b_hold_amount = (int) ceil(target_rate / b_source_rate);
     static int a_hold = 0;
     static int b_hold = 0;
+    static int8_t a_history[4];
+    static int8_t b_history[4];
 
     for (int i = 0; i < len; i += 2) {
         int16_t a = 0;
         if (BIT(a_control, 7)) {
-            a = (int8_t) ioreg.fifo_a[ioreg.fifo_a_r];
+            a_history[0] = a_history[1];
+            a_history[1] = a_history[2];
+            a_history[2] = a_history[3];
+            a_history[3] = (int8_t) ioreg.fifo_a[ioreg.fifo_a_r];
+            a = cubic_interpolate(a_history, (double) a_hold / a_hold_amount);
             a_hold = (a_hold + 1) % a_hold_amount;
             if (a_hold == 0) {
                 ioreg.fifo_a_r = (ioreg.fifo_a_r + 1) % FIFO_SIZE;
@@ -447,7 +461,11 @@ void gba_audio_callback(void *userdata, uint8_t *stream_u8, int len_u8) {
 
         int16_t b = 0;
         if (BIT(b_control, 7)) {
-            b = (int8_t) ioreg.fifo_b[ioreg.fifo_b_r];
+            b_history[0] = b_history[1];
+            b_history[1] = b_history[2];
+            b_history[2] = b_history[3];
+            b_history[3] = (int8_t) ioreg.fifo_b[ioreg.fifo_b_r];
+            b = cubic_interpolate(b_history, (double) b_hold / b_hold_amount);
             b_hold = (b_hold + 1) % b_hold_amount;
             if (b_hold == 0) {
                 ioreg.fifo_b_r = (ioreg.fifo_b_r + 1) % FIFO_SIZE;
