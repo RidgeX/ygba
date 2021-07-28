@@ -310,7 +310,7 @@ uint8_t backup_sram[0x8000];
 #define REG_POSTFLG     0x300
 #define REG_HALTCNT     0x301
 
-#define FIFO_SIZE 1568
+#define FIFO_SIZE 960
 
 typedef union {
     uint16_t w;
@@ -377,6 +377,7 @@ struct {
     int fifo_a_r, fifo_b_r;
     int fifo_a_w, fifo_b_w;
     bool fifo_a_refill, fifo_b_refill;
+    int fifo_a_ticks, fifo_b_ticks;
 
     // DMA Transfer Channels
     struct {
@@ -431,45 +432,43 @@ void gba_audio_callback(void *userdata, uint8_t *stream_u8, int len_u8) {
     int16_t *stream = (int16_t *) stream_u8;
     int len = len_u8 / 2;
 
-    uint16_t a_control = ((ioreg.io_soundcnt_h & (1 << 10)) != 0 ? ioreg.timer[1].control.w : ioreg.timer[0].control.w);
-    uint16_t b_control = ((ioreg.io_soundcnt_h & (1 << 14)) != 0 ? ioreg.timer[1].control.w : ioreg.timer[0].control.w);
-    uint16_t a_reload = ((ioreg.io_soundcnt_h & (1 << 10)) != 0 ? ioreg.timer[1].reload.w : ioreg.timer[0].reload.w);
-    uint16_t b_reload = ((ioreg.io_soundcnt_h & (1 << 14)) != 0 ? ioreg.timer[1].reload.w : ioreg.timer[0].reload.w);
+    uint16_t a_timer = BIT(ioreg.io_soundcnt_h, 10);
+    uint16_t b_timer = BIT(ioreg.io_soundcnt_h, 14);
+    uint16_t a_control = ioreg.timer[a_timer].control.w;
+    uint16_t b_control = ioreg.timer[b_timer].control.w;
+    uint16_t a_reload = ioreg.timer[a_timer].reload.w;
+    uint16_t b_reload = ioreg.timer[b_timer].reload.w;
     double a_source_rate = 16777216.0 / (65536 - a_reload);
     double b_source_rate = 16777216.0 / (65536 - b_reload);
     double target_rate = 48000.0;
-    int a_hold_amount = (int) ceil(target_rate / a_source_rate);
-    int b_hold_amount = (int) ceil(target_rate / b_source_rate);
-    static int a_hold = 0;
-    static int b_hold = 0;
+    double a_ratio = a_source_rate / target_rate;
+    double b_ratio = b_source_rate / target_rate;
+    static double a_fraction = 0;
+    static double b_fraction = 0;
     static int8_t a_history[4];
     static int8_t b_history[4];
 
     for (int i = 0; i < len; i += 2) {
-        int16_t a = 0;
-        if (BIT(a_control, 7)) {
-            a_history[0] = a_history[1];
-            a_history[1] = a_history[2];
-            a_history[2] = a_history[3];
-            a_history[3] = (int8_t) ioreg.fifo_a[ioreg.fifo_a_r];
-            a = cubic_interpolate(a_history, (double) a_hold / a_hold_amount);
-            a_hold = (a_hold + 1) % a_hold_amount;
-            if (a_hold == 0) {
-                ioreg.fifo_a_r = (ioreg.fifo_a_r + 1) % FIFO_SIZE;
-            }
+        a_history[0] = a_history[1];
+        a_history[1] = a_history[2];
+        a_history[2] = a_history[3];
+        a_history[3] = (BIT(a_control, 7) ? (int8_t) ioreg.fifo_a[ioreg.fifo_a_r] : 0);
+        int16_t a = cubic_interpolate(a_history, a_fraction);
+        a_fraction += a_ratio;
+        if (a_fraction >= 1.0) {
+            a_fraction -= 1.0;
+            ioreg.fifo_a_r = (ioreg.fifo_a_r + 1) % FIFO_SIZE;
         }
 
-        int16_t b = 0;
-        if (BIT(b_control, 7)) {
-            b_history[0] = b_history[1];
-            b_history[1] = b_history[2];
-            b_history[2] = b_history[3];
-            b_history[3] = (int8_t) ioreg.fifo_b[ioreg.fifo_b_r];
-            b = cubic_interpolate(b_history, (double) b_hold / b_hold_amount);
-            b_hold = (b_hold + 1) % b_hold_amount;
-            if (b_hold == 0) {
-                ioreg.fifo_b_r = (ioreg.fifo_b_r + 1) % FIFO_SIZE;
-            }
+        b_history[0] = b_history[1];
+        b_history[1] = b_history[2];
+        b_history[2] = b_history[3];
+        b_history[3] = (BIT(b_control, 7) ? (int8_t) ioreg.fifo_b[ioreg.fifo_b_r] : 0);
+        int16_t b = cubic_interpolate(b_history, a_fraction);
+        b_fraction += b_ratio;
+        if (b_fraction >= 1.0) {
+            b_fraction -= 1.0;
+            ioreg.fifo_b_r = (ioreg.fifo_b_r + 1) % FIFO_SIZE;
         }
 
         int16_t left = 0;
@@ -2311,14 +2310,12 @@ void gba_timer_update(uint32_t cycles) {
             bool fifo_a_tick = BIT(ioreg.io_soundcnt_h, 10) == i;
             bool fifo_b_tick = BIT(ioreg.io_soundcnt_h, 14) == i;
             if (fifo_a_tick) {
-                static uint32_t a_ticks = 0;
-                a_ticks = (a_ticks + 1) % 16;
-                if (a_ticks == 0) ioreg.fifo_a_refill = true;
+                ioreg.fifo_a_ticks = (ioreg.fifo_a_ticks + 1) % 16;
+                if (ioreg.fifo_a_ticks == 0) ioreg.fifo_a_refill = true;
             }
             if (fifo_b_tick) {
-                static uint32_t b_ticks = 0;
-                b_ticks = (b_ticks + 1) % 16;
-                if (b_ticks == 0) ioreg.fifo_b_refill = true;
+                ioreg.fifo_b_ticks = (ioreg.fifo_b_ticks + 1) % 16;
+                if (ioreg.fifo_b_ticks == 0) ioreg.fifo_b_refill = true;
             }
             if (ioreg.fifo_a_refill || ioreg.fifo_b_refill) {
                 gba_dma_update(DMA_AT_REFRESH);
