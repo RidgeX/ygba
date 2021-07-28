@@ -310,7 +310,7 @@ uint8_t backup_sram[0x8000];
 #define REG_POSTFLG     0x300
 #define REG_HALTCNT     0x301
 
-#define FIFO_SIZE 960
+#define FIFO_SIZE 8192
 
 typedef union {
     uint16_t w;
@@ -427,6 +427,12 @@ int8_t cubic_interpolate(int8_t *history, double mu) {
     return A * mu * mu * mu + B * mu * mu + C * mu + D;
 }
 
+int16_t clamp_i16(int16_t x, int16_t min, int16_t max) {
+    x = x < min ? min : x;
+    x = x > max ? max : x;
+    return x;
+}
+
 void gba_audio_callback(void *userdata, uint8_t *stream_u8, int len_u8) {
     UNUSED(userdata);
     int16_t *stream = (int16_t *) stream_u8;
@@ -457,7 +463,9 @@ void gba_audio_callback(void *userdata, uint8_t *stream_u8, int len_u8) {
         a_fraction += a_ratio;
         if (a_fraction >= 1.0) {
             a_fraction -= 1.0;
-            ioreg.fifo_a_r = (ioreg.fifo_a_r + 1) % FIFO_SIZE;
+            if ((ioreg.fifo_a_r + 1) % FIFO_SIZE != ioreg.fifo_a_w) {
+                ioreg.fifo_a_r = (ioreg.fifo_a_r + 1) % FIFO_SIZE;
+            }
         }
 
         b_history[0] = b_history[1];
@@ -468,15 +476,17 @@ void gba_audio_callback(void *userdata, uint8_t *stream_u8, int len_u8) {
         b_fraction += b_ratio;
         if (b_fraction >= 1.0) {
             b_fraction -= 1.0;
-            ioreg.fifo_b_r = (ioreg.fifo_b_r + 1) % FIFO_SIZE;
+            if ((ioreg.fifo_b_r + 1) % FIFO_SIZE != ioreg.fifo_b_w) {
+                ioreg.fifo_b_r = (ioreg.fifo_b_r + 1) % FIFO_SIZE;
+            }
         }
 
         int16_t left = 0;
         int16_t right = 0;
-        if (BIT(ioreg.io_soundcnt_h, 8)) right += a;
-        if (BIT(ioreg.io_soundcnt_h, 9)) left += a;
-        if (BIT(ioreg.io_soundcnt_h, 12)) right += b;
-        if (BIT(ioreg.io_soundcnt_h, 13)) left += b;
+        if (BIT(ioreg.io_soundcnt_h, 8)) right = clamp_i16(right + a, -512, 511);
+        if (BIT(ioreg.io_soundcnt_h, 9)) left = clamp_i16(left + a, -512, 511);
+        if (BIT(ioreg.io_soundcnt_h, 12)) right = clamp_i16(right + b, -512, 511);
+        if (BIT(ioreg.io_soundcnt_h, 13)) left = clamp_i16(left + b, -512, 511);
         stream[i] = left << 7;
         stream[i + 1] = right << 7;
     }
