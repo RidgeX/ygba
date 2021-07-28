@@ -2308,10 +2308,22 @@ void gba_timer_update(uint32_t cycles) {
         overflow = *counter < last_counter;
         if (overflow) {
             *counter += *reload;
-            ioreg.fifo_a_refill = BIT(ioreg.io_soundcnt_h, 10) == i;
-            ioreg.fifo_b_refill = BIT(ioreg.io_soundcnt_h, 14) == i;
+            bool fifo_a_tick = BIT(ioreg.io_soundcnt_h, 10) == i;
+            bool fifo_b_tick = BIT(ioreg.io_soundcnt_h, 14) == i;
+            if (fifo_a_tick) {
+                static uint32_t a_ticks = 0;
+                a_ticks = (a_ticks + 1) % 16;
+                if (a_ticks == 0) ioreg.fifo_a_refill = true;
+            }
+            if (fifo_b_tick) {
+                static uint32_t b_ticks = 0;
+                b_ticks = (b_ticks + 1) % 16;
+                if (b_ticks == 0) ioreg.fifo_b_refill = true;
+            }
             if (ioreg.fifo_a_refill || ioreg.fifo_b_refill) {
                 gba_dma_update(DMA_AT_REFRESH);
+                ioreg.fifo_a_refill = false;
+                ioreg.fifo_b_refill = false;
             }
             if (*control & TM_IRQ) {
                 ioreg.irq.w |= 1 << (3 + i);
@@ -2466,6 +2478,7 @@ int main(int argc, char **argv) {
     load_bios();
 
     if (argc == 2) {
+        skip_bios = true;
         gba_load(argv[1]);
     } else {
         gba_reset(false);
@@ -2515,7 +2528,7 @@ int main(int argc, char **argv) {
     }
     SDL_GLContext gl_context = SDL_GL_CreateContext(window);
     SDL_GL_MakeCurrent(window, gl_context);
-    SDL_GL_SetSwapInterval(0);  // Disable vsync
+    SDL_GL_SetSwapInterval(1);  // Enable vsync
 
     // Enable drag and drop
     SDL_EventState(SDL_DROPFILE, SDL_ENABLE);
@@ -2796,7 +2809,7 @@ int main(int argc, char **argv) {
         ImGui::Checkbox("Has SRAM", &has_sram);
         ImGui::Checkbox("Skip BIOS", &skip_bios);
 
-        static bool sync_to_video = false;
+        static bool sync_to_video = true;
         ImGui::Checkbox("Sync to video", &sync_to_video);
         SDL_GL_SetSwapInterval(sync_to_video ? 1 : 0);
 
