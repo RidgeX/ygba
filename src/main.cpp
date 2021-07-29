@@ -527,11 +527,11 @@ void memory_write_byte(uint32_t address, uint8_t value) {
         return;
     }
     if (address >= 0x05000000 && address < 0x06000000) {
-        *(uint16_t *)&palette_ram[address & 0x3ff] = value | value << 8;
+        *(uint16_t *)&palette_ram[address & 0x3fe] = value | value << 8;
         return;
     }
     if (address >= 0x06000000 && address < 0x07000000) {
-        address &= 0x1ffff;
+        address &= 0x1fffe;
         if (address >= 0x10000) return;  // 8-bit write ignored
         *(uint16_t *)&video_ram[address] = value | value << 8;
         return;
