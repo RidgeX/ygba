@@ -489,7 +489,11 @@ uint8_t memory_read_byte(uint32_t address) {
         return palette_ram[address & 0x3ff];
     }
     if (address >= 0x06000000 && address < 0x07000000) {
+        uint16_t mode = ioreg.dispcnt.w & 7;
+        bool bitmap_mode = (mode >= 3 && mode <= 5);
+
         address &= 0x1ffff;
+        if (bitmap_mode && address >= 0x18000) return 0;  // No VRAM OBJ mirror in bitmap mode
         if (address >= 0x18000) address -= 0x8000;
         return video_ram[address];
     }
@@ -531,13 +535,17 @@ void memory_write_byte(uint32_t address, uint8_t value) {
         return;
     }
     if (address >= 0x06000000 && address < 0x07000000) {
+        uint16_t mode = ioreg.dispcnt.w & 7;
+        bool bitmap_mode = (mode >= 3 && mode <= 5);
+
         address &= 0x1fffe;
-        if (address >= 0x10000) return;  // 8-bit write ignored
+        if (bitmap_mode && address >= 0x18000) return;  // No VRAM OBJ mirror in bitmap mode
+        if (address >= (bitmap_mode ? 0x14000 : 0x10000)) return;  // VRAM OBJ 8-bit write ignored
         *(uint16_t *)&video_ram[address] = value | value << 8;
         return;
     }
     if (address >= 0x07000000 && address < 0x08000000) {
-        return;  // 8-bit write ignored
+        return;  // OAM 8-bit write ignored
     }
     if (address >= 0x08000000 && address < 0x0e000000) {
         return;  // Read only
@@ -569,7 +577,11 @@ uint16_t memory_read_halfword(uint32_t address) {
         return *(uint16_t *)&palette_ram[address & 0x3fe];
     }
     if (address >= 0x06000000 && address < 0x07000000) {
+        uint16_t mode = ioreg.dispcnt.w & 7;
+        bool bitmap_mode = (mode >= 3 && mode <= 5);
+
         address &= 0x1fffe;
+        if (bitmap_mode && address >= 0x18000) return 0;  // No VRAM OBJ mirror in bitmap mode
         if (address >= 0x18000) address -= 0x8000;
         return *(uint16_t *)&video_ram[address];
     }
@@ -614,7 +626,11 @@ void memory_write_halfword(uint32_t address, uint16_t value) {
         return;
     }
     if (address >= 0x06000000 && address < 0x07000000) {
+        uint16_t mode = ioreg.dispcnt.w & 7;
+        bool bitmap_mode = (mode >= 3 && mode <= 5);
+
         address &= 0x1fffe;
+        if (bitmap_mode && address >= 0x18000) return;  // No VRAM OBJ mirror in bitmap mode
         if (address >= 0x18000) address -= 0x8000;
         *(uint16_t *)&video_ram[address] = value;
         return;
@@ -656,9 +672,13 @@ uint32_t memory_read_word(uint32_t address) {
         return *(uint32_t*)&palette_ram[address & 0x3fc];
     }
     if (address >= 0x06000000 && address < 0x07000000) {
+        uint16_t mode = ioreg.dispcnt.w & 7;
+        bool bitmap_mode = (mode >= 3 && mode <= 5);
+
         address &= 0x1fffc;
+        if (bitmap_mode && address >= 0x18000) return 0;  // No VRAM OBJ mirror in bitmap mode
         if (address >= 0x18000) address -= 0x8000;
-        return *(uint32_t*)&video_ram[address];
+        return *(uint32_t *)&video_ram[address];
     }
     if (address >= 0x07000000 && address < 0x08000000) {
         return *(uint32_t *)&object_ram[address & 0x3fc];
@@ -698,7 +718,11 @@ void memory_write_word(uint32_t address, uint32_t value) {
         return;
     }
     if (address >= 0x06000000 && address < 0x07000000) {
+        uint16_t mode = ioreg.dispcnt.w & 7;
+        bool bitmap_mode = (mode >= 3 && mode <= 5);
+
         address &= 0x1fffc;
+        if (bitmap_mode && address >= 0x18000) return;  // No VRAM OBJ mirror in bitmap mode
         if (address >= 0x18000) address -= 0x8000;
         *(uint32_t *)&video_ram[address] = value;
         return;
@@ -886,7 +910,7 @@ void gba_draw_tile(int bg, uint32_t tile_address, int x, int y, int hofs, int vo
     }
 }
 
-void gba_draw_obj(uint32_t mode, int pri, int y) {
+void gba_draw_obj(uint16_t mode, int pri, int y) {
     for (int n = 127; n >= 0; n--) {
         uint16_t attr0 = *(uint16_t *)&object_ram[(n * 4 + 0) * 2];
         uint16_t attr1 = *(uint16_t *)&object_ram[(n * 4 + 1) * 2];
@@ -942,7 +966,7 @@ void gba_draw_obj(uint32_t mode, int pri, int y) {
             oy += oh / 2;
         }
 
-        bool mode_bitmap = (mode == 3 || mode == 4 || mode == 5);
+        bool bitmap_mode = (mode >= 3 && mode <= 5);
         bool obj_1d = (ioreg.dispcnt.w & DCNT_OBJ_1D) != 0;
 
         if (obj_mode == 2 || priority != pri) continue;
@@ -956,7 +980,7 @@ void gba_draw_obj(uint32_t mode, int pri, int y) {
         tile_ptr &= 0x3ff;
         for (int x = ox; x < ox + ow; x += 8) {
             uint32_t tile_address = 0x10000 + tile_ptr * (colors_256 ? 64 : 32);
-            if (!mode_bitmap || tile_ptr >= 512) {
+            if (!bitmap_mode || tile_ptr >= 512) {
                 gba_draw_tile(4, tile_address, x, y, 0, row, hflip, vflip, palette_no, colors_256, true);
             }
             if (!hflip) tile_ptr++;
@@ -966,7 +990,7 @@ void gba_draw_obj(uint32_t mode, int pri, int y) {
     }
 }
 
-void gba_draw_bitmap(uint32_t mode, int y) {
+void gba_draw_bitmap(uint16_t mode, int y) {
     int width = (mode == 5 ? 160 : SCREEN_WIDTH);
 
     for (int x = 0; x < SCREEN_WIDTH; x++) {
@@ -990,7 +1014,7 @@ void gba_draw_bitmap(uint32_t mode, int y) {
     }
 }
 
-void gba_draw_tiled_bg(uint32_t mode, int bg, int y) {
+void gba_draw_tiled_bg(uint16_t mode, int bg, int y) {
     if (mode == 1 && bg == 3) return;
     if (mode == 2 && (bg == 0 || bg == 1)) return;
 
@@ -1070,7 +1094,7 @@ void gba_draw_tiled_bg(uint32_t mode, int bg, int y) {
     }
 }
 
-void gba_draw_tiled(uint32_t mode, int y) {
+void gba_draw_tiled(uint16_t mode, int y) {
     for (int pri = 3; pri >= 0; pri--) {
         for (int bg = 3; bg >= 0; bg--) {
             bool bg_visible = (ioreg.dispcnt.w & (1 << (8 + bg))) != 0;
@@ -1099,7 +1123,7 @@ void gba_draw_scanline(void) {
     gba_draw_blank(ioreg.vcount.w, forced_blank);
     if (forced_blank) return;
 
-    uint32_t mode = ioreg.dispcnt.w & 7;
+    uint16_t mode = ioreg.dispcnt.w & 7;
     switch (mode) {
         case 0:
         case 1:
