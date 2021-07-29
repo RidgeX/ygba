@@ -676,7 +676,7 @@ int arm_load_store_halfword_register(uint32_t op) {
     if (Rn == REG_PC) n &= ~3;
     if (P) n += (U ? m : -m);
     if (L) {
-        r[Rd] = align_halfword(n, memory_read_halfword(n & ~1));
+        r[Rd] = align_halfword(n, memory_read_halfword(n));
         if (Rd == REG_PC) branch_taken = true;
     } else {
         memory_write_halfword(n, (uint16_t) r[Rd]);
@@ -712,7 +712,7 @@ int arm_load_store_halfword_immediate(uint32_t op) {
     if (Rn == REG_PC) n &= ~3;
     if (P) n += (U ? imm : -imm);
     if (L) {
-        r[Rd] = align_halfword(n, memory_read_halfword(n & ~1));
+        r[Rd] = align_halfword(n, memory_read_halfword(n));
         if (Rd == REG_PC) branch_taken = true;
     } else {
         memory_write_halfword(n, (uint16_t) r[Rd]);
@@ -755,7 +755,7 @@ int arm_load_signed_halfword_or_signed_byte_register(uint32_t op) {
         r[Rd] = memory_read_byte(n);
         if (r[Rd] & 0x80) r[Rd] |= ~0xff;
     } else if (opc == 0xf) {
-        r[Rd] = align_halfword(n, memory_read_halfword(n & ~1));
+        r[Rd] = align_halfword(n, memory_read_halfword(n));
         if ((n & 1) != 0) {
             r[Rd] &= 0xff;
             SIGN_EXTEND(r[Rd], 7);
@@ -802,7 +802,7 @@ int arm_load_signed_halfword_or_signed_byte_immediate(uint32_t op) {
         r[Rd] = memory_read_byte(n);
         if (r[Rd] & 0x80) r[Rd] |= ~0xff;
     } else if (opc == 0xf) {
-        r[Rd] = align_halfword(n, memory_read_halfword(n & ~1));
+        r[Rd] = align_halfword(n, memory_read_halfword(n));
         if ((n & 1) != 0) {
             r[Rd] &= 0xff;
             SIGN_EXTEND(r[Rd], 7);
