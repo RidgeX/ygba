@@ -1224,10 +1224,16 @@ void gba_timer_update(uint32_t cycles) {
     }
 }
 
-void gba_dma_transfer_halfwords(uint32_t dst_ctrl, uint32_t src_ctrl, uint32_t *dst_addr, uint32_t *src_addr, uint32_t count) {
+void gba_dma_transfer_halfwords(int ch, uint32_t dst_ctrl, uint32_t src_ctrl, uint32_t *dst_addr, uint32_t *src_addr, uint32_t count) {
     for (uint32_t i = 0; i < count; i++) {
-        uint16_t value = memory_read_halfword(*src_addr);
-        memory_write_halfword(*dst_addr, value);
+        bool bad_src_addr = (*src_addr < 0x02000000 || *src_addr >= 0x10000000 || (ch == 0 && *src_addr >= 0x08000000));
+        bool bad_dst_addr = (*dst_addr < 0x02000000 || *dst_addr >= 0x10000000 || (ch != 3 && *dst_addr >= 0x08000000));
+
+        uint16_t value = ioreg.dma_value.w.w0;
+        if (!bad_src_addr) value = memory_read_halfword(*src_addr);
+        ioreg.dma_value.w.w0 = value;
+        if (!bad_dst_addr) memory_write_halfword(*dst_addr, value);
+
         if (dst_ctrl == DMA_INC || dst_ctrl == DMA_RELOAD) *dst_addr += 2;
         else if (dst_ctrl == DMA_DEC) *dst_addr -= 2;
         if (src_ctrl == DMA_INC) *src_addr += 2;
@@ -1235,10 +1241,16 @@ void gba_dma_transfer_halfwords(uint32_t dst_ctrl, uint32_t src_ctrl, uint32_t *
     }
 }
 
-void gba_dma_transfer_words(uint32_t dst_ctrl, uint32_t src_ctrl, uint32_t *dst_addr, uint32_t *src_addr, uint32_t count) {
+void gba_dma_transfer_words(int ch, uint32_t dst_ctrl, uint32_t src_ctrl, uint32_t *dst_addr, uint32_t *src_addr, uint32_t count) {
     for (uint32_t i = 0; i < count; i++) {
-        uint32_t value = memory_read_word(*src_addr);
-        memory_write_word(*dst_addr, value);
+        bool bad_src_addr = (*src_addr < 0x02000000 || *src_addr >= 0x10000000 || (ch == 0 && *src_addr >= 0x08000000));
+        bool bad_dst_addr = (*dst_addr < 0x02000000 || *dst_addr >= 0x10000000 || (ch != 3 && *dst_addr >= 0x08000000));
+
+        uint32_t value = ioreg.dma_value.dw;
+        if (!bad_src_addr) value = memory_read_word(*src_addr);
+        ioreg.dma_value.dw = value;
+        if (!bad_dst_addr) memory_write_word(*dst_addr, value);
+
         if (dst_ctrl == DMA_INC || dst_ctrl == DMA_RELOAD) *dst_addr += 4;
         else if (dst_ctrl == DMA_DEC) *dst_addr -= 4;
         if (src_ctrl == DMA_INC) *src_addr += 4;
@@ -1299,9 +1311,9 @@ void gba_dma_update(uint32_t current_timing) {
         uint32_t dst_addr_initial = *dst_addr;
 
         if (transfer_word) {
-            gba_dma_transfer_words(dst_ctrl, src_ctrl, dst_addr, src_addr, count);
+            gba_dma_transfer_words(ch, dst_ctrl, src_ctrl, dst_addr, src_addr, count);
         } else {
-            gba_dma_transfer_halfwords(dst_ctrl, src_ctrl, dst_addr, src_addr, count);
+            gba_dma_transfer_halfwords(ch, dst_ctrl, src_ctrl, dst_addr, src_addr, count);
         }
 
         if (dst_ctrl == DMA_RELOAD) {

@@ -76,6 +76,7 @@ typedef struct {
         io_union32 dad;
         io_union32 cnt;
     } dma[4];
+    io_union32 dma_value;
 
     // Timer Registers
     struct {
