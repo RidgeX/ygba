@@ -490,12 +490,12 @@ uint8_t memory_read_byte(uint32_t address) {
     }
     if (address >= 0x06000000 && address < 0x07000000) {
         address &= 0x1ffff;
-        if (address >= 0x18000) address -= 0x18000;        
+        if (address >= 0x18000) address -= 0x8000;
         return video_ram[address];
     }
     if (address >= 0x07000000 && address < 0x08000000) {
         return object_ram[address & 0x3ff];
-    }    
+    }
     if (address >= 0x08000000 && address < 0x0e000000) {
         address &= 0x1ffffff;
         if (address > game_rom_mask) return (uint8_t)((uint16_t)(address >> 1) >> 8 * (address & 1));
@@ -512,7 +512,7 @@ uint8_t memory_read_byte(uint32_t address) {
 
 void memory_write_byte(uint32_t address, uint8_t value) {
     if (address < 0x4000) {
-        //return;  // Read only
+        return;  // Read only
     }
     if (address >= 0x02000000 && address < 0x03000000) {
         cpu_ewram[address & 0x3ffff] = value;
@@ -532,16 +532,15 @@ void memory_write_byte(uint32_t address, uint8_t value) {
     }
     if (address >= 0x06000000 && address < 0x07000000) {
         address &= 0x1ffff;
-        if (address >= 0x18000) return;
+        if (address >= 0x10000) return;  // 8-bit write ignored
         *(uint16_t *)&video_ram[address] = value | value << 8;
         return;
     }
     if (address >= 0x07000000 && address < 0x08000000) {
-        *(uint16_t *)&object_ram[address & 0x3ff] = value | value << 8;  // FIXME ignored?
-        return;
+        return;  // 8-bit write ignored
     }
     if (address >= 0x08000000 && address < 0x0e000000) {
-        //return;  // Read only
+        return;  // Read only
     }
     if (address >= 0x0e000000 && address < 0x10000000) {
         backup_write_byte(address & 0xffff, value);
@@ -571,7 +570,7 @@ uint16_t memory_read_halfword(uint32_t address) {
     }
     if (address >= 0x06000000 && address < 0x07000000) {
         address &= 0x1fffe;
-        if (address >= 0x18000) address -= 0x18000;
+        if (address >= 0x18000) address -= 0x8000;
         return *(uint16_t *)&video_ram[address];
     }
     if (address >= 0x07000000 && address < 0x08000000) {
@@ -596,7 +595,7 @@ uint16_t memory_read_halfword(uint32_t address) {
 
 void memory_write_halfword(uint32_t address, uint16_t value) {
     if (address < 0x4000) {
-        //return;  // Read only
+        return;  // Read only
     }
     if (address >= 0x02000000 && address < 0x03000000) {
         *(uint16_t *)&cpu_ewram[address & 0x3fffe] = value;
@@ -616,7 +615,7 @@ void memory_write_halfword(uint32_t address, uint16_t value) {
     }
     if (address >= 0x06000000 && address < 0x07000000) {
         address &= 0x1fffe;
-        if (address >= 0x18000) return;
+        if (address >= 0x18000) address -= 0x8000;
         *(uint16_t *)&video_ram[address] = value;
         return;
     }
@@ -629,7 +628,7 @@ void memory_write_halfword(uint32_t address, uint16_t value) {
             eeprom_write_bit(value);
             return;
         }
-        //return;  // Read only
+        return;  // Read only
     }
     if (address >= 0x0e000000 && address < 0x10000000) {
         backup_write_halfword(address & 0xffff, value);
@@ -658,7 +657,7 @@ uint32_t memory_read_word(uint32_t address) {
     }
     if (address >= 0x06000000 && address < 0x07000000) {
         address &= 0x1fffc;
-        if (address >= 0x18000) address -= 0x18000;
+        if (address >= 0x18000) address -= 0x8000;
         return *(uint32_t*)&video_ram[address];
     }
     if (address >= 0x07000000 && address < 0x08000000) {
@@ -680,7 +679,7 @@ uint32_t memory_read_word(uint32_t address) {
 
 void memory_write_word(uint32_t address, uint32_t value) {
     if (address < 0x4000) {
-        //return;  // Read only
+        return;  // Read only
     }
     if (address >= 0x02000000 && address < 0x03000000) {
         *(uint32_t *)&cpu_ewram[address & 0x3fffc] = value;
@@ -700,7 +699,7 @@ void memory_write_word(uint32_t address, uint32_t value) {
     }
     if (address >= 0x06000000 && address < 0x07000000) {
         address &= 0x1fffc;
-        if (address >= 0x18000) return;
+        if (address >= 0x18000) address -= 0x8000;
         *(uint32_t *)&video_ram[address] = value;
         return;
     }
@@ -709,7 +708,7 @@ void memory_write_word(uint32_t address, uint32_t value) {
         return;
     }
     if (address >= 0x08000000 && address < 0x0e000000) {
-        //return;  // Read only
+        return;  // Read only
     }
     if (address >= 0x0e000000 && address < 0x10000000) {
         backup_write_word(address & 0xffff, value);
