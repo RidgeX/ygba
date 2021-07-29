@@ -490,7 +490,7 @@ int arm_load_store_multiple(uint32_t op) {
 void arm_branch_disasm(uint32_t address, uint32_t op, char *s) {
     bool L = BIT(op, 24);
     uint32_t imm = BITS(op, 0, 23);
-    ZERO_EXTEND(imm, 23);
+    SIGN_EXTEND(imm, 23);
 
     strcpy(s, L ? "bl" : "b");
     print_arm_condition(s, op);
@@ -501,7 +501,7 @@ void arm_branch_disasm(uint32_t address, uint32_t op, char *s) {
 int arm_branch(uint32_t op) {
     bool L = BIT(op, 24);
     uint32_t imm = BITS(op, 0, 23);
-    ZERO_EXTEND(imm, 23);
+    SIGN_EXTEND(imm, 23);
 
     if (L) r[REG_LR] = r[REG_PC] - 4;
     r[REG_PC] += imm << 2;
@@ -757,9 +757,11 @@ int arm_load_signed_halfword_or_signed_byte_register(uint32_t op) {
     } else if (opc == 0xf) {
         r[Rd] = align_halfword(n, memory_read_halfword(n & ~1));
         if ((n & 1) != 0) {
-            if (r[Rd] & 0x80) r[Rd] |= ~0xff;
+            r[Rd] &= 0xff;
+            SIGN_EXTEND(r[Rd], 7);
         } else {
-            if (r[Rd] & 0x8000) r[Rd] |= ~0xffff;
+            r[Rd] &= 0xffff;
+            SIGN_EXTEND(r[Rd], 15);
         }
     } else {
         assert(false);
@@ -802,9 +804,11 @@ int arm_load_signed_halfword_or_signed_byte_immediate(uint32_t op) {
     } else if (opc == 0xf) {
         r[Rd] = align_halfword(n, memory_read_halfword(n & ~1));
         if ((n & 1) != 0) {
-            if (r[Rd] & 0x80) r[Rd] |= ~0xff;
+            r[Rd] &= 0xff;
+            SIGN_EXTEND(r[Rd], 7);
         } else {
-            if (r[Rd] & 0x8000) r[Rd] |= ~0xffff;
+            r[Rd] &= 0xffff;
+            SIGN_EXTEND(r[Rd], 15);
         }
     } else {
         assert(false);

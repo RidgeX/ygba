@@ -578,7 +578,7 @@ int thumb_load_store_multiple(uint16_t op) {
 void thumb_conditional_branch_disasm(uint32_t address, uint16_t op, char *s) {
     uint32_t cond = BITS(op, 8, 11);
     uint32_t imm = BITS(op, 0, 7);
-    ZERO_EXTEND(imm, 7);
+    SIGN_EXTEND(imm, 7);
 
     switch (cond) {
         case COND_EQ: strcpy(s, "beq"); break;
@@ -604,7 +604,7 @@ void thumb_conditional_branch_disasm(uint32_t address, uint16_t op, char *s) {
 int thumb_conditional_branch(uint16_t op) {
     uint32_t cond = BITS(op, 8, 11);
     uint32_t imm = BITS(op, 0, 7);
-    ZERO_EXTEND(imm, 7);
+    SIGN_EXTEND(imm, 7);
 
     if (condition_passed(cond)) {
         r[REG_PC] += imm << 1;
@@ -633,7 +633,7 @@ int thumb_software_interrupt(uint16_t op) {
 
 void thumb_unconditional_branch_disasm(uint32_t address, uint16_t op, char *s) {
     uint32_t imm = BITS(op, 0, 10);
-    ZERO_EXTEND(imm, 10);
+    SIGN_EXTEND(imm, 10);
 
     strcpy(s, "b");
     strcat(s, " ");
@@ -643,7 +643,7 @@ void thumb_unconditional_branch_disasm(uint32_t address, uint16_t op, char *s) {
 
 int thumb_unconditional_branch(uint16_t op) {
     uint32_t imm = BITS(op, 0, 10);
-    ZERO_EXTEND(imm, 10);
+    SIGN_EXTEND(imm, 10);
 
     r[REG_PC] += imm << 1;
     branch_taken = true;
@@ -660,7 +660,7 @@ void thumb_branch_with_link_prefix_disasm(uint32_t address, uint16_t op, char *s
 
 int thumb_branch_with_link_prefix(uint16_t op) {
     uint32_t imm = BITS(op, 0, 10);
-    ZERO_EXTEND(imm, 10);
+    SIGN_EXTEND(imm, 10);
 
     r[REG_LR] = r[REG_PC] + (imm << 12);
 
@@ -670,7 +670,7 @@ int thumb_branch_with_link_prefix(uint16_t op) {
 void thumb_branch_with_link_suffix_disasm(uint32_t address, uint16_t op, char *s) {
     uint16_t op_last = memory_read_halfword(address - 2);
     uint32_t imm_last = BITS(op_last, 0, 10);
-    ZERO_EXTEND(imm_last, 10);
+    SIGN_EXTEND(imm_last, 10);
     uint32_t imm = BITS(op, 0, 10);
 
     strcpy(s, "bl");

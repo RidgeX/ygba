@@ -8,7 +8,7 @@
 
 #define ASR(x, i) (((x) & (1 << 31)) != 0 ? ~(~(x) >> (i)) : (x) >> (i))
 #define ROR(x, i) (((x) >> (i)) | ((x) << (32 - (i))))
-#define ZERO_EXTEND(x, i) if ((x) & (1 << (i))) { (x) |= ~((1 << ((i) + 1)) - 1); }
+#define SIGN_EXTEND(x, i) if ((x) & (1 << (i))) { (x) |= ~((1 << ((i) + 1)) - 1); }
 
 #define FLAG_C() (cpsr & PSR_C ? true : false)
 #define FLAG_T() (cpsr & PSR_T ? true : false)
