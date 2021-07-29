@@ -158,7 +158,7 @@ void gba_audio_callback(void *userdata, uint8_t *stream_u8, int len_u8) {
         int16_t a = cubic_interpolate(a_history, a_fraction);
         a_fraction += a_ratio;
         if (a_fraction >= 1.0) {
-            a_fraction -= 1.0;
+            a_fraction -= (int) a_fraction;  // % 1.0
             if ((ioreg.fifo_a_r + 1) % FIFO_SIZE != ioreg.fifo_a_w) {
                 ioreg.fifo_a_r = (ioreg.fifo_a_r + 1) % FIFO_SIZE;
             }
@@ -171,7 +171,7 @@ void gba_audio_callback(void *userdata, uint8_t *stream_u8, int len_u8) {
         int16_t b = cubic_interpolate(b_history, a_fraction);
         b_fraction += b_ratio;
         if (b_fraction >= 1.0) {
-            b_fraction -= 1.0;
+            b_fraction -= (int) b_fraction;  // % 1.0
             if ((ioreg.fifo_b_r + 1) % FIFO_SIZE != ioreg.fifo_b_w) {
                 ioreg.fifo_b_r = (ioreg.fifo_b_r + 1) % FIFO_SIZE;
             }
