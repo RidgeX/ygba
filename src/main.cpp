@@ -498,7 +498,7 @@ uint8_t memory_read_byte(uint32_t address) {
     }    
     if (address >= 0x08000000 && address < 0x0e000000) {
         address &= 0x1ffffff;
-        if (address > game_rom_mask) return (uint8_t)((address >> 1) >> 8 * (address & 1));
+        if (address > game_rom_mask) return (uint8_t)((uint16_t)(address >> 1) >> 8 * (address & 1));
         return game_rom[address & game_rom_mask];
     }
     if (address >= 0x0e000000 && address < 0x10000000) {
@@ -507,7 +507,7 @@ uint8_t memory_read_byte(uint32_t address) {
 #ifdef LOG_BAD_MEMORY_ACCESS
     printf("memory_read_byte(0x%08x);\n", address);
 #endif
-    return (uint8_t)(open_bus() >> 8 * (address & 1));
+    return (uint8_t)(open_bus() >> 8 * (address & 3));
 }
 
 void memory_write_byte(uint32_t address, uint8_t value) {
@@ -591,7 +591,7 @@ uint16_t memory_read_halfword(uint32_t address) {
 #ifdef LOG_BAD_MEMORY_ACCESS
     printf("memory_read_halfword(0x%08x);\n", address);
 #endif
-    return (uint16_t)(open_bus() >> 8 * (address & 3));
+    return (uint16_t)(open_bus() >> 8 * (address & 2));
 }
 
 void memory_write_halfword(uint32_t address, uint16_t value) {
@@ -666,7 +666,7 @@ uint32_t memory_read_word(uint32_t address) {
     }
     if (address >= 0x08000000 && address < 0x0e000000) {
         address &= 0x1fffffc;
-        if (address > game_rom_mask) return (address >> 1) | ((address | 2) >> 1) << 16;
+        if (address > game_rom_mask) return (uint16_t)((address & ~2) >> 1) | (uint16_t)((address | 2) >> 1) << 16;
         return *(uint32_t *)&game_rom[address & (game_rom_mask & ~3)];
     }
     if (address >= 0x0e000000 && address < 0x10000000) {

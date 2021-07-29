@@ -176,7 +176,7 @@ uint8_t io_read_byte(uint32_t address) {
             break;
     }
 
-    return (uint8_t)(open_bus() >> 8 * (address & 1));
+    return (uint8_t)(open_bus() >> 8 * (address & 3));
 }
 
 void io_write_byte(uint32_t address, uint8_t value) {
@@ -525,7 +525,7 @@ uint16_t io_read_halfword(uint32_t address) {
             break;
     }
 
-    return (uint16_t)(open_bus() >> 8 * (address & 3));
+    return (uint16_t)(open_bus() >> 8 * (address & 2));
 }
 
 void io_write_halfword(uint32_t address, uint16_t value) {
