@@ -1248,37 +1248,30 @@ void gba_timer_update(uint32_t cycles) {
     }
 }
 
-void gba_dma_transfer_halfwords(int ch, uint32_t dst_ctrl, uint32_t src_ctrl, uint32_t *dst_addr, uint32_t *src_addr, uint32_t count) {
+void gba_dma_transfer(int ch, uint32_t dst_ctrl, uint32_t src_ctrl, uint32_t *dst_addr, uint32_t *src_addr, uint32_t size, uint32_t count) {
     for (uint32_t i = 0; i < count; i++) {
-        bool bad_src_addr = (*src_addr < 0x02000000 || *src_addr >= 0x10000000 || (ch == 0 && *src_addr >= 0x08000000));
-        bool bad_dst_addr = (*dst_addr < 0x02000000 || *dst_addr >= 0x10000000 || (ch != 3 && *dst_addr >= 0x08000000));
+        bool bad_src_addr = !(*src_addr >= 0x02000000 && *src_addr < 0x10000000);
+        bad_src_addr |= (ch == 0 && *src_addr >= 0x08000000);
 
-        uint16_t value = ioreg.dma_value.w.w0;
-        if (!bad_src_addr) value = memory_read_halfword(*src_addr);
-        ioreg.dma_value.w.w0 = value;
-        if (!bad_dst_addr) memory_write_halfword(*dst_addr, value);
+        bool bad_dst_addr = !(*dst_addr >= 0x02000000 && *dst_addr < 0x10000000);
+        bad_dst_addr |= (ch != 3 && *dst_addr >= 0x08000000);
 
-        if (dst_ctrl == DMA_INC || dst_ctrl == DMA_RELOAD) *dst_addr += 2;
-        else if (dst_ctrl == DMA_DEC) *dst_addr -= 2;
-        if (src_ctrl == DMA_INC) *src_addr += 2;
-        else if (src_ctrl == DMA_DEC) *src_addr -= 2;
-    }
-}
+        if (size == 4) {
+            uint32_t value = ioreg.dma_value.dw;
+            if (!bad_src_addr) value = memory_read_word(*src_addr);
+            ioreg.dma_value.dw = value;
+            if (!bad_dst_addr) memory_write_word(*dst_addr, value);
+        } else {
+            uint16_t value = ioreg.dma_value.w.w0;
+            if (!bad_src_addr) value = memory_read_halfword(*src_addr);
+            ioreg.dma_value.w.w0 = value;
+            if (!bad_dst_addr) memory_write_halfword(*dst_addr, value);
+        }
 
-void gba_dma_transfer_words(int ch, uint32_t dst_ctrl, uint32_t src_ctrl, uint32_t *dst_addr, uint32_t *src_addr, uint32_t count) {
-    for (uint32_t i = 0; i < count; i++) {
-        bool bad_src_addr = (*src_addr < 0x02000000 || *src_addr >= 0x10000000 || (ch == 0 && *src_addr >= 0x08000000));
-        bool bad_dst_addr = (*dst_addr < 0x02000000 || *dst_addr >= 0x10000000 || (ch != 3 && *dst_addr >= 0x08000000));
-
-        uint32_t value = ioreg.dma_value.dw;
-        if (!bad_src_addr) value = memory_read_word(*src_addr);
-        ioreg.dma_value.dw = value;
-        if (!bad_dst_addr) memory_write_word(*dst_addr, value);
-
-        if (dst_ctrl == DMA_INC || dst_ctrl == DMA_RELOAD) *dst_addr += 4;
-        else if (dst_ctrl == DMA_DEC) *dst_addr -= 4;
-        if (src_ctrl == DMA_INC) *src_addr += 4;
-        else if (src_ctrl == DMA_DEC) *src_addr -= 4;
+        if (dst_ctrl == DMA_INC || dst_ctrl == DMA_RELOAD) *dst_addr += size;
+        else if (dst_ctrl == DMA_DEC) *dst_addr -= size;
+        if (src_ctrl == DMA_INC) *src_addr += size;
+        else if (src_ctrl == DMA_DEC) *src_addr -= size;
     }
 }
 
@@ -1296,7 +1289,7 @@ void gba_dma_update(uint32_t current_timing) {
         uint32_t dst_ctrl = (dmacnt >> 21) & 3;
         uint32_t src_ctrl = (dmacnt >> 23) & 3;
         if (*src_addr >= 0x08000000 && *src_addr <= 0x0e000000) src_ctrl = DMA_INC;
-        bool transfer_word = (dmacnt & DMA_32) != 0;
+        bool word_size = (dmacnt & DMA_32) != 0;
         uint32_t count = dmacnt & 0xffff;
         if (count == 0) count = (ch == 3 ? 0x10000 : 0x4000);
 
@@ -1313,7 +1306,7 @@ void gba_dma_update(uint32_t current_timing) {
                 if (*dst_addr == 0x40000a0 && !ioreg.fifo_a_refill) continue;
                 if (*dst_addr == 0x40000a4 && !ioreg.fifo_b_refill) continue;
                 dst_ctrl = DMA_FIXED;
-                transfer_word = true;
+                word_size = true;
                 count = 4;
             } else if (ch == 3) {
                 continue;  // FIXME
@@ -1333,16 +1326,8 @@ void gba_dma_update(uint32_t current_timing) {
         }
 
         uint32_t dst_addr_initial = *dst_addr;
-
-        if (transfer_word) {
-            gba_dma_transfer_words(ch, dst_ctrl, src_ctrl, dst_addr, src_addr, count);
-        } else {
-            gba_dma_transfer_halfwords(ch, dst_ctrl, src_ctrl, dst_addr, src_addr, count);
-        }
-
-        if (dst_ctrl == DMA_RELOAD) {
-            *dst_addr = dst_addr_initial;
-        }
+        gba_dma_transfer(ch, dst_ctrl, src_ctrl, dst_addr, src_addr, word_size ? 4 : 2, count);
+        if (dst_ctrl == DMA_RELOAD) *dst_addr = dst_addr_initial;
 
         if (dma_special) {  // FIXME Hack for sound DMA source address not being reloaded by interrupt service routine
             uint32_t info = *(uint32_t *)&cpu_iwram[0x7ff0];  // Pointer to MP2K sound engine info
