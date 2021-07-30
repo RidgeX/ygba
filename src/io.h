@@ -75,6 +75,9 @@ typedef struct {
         io_union32 sad;
         io_union32 dad;
         io_union32 cnt;
+        uint32_t src_addr;
+        uint32_t dst_addr;
+        uint16_t count;
     } dma[4];
     io_union32 dma_value;
 

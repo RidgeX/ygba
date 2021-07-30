@@ -180,6 +180,8 @@ uint8_t io_read_byte(uint32_t address) {
 }
 
 void io_write_byte(uint32_t address, uint8_t value) {
+    uint8_t old_value;
+
     switch (address) {
         case REG_DISPCNT + 0: ioreg.dispcnt.b.b0 = (ioreg.dispcnt.b.b0 & 0x08) | (value & 0xf7); break;
         case REG_DISPCNT + 1: ioreg.dispcnt.b.b1 = value; break;
@@ -326,7 +328,7 @@ void io_write_byte(uint32_t address, uint8_t value) {
         case REG_DMA0CNT_L + 0: ioreg.dma[0].cnt.b.b0 = value; break;
         case REG_DMA0CNT_L + 1: ioreg.dma[0].cnt.b.b1 = value & 0x3f; break;
         case REG_DMA0CNT_H + 0: ioreg.dma[0].cnt.b.b2 = value & 0xe0; break;
-        case REG_DMA0CNT_H + 1: ioreg.dma[0].cnt.b.b3 = value & 0xf7; if (value & 0x80) { gba_dma_update(DMA_NOW); } break;
+        case REG_DMA0CNT_H + 1: old_value = ioreg.dma[0].cnt.b.b3; ioreg.dma[0].cnt.b.b3 = value & 0xf7; if (!(old_value & 0x80) && (value & 0x80)) { gba_dma_reset(0); gba_dma_update(DMA_NOW); } break;
         case REG_DMA1SAD_L + 0: ioreg.dma[1].sad.b.b0 = value; break;
         case REG_DMA1SAD_L + 1: ioreg.dma[1].sad.b.b1 = value; break;
         case REG_DMA1SAD_H + 0: ioreg.dma[1].sad.b.b2 = value; break;
@@ -338,7 +340,7 @@ void io_write_byte(uint32_t address, uint8_t value) {
         case REG_DMA1CNT_L + 0: ioreg.dma[1].cnt.b.b0 = value; break;
         case REG_DMA1CNT_L + 1: ioreg.dma[1].cnt.b.b1 = value & 0x3f; break;
         case REG_DMA1CNT_H + 0: ioreg.dma[1].cnt.b.b2 = value & 0xe0; break;
-        case REG_DMA1CNT_H + 1: ioreg.dma[1].cnt.b.b3 = value & 0xf7; if (value & 0x80) { gba_dma_update(DMA_NOW); } break;
+        case REG_DMA1CNT_H + 1: old_value = ioreg.dma[1].cnt.b.b3; ioreg.dma[1].cnt.b.b3 = value & 0xf7; if (!(old_value & 0x80) && (value & 0x80)) { gba_dma_reset(1); gba_dma_update(DMA_NOW); } break;
         case REG_DMA2SAD_L + 0: ioreg.dma[2].sad.b.b0 = value; break;
         case REG_DMA2SAD_L + 1: ioreg.dma[2].sad.b.b1 = value; break;
         case REG_DMA2SAD_H + 0: ioreg.dma[2].sad.b.b2 = value; break;
@@ -350,7 +352,7 @@ void io_write_byte(uint32_t address, uint8_t value) {
         case REG_DMA2CNT_L + 0: ioreg.dma[2].cnt.b.b0 = value; break;
         case REG_DMA2CNT_L + 1: ioreg.dma[2].cnt.b.b1 = value & 0x3f; break;
         case REG_DMA2CNT_H + 0: ioreg.dma[2].cnt.b.b2 = value & 0xe0; break;
-        case REG_DMA2CNT_H + 1: ioreg.dma[2].cnt.b.b3 = value & 0xf7; if (value & 0x80) { gba_dma_update(DMA_NOW); } break;
+        case REG_DMA2CNT_H + 1: old_value = ioreg.dma[2].cnt.b.b3; ioreg.dma[2].cnt.b.b3 = value & 0xf7; if (!(old_value & 0x80) && (value & 0x80)) { gba_dma_reset(2); gba_dma_update(DMA_NOW); } break;
         case REG_DMA3SAD_L + 0: ioreg.dma[3].sad.b.b0 = value; break;
         case REG_DMA3SAD_L + 1: ioreg.dma[3].sad.b.b1 = value; break;
         case REG_DMA3SAD_H + 0: ioreg.dma[3].sad.b.b2 = value; break;
@@ -362,23 +364,23 @@ void io_write_byte(uint32_t address, uint8_t value) {
         case REG_DMA3CNT_L + 0: ioreg.dma[3].cnt.b.b0 = value; break;
         case REG_DMA3CNT_L + 1: ioreg.dma[3].cnt.b.b1 = value; break;
         case REG_DMA3CNT_H + 0: ioreg.dma[3].cnt.b.b2 = value & 0xe0; break;
-        case REG_DMA3CNT_H + 1: ioreg.dma[3].cnt.b.b3 = value; if (value & 0x80) { gba_dma_update(DMA_NOW); } break;
+        case REG_DMA3CNT_H + 1: old_value = ioreg.dma[3].cnt.b.b3; ioreg.dma[3].cnt.b.b3 = value; if (!(old_value & 0x80) && (value & 0x80)) { gba_dma_reset(3); gba_dma_update(DMA_NOW); } break;
 
         case REG_TM0CNT_L + 0: ioreg.timer[0].reload.b.b0 = value; break;
         case REG_TM0CNT_L + 1: ioreg.timer[0].reload.b.b1 = value; break;
-        case REG_TM0CNT_H + 0: if (!(ioreg.timer[0].control.b.b0 & 0x80) && (value & 0x80)) { gba_timer_reset(0); } ioreg.timer[0].control.b.b0 = value & 0xc7; break;
+        case REG_TM0CNT_H + 0: old_value = ioreg.timer[0].control.b.b0; ioreg.timer[0].control.b.b0 = value & 0xc7; if (!(old_value & 0x80) && (value & 0x80)) { gba_timer_reset(0); } break;
         case REG_TM0CNT_H + 1: ioreg.timer[0].control.b.b1 = value & 0x00; break;
         case REG_TM1CNT_L + 0: ioreg.timer[1].reload.b.b0 = value; break;
         case REG_TM1CNT_L + 1: ioreg.timer[1].reload.b.b1 = value; break;
-        case REG_TM1CNT_H + 0: if (!(ioreg.timer[1].control.b.b0 & 0x80) && (value & 0x80)) { gba_timer_reset(1); } ioreg.timer[1].control.b.b0 = value & 0xc7; break;
+        case REG_TM1CNT_H + 0: old_value = ioreg.timer[1].control.b.b0; ioreg.timer[1].control.b.b0 = value & 0xc7; if (!(old_value & 0x80) && (value & 0x80)) { gba_timer_reset(1); } break;
         case REG_TM1CNT_H + 1: ioreg.timer[1].control.b.b1 = value & 0x00; break;
         case REG_TM2CNT_L + 0: ioreg.timer[2].reload.b.b0 = value; break;
         case REG_TM2CNT_L + 1: ioreg.timer[2].reload.b.b1 = value; break;
-        case REG_TM2CNT_H + 0: if (!(ioreg.timer[2].control.b.b0 & 0x80) && (value & 0x80)) { gba_timer_reset(2); } ioreg.timer[2].control.b.b0 = value & 0xc7; break;
+        case REG_TM2CNT_H + 0: old_value = ioreg.timer[2].control.b.b0; ioreg.timer[2].control.b.b0 = value & 0xc7; if (!(old_value & 0x80) && (value & 0x80)) { gba_timer_reset(2); } break;
         case REG_TM2CNT_H + 1: ioreg.timer[2].control.b.b1 = value & 0x00; break;
         case REG_TM3CNT_L + 0: ioreg.timer[3].reload.b.b0 = value; break;
         case REG_TM3CNT_L + 1: ioreg.timer[3].reload.b.b1 = value; break;
-        case REG_TM3CNT_H + 0: if (!(ioreg.timer[3].control.b.b0 & 0x80) && (value & 0x80)) { gba_timer_reset(3); } ioreg.timer[3].control.b.b0 = value & 0xc7; break;
+        case REG_TM3CNT_H + 0: old_value = ioreg.timer[3].control.b.b0; ioreg.timer[3].control.b.b0 = value & 0xc7; if (!(old_value & 0x80) && (value & 0x80)) { gba_timer_reset(3); } break;
         case REG_TM3CNT_H + 1: ioreg.timer[3].control.b.b1 = value & 0x00; break;
 
         //case REG_SIOMULTI0 + 0:
@@ -529,6 +531,8 @@ uint16_t io_read_halfword(uint32_t address) {
 }
 
 void io_write_halfword(uint32_t address, uint16_t value) {
+    uint16_t old_value;
+
     switch (address) {
         case REG_DISPCNT: ioreg.dispcnt.w = (ioreg.dispcnt.w & 0x0008) | (value & 0xfff7); break;
         case REG_DISPSTAT: ioreg.dispstat.w = (ioreg.dispstat.w & 0x0007) | (value & 0xff38); break;
@@ -603,34 +607,34 @@ void io_write_halfword(uint32_t address, uint16_t value) {
         case REG_DMA0DAD_L: ioreg.dma[0].dad.w.w0 = value; break;
         case REG_DMA0DAD_H: ioreg.dma[0].dad.w.w1 = value; break;
         case REG_DMA0CNT_L: ioreg.dma[0].cnt.w.w0 = value & 0x3fff; break;
-        case REG_DMA0CNT_H: ioreg.dma[0].cnt.w.w1 = value & 0xf7e0; if (value & 0x8000) { gba_dma_update(DMA_NOW); } break;
+        case REG_DMA0CNT_H: old_value = ioreg.dma[0].cnt.w.w1; ioreg.dma[0].cnt.w.w1 = value & 0xf7e0; if (!(old_value & 0x8000) && (value & 0x8000)) { gba_dma_reset(0); gba_dma_update(DMA_NOW); } break;
         case REG_DMA1SAD_L: ioreg.dma[1].sad.w.w0 = value; break;
         case REG_DMA1SAD_H: ioreg.dma[1].sad.w.w1 = value; break;
         case REG_DMA1DAD_L: ioreg.dma[1].dad.w.w0 = value; break;
         case REG_DMA1DAD_H: ioreg.dma[1].dad.w.w1 = value; break;
         case REG_DMA1CNT_L: ioreg.dma[1].cnt.w.w0 = value & 0x3fff; break;
-        case REG_DMA1CNT_H: ioreg.dma[1].cnt.w.w1 = value & 0xf7e0; if (value & 0x8000) { gba_dma_update(DMA_NOW); } break;
+        case REG_DMA1CNT_H: old_value = ioreg.dma[1].cnt.w.w1; ioreg.dma[1].cnt.w.w1 = value & 0xf7e0; if (!(old_value & 0x8000) && (value & 0x8000)) { gba_dma_reset(1); gba_dma_update(DMA_NOW); } break;
         case REG_DMA2SAD_L: ioreg.dma[2].sad.w.w0 = value; break;
         case REG_DMA2SAD_H: ioreg.dma[2].sad.w.w1 = value; break;
         case REG_DMA2DAD_L: ioreg.dma[2].dad.w.w0 = value; break;
         case REG_DMA2DAD_H: ioreg.dma[2].dad.w.w1 = value; break;
         case REG_DMA2CNT_L: ioreg.dma[2].cnt.w.w0 = value & 0x3fff; break;
-        case REG_DMA2CNT_H: ioreg.dma[2].cnt.w.w1 = value & 0xf7e0; if (value & 0x8000) { gba_dma_update(DMA_NOW); } break;
+        case REG_DMA2CNT_H: old_value = ioreg.dma[2].cnt.w.w1; ioreg.dma[2].cnt.w.w1 = value & 0xf7e0; if (!(old_value & 0x8000) && (value & 0x8000)) { gba_dma_reset(2); gba_dma_update(DMA_NOW); } break;
         case REG_DMA3SAD_L: ioreg.dma[3].sad.w.w0 = value; break;
         case REG_DMA3SAD_H: ioreg.dma[3].sad.w.w1 = value; break;
         case REG_DMA3DAD_L: ioreg.dma[3].dad.w.w0 = value; break;
         case REG_DMA3DAD_H: ioreg.dma[3].dad.w.w1 = value; break;
         case REG_DMA3CNT_L: ioreg.dma[3].cnt.w.w0 = value; break;
-        case REG_DMA3CNT_H: ioreg.dma[3].cnt.w.w1 = value & 0xffe0; if (value & 0x8000) { gba_dma_update(DMA_NOW); } break;
+        case REG_DMA3CNT_H: old_value = ioreg.dma[3].cnt.w.w1; ioreg.dma[3].cnt.w.w1 = value & 0xffe0; if (!(old_value & 0x8000) && (value & 0x8000)) { gba_dma_reset(3); gba_dma_update(DMA_NOW); } break;
 
         case REG_TM0CNT_L: ioreg.timer[0].reload.w = value; break;
-        case REG_TM0CNT_H: if (!(ioreg.timer[0].control.w & 0x80) && (value & 0x80)) { gba_timer_reset(0); } ioreg.timer[0].control.w = value & 0x00c7; break;
+        case REG_TM0CNT_H: old_value = ioreg.timer[0].control.w; ioreg.timer[0].control.w = value & 0x00c7; if (!(old_value & 0x80) && (value & 0x80)) { gba_timer_reset(0); } break;
         case REG_TM1CNT_L: ioreg.timer[1].reload.w = value; break;
-        case REG_TM1CNT_H: if (!(ioreg.timer[1].control.w & 0x80) && (value & 0x80)) { gba_timer_reset(1); } ioreg.timer[1].control.w = value & 0x00c7; break;
+        case REG_TM1CNT_H: old_value = ioreg.timer[1].control.w; ioreg.timer[1].control.w = value & 0x00c7; if (!(old_value & 0x80) && (value & 0x80)) { gba_timer_reset(1); } break;
         case REG_TM2CNT_L: ioreg.timer[2].reload.w = value; break;
-        case REG_TM2CNT_H: if (!(ioreg.timer[2].control.w & 0x80) && (value & 0x80)) { gba_timer_reset(2); } ioreg.timer[2].control.w = value & 0x00c7; break;
+        case REG_TM2CNT_H: old_value = ioreg.timer[2].control.w; ioreg.timer[2].control.w = value & 0x00c7; if (!(old_value & 0x80) && (value & 0x80)) { gba_timer_reset(2); } break;
         case REG_TM3CNT_L: ioreg.timer[3].reload.w = value; break;
-        case REG_TM3CNT_H: if (!(ioreg.timer[3].control.w & 0x80) && (value & 0x80)) { gba_timer_reset(3); } ioreg.timer[3].control.w = value & 0x00c7; break;
+        case REG_TM3CNT_H: old_value = ioreg.timer[3].control.w; ioreg.timer[3].control.w = value & 0x00c7; if (!(old_value & 0x80) && (value & 0x80)) { gba_timer_reset(3); } break;
 
         //case REG_SIOMULTI0:
         //case REG_SIOMULTI1:
@@ -727,6 +731,8 @@ uint32_t io_read_word(uint32_t address) {
 }
 
 void io_write_word(uint32_t address, uint32_t value) {
+    uint32_t old_value;
+
     switch (address) {
         case REG_DISPCNT: ioreg.dispcnt.w = (ioreg.dispcnt.w & 0x0008) | (value & 0xfff7); break;
         case REG_DISPSTAT: ioreg.dispstat.w = (ioreg.dispstat.w & 0x0007) | (value & 0xff38); break;
@@ -771,21 +777,21 @@ void io_write_word(uint32_t address, uint32_t value) {
 
         case REG_DMA0SAD_L: ioreg.dma[0].sad.dw = value; break;
         case REG_DMA0DAD_L: ioreg.dma[0].dad.dw = value; break;
-        case REG_DMA0CNT_L: ioreg.dma[0].cnt.dw = value & 0xf7e03fff; if (value & 0x80000000) { gba_dma_update(DMA_NOW); } break;
+        case REG_DMA0CNT_L: old_value = ioreg.dma[0].cnt.dw; ioreg.dma[0].cnt.dw = value & 0xf7e03fff; if (!(old_value & 0x80000000) && (value & 0x80000000)) { gba_dma_reset(0); gba_dma_update(DMA_NOW); } break;
         case REG_DMA1SAD_L: ioreg.dma[1].sad.dw = value; break;
         case REG_DMA1DAD_L: ioreg.dma[1].dad.dw = value; break;
-        case REG_DMA1CNT_L: ioreg.dma[1].cnt.dw = value & 0xf7e03fff; if (value & 0x80000000) { gba_dma_update(DMA_NOW); } break;
+        case REG_DMA1CNT_L: old_value = ioreg.dma[1].cnt.dw; ioreg.dma[1].cnt.dw = value & 0xf7e03fff; if (!(old_value & 0x80000000) && (value & 0x80000000)) { gba_dma_reset(1); gba_dma_update(DMA_NOW); } break;
         case REG_DMA2SAD_L: ioreg.dma[2].sad.dw = value; break;
         case REG_DMA2DAD_L: ioreg.dma[2].dad.dw = value; break;
-        case REG_DMA2CNT_L: ioreg.dma[2].cnt.dw = value & 0xf7e03fff; if (value & 0x80000000) { gba_dma_update(DMA_NOW); } break;
+        case REG_DMA2CNT_L: old_value = ioreg.dma[2].cnt.dw; ioreg.dma[2].cnt.dw = value & 0xf7e03fff; if (!(old_value & 0x80000000) && (value & 0x80000000)) { gba_dma_reset(2); gba_dma_update(DMA_NOW); } break;
         case REG_DMA3SAD_L: ioreg.dma[3].sad.dw = value; break;
         case REG_DMA3DAD_L: ioreg.dma[3].dad.dw = value; break;
-        case REG_DMA3CNT_L: ioreg.dma[3].cnt.dw = value & 0xffe0ffff; if (value & 0x80000000) { gba_dma_update(DMA_NOW); } break;
+        case REG_DMA3CNT_L: old_value = ioreg.dma[3].cnt.dw; ioreg.dma[3].cnt.dw = value & 0xffe0ffff; if (!(old_value & 0x80000000) && (value & 0x80000000)) { gba_dma_reset(3); gba_dma_update(DMA_NOW); } break;
 
-        case REG_TM0CNT_L: ioreg.timer[0].reload.w = value & 0xffff; if (!(ioreg.timer[0].control.w & 0x80) && ((value >> 16) & 0x80)) { gba_timer_reset(0); } ioreg.timer[0].control.w = (value >> 16) & 0x00c7; break;
-        case REG_TM1CNT_L: ioreg.timer[1].reload.w = value & 0xffff; if (!(ioreg.timer[1].control.w & 0x80) && ((value >> 16) & 0x80)) { gba_timer_reset(1); } ioreg.timer[1].control.w = (value >> 16) & 0x00c7; break;
-        case REG_TM2CNT_L: ioreg.timer[2].reload.w = value & 0xffff; if (!(ioreg.timer[2].control.w & 0x80) && ((value >> 16) & 0x80)) { gba_timer_reset(2); } ioreg.timer[2].control.w = (value >> 16) & 0x00c7; break;
-        case REG_TM3CNT_L: ioreg.timer[3].reload.w = value & 0xffff; if (!(ioreg.timer[3].control.w & 0x80) && ((value >> 16) & 0x80)) { gba_timer_reset(3); } ioreg.timer[3].control.w = (value >> 16) & 0x00c7; break;
+        case REG_TM0CNT_L: ioreg.timer[0].reload.w = value & 0xffff; old_value = ioreg.timer[0].control.w; ioreg.timer[0].control.w = (value >> 16) & 0x00c7; if (!(old_value & 0x80) && ((value >> 16) & 0x80)) { gba_timer_reset(0); } break;
+        case REG_TM1CNT_L: ioreg.timer[1].reload.w = value & 0xffff; old_value = ioreg.timer[1].control.w; ioreg.timer[1].control.w = (value >> 16) & 0x00c7; if (!(old_value & 0x80) && ((value >> 16) & 0x80)) { gba_timer_reset(1); } break;
+        case REG_TM2CNT_L: ioreg.timer[2].reload.w = value & 0xffff; old_value = ioreg.timer[2].control.w; ioreg.timer[2].control.w = (value >> 16) & 0x00c7; if (!(old_value & 0x80) && ((value >> 16) & 0x80)) { gba_timer_reset(2); } break;
+        case REG_TM3CNT_L: ioreg.timer[3].reload.w = value & 0xffff; old_value = ioreg.timer[3].control.w; ioreg.timer[3].control.w = (value >> 16) & 0x00c7; if (!(old_value & 0x80) && ((value >> 16) & 0x80)) { gba_timer_reset(3); } break;
 
         //case REG_SIOMULTI0:
         //case REG_SIOMULTI2:

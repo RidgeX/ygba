@@ -1278,34 +1278,43 @@ void gba_dma_transfer(int ch, uint32_t dst_ctrl, uint32_t src_ctrl, uint32_t *ds
     }
 }
 
+void gba_dma_reset(int ch) {
+    uint32_t sad = ioreg.dma[ch].sad.dw;
+    uint32_t dad = ioreg.dma[ch].dad.dw;
+    uint32_t cnt = ioreg.dma[ch].cnt.dw;
+
+    ioreg.dma[ch].src_addr = sad;
+    ioreg.dma[ch].dst_addr = dad;
+    ioreg.dma[ch].count = (uint16_t) cnt;
+    if (ioreg.dma[ch].count == 0) ioreg.dma[ch].count = (ch == 3 ? 0x10000 : 0x4000);
+}
+
 void gba_dma_update(uint32_t current_timing) {
     for (int ch = 0; ch < 4; ch++) {
-        uint32_t dmacnt = ioreg.dma[ch].cnt.dw;
-        uint32_t *dst_addr = &ioreg.dma[ch].dad.dw;
-        uint32_t *src_addr = &ioreg.dma[ch].sad.dw;
+        uint32_t dad = ioreg.dma[ch].dad.dw;
+        uint32_t cnt = ioreg.dma[ch].cnt.dw;
+        uint32_t start_timing = BITS(cnt, 28, 29);
 
-        if ((dmacnt & DMA_ENABLE) == 0) continue;
-
-        uint32_t start_timing = (dmacnt >> 28) & 3;
+        if (!(cnt & DMA_ENABLE)) continue;
         if (start_timing != current_timing) continue;
 
-        uint32_t dst_ctrl = (dmacnt >> 21) & 3;
-        uint32_t src_ctrl = (dmacnt >> 23) & 3;
+        uint32_t *dst_addr = &ioreg.dma[ch].dst_addr;
+        uint32_t *src_addr = &ioreg.dma[ch].src_addr;
+        uint16_t count = ioreg.dma[ch].count;
+
+        uint32_t dst_ctrl = BITS(cnt, 21, 22);
+        uint32_t src_ctrl = BITS(cnt, 23, 24);
         if (*src_addr >= 0x08000000 && *src_addr <= 0x0e000000) src_ctrl = DMA_INC;
-        bool word_size = (dmacnt & DMA_32) != 0;
-        uint32_t count = dmacnt & 0xffff;
-        if (count == 0) count = (ch == 3 ? 0x10000 : 0x4000);
+        bool word_size = cnt & DMA_32;
 
         if (start_timing == DMA_AT_VBLANK) assert(ioreg.vcount.w == 160);
         if (start_timing == DMA_AT_HBLANK) assert(ppu_cycles < 197120 && ppu_cycles % 1232 == 1006);
-        bool dma_special = false;
         if (start_timing == DMA_AT_REFRESH) {
             if (ch == 0) {
                 continue;
             } else if (ch == 1 || ch == 2) {
-                dma_special = true;
                 if (!(*dst_addr == 0x40000a0 || *dst_addr == 0x40000a4)) continue;
-                assert((dmacnt & DMA_REPEAT) != 0);
+                assert(cnt & DMA_REPEAT);
                 if (*dst_addr == 0x40000a0 && !ioreg.fifo_a_refill) continue;
                 if (*dst_addr == 0x40000a4 && !ioreg.fifo_b_refill) continue;
                 dst_ctrl = DMA_FIXED;
@@ -1317,7 +1326,7 @@ void gba_dma_update(uint32_t current_timing) {
         }
 
         assert(src_ctrl != DMA_RELOAD);
-        assert((dmacnt & DMA_DRQ) == 0);
+        assert(!(cnt & DMA_DRQ));
 
         // EEPROM size autodetect
         if (game_rom_size <= 0x1000000 && *dst_addr >= 0x0d000000 && *dst_addr < 0x0e000000) {
@@ -1329,33 +1338,20 @@ void gba_dma_update(uint32_t current_timing) {
         }
 
         active_dma = ch;
-
-        uint32_t dst_addr_initial = *dst_addr;
         gba_dma_transfer(ch, dst_ctrl, src_ctrl, dst_addr, src_addr, word_size ? 4 : 2, count);
-        if (dst_ctrl == DMA_RELOAD) *dst_addr = dst_addr_initial;
-
         active_dma = -1;
 
-        if (dma_special) {  // FIXME Hack for sound DMA source address not being reloaded by interrupt service routine
-            uint32_t info = *(uint32_t *)&cpu_iwram[0x7ff0];  // Pointer to MP2K sound engine info
-            if (info >= 0x2000000 && info < 0x4000000) {
-                uint32_t a_start = info + 848;
-                uint32_t a_end = a_start + 1568;
-                uint32_t b_start = info + 848 + 1568 + 16;
-                uint32_t b_end = b_start + 1568;
-                if (*dst_addr == 0x040000a0 && *src_addr >= a_end) *src_addr = a_start;
-                if (*dst_addr == 0x040000a4 && *src_addr >= b_end) *src_addr = b_start;
-            }
-        }
-
-        if ((dmacnt & DMA_IRQ) != 0) {
+        if (cnt & DMA_IRQ) {
             ioreg.irq.w |= 1 << (8 + ch);
         }
 
-        if ((dmacnt & DMA_REPEAT) != 0) continue;
-
-        dmacnt &= ~DMA_ENABLE;
-        ioreg.dma[ch].cnt.dw = dmacnt;
+        if (cnt & DMA_REPEAT) {
+            if (dst_ctrl == DMA_RELOAD) ioreg.dma[ch].dst_addr = dad;
+            ioreg.dma[ch].count = (uint16_t) cnt;
+            if (ioreg.dma[ch].count == 0) ioreg.dma[ch].count = (ch == 3 ? 0x10000 : 0x4000);
+        } else {
+            ioreg.dma[ch].cnt.dw &= ~DMA_ENABLE;
+        }
     }
 }
 
