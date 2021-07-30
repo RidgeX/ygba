@@ -66,8 +66,8 @@
     [x] Windows 0 and 1
     [ ] Object window
     [ ] Alpha blending
-[ ] Sound
-    [ ] 8-bit signed digital sound
+[x] Sound
+    [x] 8-bit signed digital sound
     [ ] Programmable sound generators
 [x] Timers
 [x] DMA transfers
@@ -76,7 +76,7 @@
     [x] VBlank, VCount and HBlank
     [x] Timers
     [x] DMA transfers
-    [ ] Key input
+    [x] Key input
 [x] Instruction cycle timings
     [x] 1 cycle per instruction
     [ ] Accurate timings based on instruction, type of memory accessed, WAITCNT register
