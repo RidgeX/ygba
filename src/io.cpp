@@ -166,7 +166,7 @@ uint8_t io_read_byte(uint32_t address) {
         case REG_WAITCNT + 1: return ioreg.waitcnt.b.b1;
         case REG_IME + 0: return ioreg.ime.b.b0;
         case REG_IME + 1: return ioreg.ime.b.b1;
-        case REG_POSTFLG: return 0;  // ioreg.postflg;
+        case REG_POSTFLG: return ioreg.postflg;
         case REG_HALTCNT: return 0;
 
         default:

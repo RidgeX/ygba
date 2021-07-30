@@ -811,6 +811,7 @@ void gba_reset(bool keep_backup) {
     ioreg.bg_affine[1].dmy.w = 0x100;
     if (skip_bios) {
         ioreg.rcnt.w = 0x8000;
+        ioreg.postflg = 1;
     }
 }
 
