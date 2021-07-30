@@ -115,7 +115,7 @@ uint8_t backup_eeprom[0x2000];
 uint8_t backup_flash[0x20000];
 uint8_t backup_sram[0x8000];
 
-int8_t cubic_interpolate(int8_t *history, double mu) {
+double cubic_interpolate(int8_t *history, double mu) {
     double A = history[3] - history[2] - history[0] + history[1];
     double B = history[0] - history[1] - A;
     double C = history[2] - history[0];
@@ -155,7 +155,7 @@ void gba_audio_callback(void *userdata, uint8_t *stream_u8, int len_u8) {
         a_history[1] = a_history[2];
         a_history[2] = a_history[3];
         a_history[3] = (BIT(a_control, 7) ? (int8_t) ioreg.fifo_a[ioreg.fifo_a_r] : 0);
-        int16_t a = cubic_interpolate(a_history, a_fraction);
+        double a = cubic_interpolate(a_history, a_fraction);
         a_fraction += a_ratio;
         if (a_fraction >= 1.0) {
             a_fraction -= (int) a_fraction;  // % 1.0
@@ -168,7 +168,7 @@ void gba_audio_callback(void *userdata, uint8_t *stream_u8, int len_u8) {
         b_history[1] = b_history[2];
         b_history[2] = b_history[3];
         b_history[3] = (BIT(b_control, 7) ? (int8_t) ioreg.fifo_b[ioreg.fifo_b_r] : 0);
-        int16_t b = cubic_interpolate(b_history, a_fraction);
+        double b = cubic_interpolate(b_history, a_fraction);
         b_fraction += b_ratio;
         if (b_fraction >= 1.0) {
             b_fraction -= (int) b_fraction;  // % 1.0
