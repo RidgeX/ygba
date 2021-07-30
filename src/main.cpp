@@ -1,3 +1,6 @@
+// Copyright (c) 2021 Ridge Shrubsall
+// SPDX-License-Identifier: BSD-3-Clause
+
 #ifdef WIN32
 #define _CRT_SECURE_NO_WARNINGS
 #endif

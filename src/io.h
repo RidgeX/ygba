@@ -1,3 +1,6 @@
+// Copyright (c) 2021 Ridge Shrubsall
+// SPDX-License-Identifier: BSD-3-Clause
+
 #ifndef IO_H
 #define IO_H
 
