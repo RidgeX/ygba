@@ -2,9 +2,12 @@
 // SPDX-License-Identifier: BSD-3-Clause
 
 #include <stdint.h>
+#include <stdio.h>
 
 #include "io.h"
 #include "main.h"
+
+//#define LOG_BAD_MEMORY_ACCESS
 
 io_registers ioreg;
 

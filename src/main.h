@@ -64,6 +64,7 @@
 #define INT_CART        (1 << 13)
 
 extern bool halted;
+extern int active_dma;
 
 void gba_audio_fifo_a(uint32_t sample);
 void gba_audio_fifo_b(uint32_t sample);
