@@ -7,6 +7,8 @@ add_executable(ygba WIN32
     cpu-thumb.cpp
     cpu.cpp
     cpu.h
+    gpio.cpp
+    gpio.h
     io.cpp
     io.h
     main.cpp

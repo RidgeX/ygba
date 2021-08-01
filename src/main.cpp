@@ -48,6 +48,7 @@ using namespace gl;
 #include "algorithms.h"
 #include "backup.h"
 #include "cpu.h"
+#include "gpio.h"
 #include "io.h"
 #include "main.h"
 
@@ -59,7 +60,6 @@ bool halted = false;
 int active_dma = -1;
 uint32_t last_bios_access = 0xe4;
 bool skip_bios = false;
-bool has_rtc = false;
 char game_title[13];
 char game_code[5];
 
@@ -376,6 +376,9 @@ uint16_t memory_read_halfword(uint32_t address) {
         if (has_eeprom && game_rom_size <= 0x1000000 && (address >= 0x0d000000 && address < 0x0e000000)) {
             return eeprom_read_bit();
         }
+        if (has_rtc && (address >= 0x080000c4 && address < 0x080000ca)) {
+            return gpio_read_halfword(address & 0x1fffffe);
+        }
         return rom_read_halfword(address & 0x1fffffe);
     }
     if (address >= 0x0e000000 && address < 0x10000000) {
@@ -424,6 +427,10 @@ void memory_write_halfword(uint32_t address, uint16_t value) {
     if (address >= 0x08000000 && address < 0x0e000000) {
         if (has_eeprom && game_rom_size <= 0x1000000 && (address >= 0x0d000000 && address < 0x0e000000)) {
             eeprom_write_bit(value);
+            return;
+        }
+        if (has_rtc && (address >= 0x080000c4 && address < 0x080000ca)) {
+            gpio_write_halfword(address & 0x1fffffe, value);
             return;
         }
         return;  // Read only
@@ -1087,7 +1094,7 @@ void gba_dma_update(uint32_t current_timing) {
 
         uint32_t dst_ctrl = BITS(cnt, 21, 22);
         uint32_t src_ctrl = BITS(cnt, 23, 24);
-        if (*src_addr >= 0x08000000 && *src_addr <= 0x0e000000) src_ctrl = DMA_INC;
+        if (*src_addr >= 0x08000000 && *src_addr < 0x0e000000) src_ctrl = DMA_INC;
         bool word_size = cnt & DMA_32;
 
         if (start_timing == DMA_AT_VBLANK) assert(ioreg.vcount.w == 160);

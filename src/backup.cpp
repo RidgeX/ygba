@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "backup.h"
 #include "main.h"
 
 //#define LOG_BAD_MEMORY_ACCESS
@@ -114,6 +115,7 @@ void backup_write_byte(uint32_t address, uint8_t value) {
 
             default:
                 assert(false);
+                break;
         }
         return;
     } else if (has_sram) {
@@ -219,5 +221,6 @@ void eeprom_write_bit(uint16_t value) {
 
         default:
             assert(false);
+            break;
     }
 }
