@@ -9,17 +9,29 @@
 #include "gpio.h"
 #include "main.h"
 
+bool has_rtc = false;
+
 uint16_t gpio_data = 0;
 uint16_t gpio_direction = 0;
 uint16_t gpio_read_enable = 0;
-
-bool has_rtc = false;
 
 uint64_t rtc_rbits = 0;
 uint32_t rtc_num_rbits = 0;
 uint64_t rtc_wbits = 0;
 uint32_t rtc_num_wbits = 0;
 uint32_t rtc_state = 0;
+
+void gpio_init(void) {
+    gpio_data = 0;
+    gpio_direction = 0;
+    gpio_read_enable = 0;
+
+    rtc_rbits = 0;
+    rtc_num_rbits = 0;
+    rtc_wbits = 0;
+    rtc_num_wbits = 0;
+    rtc_state = 0;
+}
 
 uint8_t bcd_to_decimal(uint8_t x) {
     uint8_t tens = x >> 4;

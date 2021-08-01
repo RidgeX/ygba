@@ -33,6 +33,26 @@ bool flash_id = false;
 uint8_t flash_manufacturer = 0;
 uint8_t flash_device = 0;
 
+void backup_erase(void) {
+    memset(backup_eeprom, 0xff, sizeof(backup_eeprom));
+    memset(backup_flash, 0xff, sizeof(backup_flash));
+    memset(backup_sram, 0xff, sizeof(backup_sram));
+}
+
+void backup_init(void) {
+    eeprom_addr = 0;
+    eeprom_rbits = 0;
+    eeprom_num_rbits = 0;
+    eeprom_wbits = 0;
+    eeprom_num_wbits = 0;
+    eeprom_state = 0;
+    eeprom_width = 0;
+
+    flash_bank = 0;
+    flash_state = 0;
+    flash_id = false;
+}
+
 uint8_t backup_read_byte(uint32_t address) {
     if (has_flash) {
         flash_state &= ~7;

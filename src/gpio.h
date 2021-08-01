@@ -22,6 +22,7 @@
 
 extern bool has_rtc;
 
+void gpio_init(void);
 uint16_t gpio_read_halfword(uint32_t address);
 void gpio_write_halfword(uint32_t address, uint16_t value);
 

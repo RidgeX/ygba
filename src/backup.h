@@ -33,6 +33,8 @@ extern uint32_t eeprom_width;
 extern uint8_t flash_manufacturer;
 extern uint8_t flash_device;
 
+void backup_erase(void);
+void backup_init(void);
 uint8_t backup_read_byte(uint32_t address);
 void backup_write_byte(uint32_t address, uint8_t value);
 uint16_t backup_read_halfword(uint32_t address);

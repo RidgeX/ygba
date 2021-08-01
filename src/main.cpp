@@ -580,11 +580,9 @@ void gba_reset(bool keep_backup) {
     memset(palette_ram, 0, sizeof(palette_ram));
     memset(video_ram, 0, sizeof(video_ram));
     memset(object_ram, 0, sizeof(object_ram));
-    if (!keep_backup) {
-        memset(backup_eeprom, 0xff, sizeof(backup_eeprom));
-        memset(backup_flash, 0xff, sizeof(backup_flash));
-        memset(backup_sram, 0xff, sizeof(backup_sram));
-    }
+    if (!keep_backup) backup_erase();
+    backup_init();
+    gpio_init();
 
     memset(r, 0, sizeof(uint32_t) * 16);
     arm_init_registers(skip_bios);
