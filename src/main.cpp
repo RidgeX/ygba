@@ -59,7 +59,7 @@ bool halted = false;
 int active_dma = -1;
 uint32_t last_bios_access = 0xe4;
 bool skip_bios = false;
-//bool has_rtc = false;
+bool has_rtc = false;
 char game_title[13];
 char game_code[5];
 
@@ -528,6 +528,7 @@ void gba_detect_cartridge_features(void) {
     has_eeprom = false;
     has_flash = false;
     has_sram = false;
+    has_rtc = false;
 
     uint8_t *eeprom_v = (uint8_t *) "EEPROM_V";
     match = boyer_moore_matcher(game_rom, game_rom_size, eeprom_v, 8);
@@ -553,12 +554,16 @@ void gba_detect_cartridge_features(void) {
     match = boyer_moore_matcher(game_rom, game_rom_size, sram_f_v, 8);
     if (match) { has_sram = true; }
 
+    uint8_t *siirtc_v = (uint8_t *) "SIIRTC_V";
+    match = boyer_moore_matcher(game_rom, game_rom_size, siirtc_v, 8);
+    if (match) { has_rtc = true; }
+
     memcpy(game_title, game_rom + 0xa0, 12);
     game_title[12] = '\0';
     memcpy(game_code, game_rom + 0xac, 4);
     game_code[4] = '\0';
 
-    if (strcmp(game_code, "ALUE") == 0 && strcmp(game_title, "MONKEYBALLJR") == 0) { has_eeprom = true; has_flash = false; has_sram = false; }
+    if (strcmp(game_code, "ALUE") == 0 && strcmp(game_title, "MONKEYBALLJR") == 0) { has_eeprom = true; has_flash = false; has_sram = false; has_rtc = false; }
 }
 
 void gba_reset(bool keep_backup) {
@@ -1501,6 +1506,7 @@ int main(int argc, char **argv) {
         ImGui::Checkbox("Has EEPROM", &has_eeprom);
         ImGui::Checkbox("Has Flash", &has_flash);
         ImGui::Checkbox("Has SRAM", &has_sram);
+        ImGui::Checkbox("Has RTC", &has_rtc);
         ImGui::Checkbox("Skip BIOS", &skip_bios);
 
         static bool sync_to_video = true;
