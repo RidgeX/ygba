@@ -242,6 +242,21 @@ uint32_t open_bus(void) {
     }
 }
 
+uint8_t rom_read_byte(uint32_t address) {
+    if (address > game_rom_mask) return (uint8_t)((uint16_t)(address >> 1) >> 8 * (address & 1));
+    return game_rom[address & game_rom_mask];
+}
+
+uint16_t rom_read_halfword(uint32_t address) {
+    if (address > game_rom_mask) return (uint16_t)(address >> 1);
+    return *(uint16_t *)&game_rom[address & (game_rom_mask & ~1)];
+}
+
+uint32_t rom_read_word(uint32_t address) {
+    if (address > game_rom_mask) return (uint16_t)((address & ~2) >> 1) | (uint16_t)((address | 2) >> 1) << 16;
+    return *(uint32_t *)&game_rom[address & (game_rom_mask & ~3)];
+}
+
 uint8_t memory_read_byte(uint32_t address) {
     if (address < 0x4000) {
         if (r[15] < 0x4000) last_bios_access = address;
@@ -254,7 +269,7 @@ uint8_t memory_read_byte(uint32_t address) {
         return cpu_iwram[address & 0x7fff];
     }
     if (address >= 0x04000000 && address < 0x05000000) {
-        return io_read_byte(address - 0x4000000);
+        return io_read_byte(address & 0x3ffffff);
     }
     if (address >= 0x05000000 && address < 0x06000000) {
         return palette_ram[address & 0x3ff];
@@ -272,9 +287,7 @@ uint8_t memory_read_byte(uint32_t address) {
         return object_ram[address & 0x3ff];
     }
     if (address >= 0x08000000 && address < 0x0e000000) {
-        address &= 0x1ffffff;
-        if (address > game_rom_mask) return (uint8_t)((uint16_t)(address >> 1) >> 8 * (address & 1));
-        return game_rom[address & game_rom_mask];
+        return rom_read_byte(address & 0x1ffffff);
     }
     if (address >= 0x0e000000 && address < 0x10000000) {
         return backup_read_byte(address & 0xffff);
@@ -298,7 +311,7 @@ void memory_write_byte(uint32_t address, uint8_t value) {
         return;
     }
     if (address >= 0x04000000 && address < 0x05000000) {
-        io_write_byte(address - 0x4000000, value);
+        io_write_byte(address & 0x3ffffff, value);
         return;
     }
     if (address >= 0x05000000 && address < 0x06000000) {
@@ -342,7 +355,7 @@ uint16_t memory_read_halfword(uint32_t address) {
         return *(uint16_t *)&cpu_iwram[address & 0x7ffe];
     }
     if (address >= 0x04000000 && address < 0x05000000) {
-        return io_read_halfword((address - 0x4000000) & ~1);
+        return io_read_halfword(address & 0x3fffffe);
     }
     if (address >= 0x05000000 && address < 0x06000000) {
         return *(uint16_t *)&palette_ram[address & 0x3fe];
@@ -360,12 +373,10 @@ uint16_t memory_read_halfword(uint32_t address) {
         return *(uint16_t *)&object_ram[address & 0x3fe];
     }
     if (address >= 0x08000000 && address < 0x0e000000) {
-        if (has_eeprom && game_rom_size <= 0x1000000 && address >= 0x0d000000) {
+        if (has_eeprom && game_rom_size <= 0x1000000 && (address >= 0x0d000000 && address < 0x0e000000)) {
             return eeprom_read_bit();
         }
-        address &= 0x1fffffe;
-        if (address > game_rom_mask) return (uint16_t)(address >> 1);
-        return *(uint16_t *)&game_rom[address & (game_rom_mask & ~1)];
+        return rom_read_halfword(address & 0x1fffffe);
     }
     if (address >= 0x0e000000 && address < 0x10000000) {
         return backup_read_halfword(address & 0xffff);
@@ -389,7 +400,7 @@ void memory_write_halfword(uint32_t address, uint16_t value) {
         return;
     }
     if (address >= 0x04000000 && address < 0x05000000) {
-        io_write_halfword((address - 0x4000000) & ~1, value);
+        io_write_halfword(address & 0x3fffffe, value);
         return;
     }
     if (address >= 0x05000000 && address < 0x06000000) {
@@ -411,7 +422,7 @@ void memory_write_halfword(uint32_t address, uint16_t value) {
         return;
     }
     if (address >= 0x08000000 && address < 0x0e000000) {
-        if (has_eeprom && game_rom_size <= 0x1000000 && address >= 0x0d000000) {
+        if (has_eeprom && game_rom_size <= 0x1000000 && (address >= 0x0d000000 && address < 0x0e000000)) {
             eeprom_write_bit(value);
             return;
         }
@@ -437,7 +448,7 @@ uint32_t memory_read_word(uint32_t address) {
         return *(uint32_t *)&cpu_iwram[address & 0x7ffc];
     }
     if (address >= 0x04000000 && address < 0x05000000) {
-        return io_read_word((address - 0x4000000) & ~3);
+        return io_read_word(address & 0x3fffffc);
     }
     if (address >= 0x05000000 && address < 0x06000000) {
         return *(uint32_t*)&palette_ram[address & 0x3fc];
@@ -455,9 +466,7 @@ uint32_t memory_read_word(uint32_t address) {
         return *(uint32_t *)&object_ram[address & 0x3fc];
     }
     if (address >= 0x08000000 && address < 0x0e000000) {
-        address &= 0x1fffffc;
-        if (address > game_rom_mask) return (uint16_t)((address & ~2) >> 1) | (uint16_t)((address | 2) >> 1) << 16;
-        return *(uint32_t *)&game_rom[address & (game_rom_mask & ~3)];
+        return rom_read_word(address & 0x1fffffc);
     }
     if (address >= 0x0e000000 && address < 0x10000000) {
         return backup_read_word(address & 0xffff);
@@ -481,7 +490,7 @@ void memory_write_word(uint32_t address, uint32_t value) {
         return;
     }
     if (address >= 0x04000000 && address < 0x05000000) {
-        io_write_word((address - 0x4000000) & ~3, value);
+        io_write_word(address & 0x3fffffc, value);
         return;
     }
     if (address >= 0x05000000 && address < 0x06000000) {
@@ -1098,7 +1107,7 @@ void gba_dma_update(uint32_t current_timing) {
         assert(!(cnt & DMA_DRQ));
 
         // EEPROM size autodetect
-        if (game_rom_size <= 0x1000000 && *dst_addr >= 0x0d000000 && *dst_addr < 0x0e000000) {
+        if (has_eeprom && game_rom_size <= 0x1000000 && (*dst_addr >= 0x0d000000 && *dst_addr < 0x0e000000)) {
             if (count == 9 || count == 73) {
                 eeprom_width = 6;
             } else if (count == 17 || count == 81) {
