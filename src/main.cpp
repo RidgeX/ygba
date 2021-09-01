@@ -1420,6 +1420,13 @@ int main(int argc, char **argv) {
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, SCREEN_WIDTH, SCREEN_HEIGHT, 0, GL_RGBA, GL_UNSIGNED_BYTE, screen_pixels);
         glBindTexture(GL_TEXTURE_2D, 0);
 
+        // Screen
+        ImGui::Begin("Screen");
+        ImGui::SliderInt("Scale", &screen_scale, 1, 5);
+        ImVec2 screen_size = ImVec2((float) SCREEN_WIDTH * screen_scale, (float) SCREEN_HEIGHT * screen_scale);
+        ImGui::Image((void *)(intptr_t) screen_texture, screen_size);
+        ImGui::End();
+
         // Debugger
         static char cpsr_flag_text[8];
         static char cpsr_mode_text[11];
@@ -1495,17 +1502,6 @@ int main(int argc, char **argv) {
             ImGui::End();
         }
 
-        // Screen
-        ImGui::Begin("Screen");
-        ImGui::SliderInt("Scale", &screen_scale, 1, 5);
-        ImVec2 screen_size = ImVec2((float) SCREEN_WIDTH * screen_scale, (float) SCREEN_HEIGHT * screen_scale);
-        ImVec2 uv0 = ImVec2(0.0f, 0.0f);
-        ImVec2 uv1 = ImVec2(1.0f, 1.0f);
-        ImVec4 tint_col = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
-        ImVec4 border_col = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
-        ImGui::Image((void *)(intptr_t) screen_texture, screen_size, uv0, uv1, tint_col, border_col);
-        ImGui::End();
-
         // Settings
         ImGui::Begin("Settings");
         ImGui::Checkbox("Has EEPROM", &has_eeprom);
@@ -1522,8 +1518,8 @@ int main(int argc, char **argv) {
         ImGui::Checkbox("Mute audio", &mute_audio);
         SDL_PauseAudioDevice(audio_device, mute_audio ? 1 : 0);
 
-        ImGui::Text("DMA1SAD: %08X", ioreg.dma[1].sad.dw);
-        ImGui::Text("DMA2SAD: %08X", ioreg.dma[2].sad.dw);
+        ImGui::Text("DMA1SAD: %08X", ioreg.dma[1].src_addr);
+        ImGui::Text("DMA2SAD: %08X", ioreg.dma[2].src_addr);
         ImGui::Text("fifo_a_r: %d", ioreg.fifo_a_r);
         ImGui::Text("fifo_a_w: %d", ioreg.fifo_a_w);
         ImGui::Text("fifo_b_r: %d", ioreg.fifo_b_r);
