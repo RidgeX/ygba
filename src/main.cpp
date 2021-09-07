@@ -1169,7 +1169,10 @@ void gba_emulate(void) {
 
 void load_bios(void) {
     FILE *fp = fopen("gba_bios.bin", "rb");
-    assert(fp != NULL);
+    if (fp == NULL) {
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Missing BIOS file", "Failed to open BIOS file 'gba_bios.bin'.", NULL);
+        exit(EXIT_FAILURE);
+    }
     fread(system_rom, 1, sizeof(system_rom), fp);
     fclose(fp);
 }
