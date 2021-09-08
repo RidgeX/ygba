@@ -62,6 +62,9 @@ uint32_t last_bios_access = 0xe4;
 bool skip_bios = false;
 char game_title[13];
 char game_code[5];
+uint8_t game_version = 0;
+uint32_t idle_loop_address = 0;
+uint16_t idle_loop_last_irq = 0;
 
 #define SCREEN_WIDTH  240
 #define SCREEN_HEIGHT 160
@@ -536,6 +539,7 @@ void gba_detect_cartridge_features(void) {
     has_flash = false;
     has_sram = false;
     has_rtc = false;
+    idle_loop_address = 0;
 
     uint8_t *eeprom_v = (uint8_t *) "EEPROM_V";
     match = boyer_moore_matcher(game_rom, game_rom_size, eeprom_v, 8);
@@ -569,8 +573,20 @@ void gba_detect_cartridge_features(void) {
     game_title[12] = '\0';
     memcpy(game_code, game_rom + 0xac, 4);
     game_code[4] = '\0';
+    game_version = game_rom[0xbc];
 
-    if (strcmp(game_code, "ALUE") == 0 && strcmp(game_title, "MONKEYBALLJR") == 0) { has_eeprom = true; has_flash = false; has_sram = false; has_rtc = false; }
+    // Pokemon - Emerald Version (USA, Europe)
+    if (strcmp(game_title, "POKEMON EMER") == 0 && strcmp(game_code, "BPEE") == 0 && game_version == 0) idle_loop_address = 0x80008c6;
+    // Pokemon - FireRed Version (USA)
+    if (strcmp(game_title, "POKEMON FIRE") == 0 && strcmp(game_code, "BPRE") == 0 && game_version == 0) idle_loop_address = 0x80008aa;
+    // Pokemon - FireRed Version (USA, Europe) (Rev 1)
+    if (strcmp(game_title, "POKEMON FIRE") == 0 && strcmp(game_code, "BPRE") == 0 && game_version == 1) idle_loop_address = 0x80008be;
+    // Pokemon - LeafGreen Version (USA)
+    if (strcmp(game_title, "POKEMON LEAF") == 0 && strcmp(game_code, "BPGE") == 0 && game_version == 0) idle_loop_address = 0x80008aa;
+    // Pokemon - LeafGreen Version (USA, Europe) (Rev 1)
+    if (strcmp(game_title, "POKEMON LEAF") == 0 && strcmp(game_code, "BPGE") == 0 && game_version == 1) idle_loop_address = 0x80008be;
+    // Super Monkey Ball Jr. (USA)
+    if (strcmp(game_title, "MONKEYBALLJR") == 0 && strcmp(game_code, "ALUE") == 0 && game_version == 0) has_flash = has_sram = false;
 }
 
 void gba_reset(bool keep_backup) {
@@ -1153,6 +1169,16 @@ void gba_emulate(void) {
         } else {
             if (branch_taken) arm_fill_pipeline();
             if (!halted) cpu_cycles = arm_step();
+        }
+
+        // Idle loop optimization
+        if (idle_loop_address != 0 && idle_loop_address == get_pc()) {
+            bool vblank_raised = (idle_loop_last_irq & INT_VBLANK);
+            bool vblank_handled = !(ioreg.irq.w & INT_VBLANK);
+            if (!(vblank_raised && vblank_handled)) {
+                halted = true;
+            }
+            idle_loop_last_irq = ioreg.irq.w;
         }
 
         if (!branch_taken && (cpsr & PSR_I) == 0 && ioreg.ime.w != 0 && (ioreg.irq.w & ioreg.ie.w) != 0) {
