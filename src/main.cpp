@@ -1147,13 +1147,12 @@ void gba_emulate(void) {
     while (true) {
         int cpu_cycles = 0;
 
-        if (!halted) {
-            if (FLAG_T()) {
-                cpu_cycles = thumb_step();
-            } else {
-                cpu_cycles = arm_step();
-            }
-            assert(cpu_cycles == 1);
+        if (FLAG_T()) {
+            if (branch_taken) thumb_fill_pipeline();
+            if (!halted) cpu_cycles = thumb_step();
+        } else {
+            if (branch_taken) arm_fill_pipeline();
+            if (!halted) cpu_cycles = arm_step();
         }
 
         if (!branch_taken && (cpsr & PSR_I) == 0 && ioreg.ime.w != 0 && (ioreg.irq.w & ioreg.ie.w) != 0) {
@@ -1161,7 +1160,7 @@ void gba_emulate(void) {
             halted = false;
         }
 
-        gba_timer_update(1);
+        gba_timer_update(1);  // FIXME
         gba_ppu_update();
         if (ppu_cycles == 0 || (single_step && cpu_cycles > 0)) break;
     }

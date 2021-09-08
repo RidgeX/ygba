@@ -219,19 +219,15 @@ void arm_disasm(uint32_t address, uint32_t op, char *s) {
     (*handler)(address, op, s);
 }
 
-int arm_step(void) {
-    if (branch_taken) {
-        arm_op = memory_read_word(r[15]);
-        arm_pipeline[0] = memory_read_word(r[15] + 4);
-        arm_pipeline[1] = memory_read_word(r[15] + 8);
-        branch_taken = false;
-        r[15] += 8;
-    } else {
-        arm_op = arm_pipeline[0];
-        arm_pipeline[0] = arm_pipeline[1];
-        arm_pipeline[1] = memory_read_word(r[15]);
-    }
+void arm_fill_pipeline(void) {
+    arm_op = memory_read_word(r[15]);
+    arm_pipeline[0] = memory_read_word(r[15] + 4);
+    arm_pipeline[1] = memory_read_word(r[15] + 8);
+    branch_taken = false;
+    r[15] += 8;
+}
 
+int arm_step(void) {
     uint32_t cond = BITS(arm_op, 28, 31);
     int cycles = 1;
     if (condition_passed(cond)) {
@@ -243,6 +239,9 @@ int arm_step(void) {
 
     if (!branch_taken) {
         r[15] += 4;
+        arm_op = arm_pipeline[0];
+        arm_pipeline[0] = arm_pipeline[1];
+        arm_pipeline[1] = memory_read_word(r[15]);
     }
 
     return cycles;
@@ -255,19 +254,15 @@ void thumb_disasm(uint32_t address, uint16_t op, char *s) {
     (*handler)(address, op, s);
 }
 
-int thumb_step(void) {
-    if (branch_taken) {
-        thumb_op = memory_read_halfword(r[15]);
-        thumb_pipeline[0] = memory_read_halfword(r[15] + 2);
-        thumb_pipeline[1] = memory_read_halfword(r[15] + 4);
-        branch_taken = false;
-        r[15] += 4;
-    } else {
-        thumb_op = thumb_pipeline[0];
-        thumb_pipeline[0] = thumb_pipeline[1];
-        thumb_pipeline[1] = memory_read_halfword(r[15]);
-    }
+void thumb_fill_pipeline(void) {
+    thumb_op = memory_read_halfword(r[15]);
+    thumb_pipeline[0] = memory_read_halfword(r[15] + 2);
+    thumb_pipeline[1] = memory_read_halfword(r[15] + 4);
+    branch_taken = false;
+    r[15] += 4;
+}
 
+int thumb_step(void) {
     uint16_t index = BITS(thumb_op, 8, 15);
     int (*handler)(uint16_t) = thumb_lookup[index];
     assert(handler != NULL);
@@ -275,6 +270,9 @@ int thumb_step(void) {
 
     if (!branch_taken) {
         r[15] += 2;
+        thumb_op = thumb_pipeline[0];
+        thumb_pipeline[0] = thumb_pipeline[1];
+        thumb_pipeline[1] = memory_read_halfword(r[15]);
     }
 
     return cycles;
