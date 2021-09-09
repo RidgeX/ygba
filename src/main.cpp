@@ -56,6 +56,7 @@ bool halted = false;
 int active_dma = -1;
 uint32_t last_bios_access = 0xe4;
 bool skip_bios = false;
+char *save_path = NULL;
 char game_title[13];
 char game_code[5];
 uint8_t game_version = 0;
@@ -615,13 +616,56 @@ void gba_reset(bool keep_backup) {
     }
 }
 
-void gba_load(const char *filename) {
-    gba_reset(false);
+void read_save_file(void) {
+    SDL_RWops *rw = SDL_RWFromFile(save_path, "rb");
+    if (rw == NULL) return;
 
+    if (has_eeprom) {
+        SDL_RWread(rw, backup_eeprom, sizeof(backup_eeprom), 1);
+    } else if (has_flash) {
+        SDL_RWread(rw, backup_flash, sizeof(backup_flash), 1);
+    } else if (has_sram) {
+        SDL_RWread(rw, backup_sram, sizeof(backup_sram), 1);
+    }
+
+    SDL_RWclose(rw);
+}
+
+void write_save_file(void) {
+    if (!has_eeprom && !has_flash && !has_sram) return;
+
+    SDL_RWops *rw = SDL_RWFromFile(save_path, "wb");
+    if (rw == NULL) return;
+
+    if (has_eeprom) {
+        SDL_RWwrite(rw, backup_eeprom, sizeof(backup_eeprom), 1);
+    } else if (has_flash) {
+        SDL_RWwrite(rw, backup_flash, sizeof(backup_flash), 1);
+    } else if (has_sram) {
+        SDL_RWwrite(rw, backup_sram, sizeof(backup_sram), 1);
+    }
+
+    SDL_RWclose(rw);
+}
+
+void load_bios_file(void) {
+    SDL_RWops *rw = SDL_RWFromFile("gba_bios.bin", "rb");
+    if (rw == NULL) {
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Missing BIOS file", "Failed to open BIOS file 'gba_bios.bin'.", NULL);
+        exit(EXIT_FAILURE);
+    }
+
+    SDL_RWread(rw, system_rom, sizeof(system_rom), 1);
+
+    SDL_RWclose(rw);
+}
+
+void load_rom_file(const char *rom_path) {
     memset(game_rom, 0, sizeof(game_rom));
 
-    SDL_RWops *rw = SDL_RWFromFile(filename, "rb");
-    assert(rw != NULL);
+    SDL_RWops *rw = SDL_RWFromFile(rom_path, "rb");
+    if (rw == NULL) return;
+
     SDL_RWseek(rw, 0, RW_SEEK_END);
     game_rom_size = SDL_RWtell(rw);
     assert(game_rom_size != 0);
@@ -630,9 +674,26 @@ void gba_load(const char *filename) {
     if (game_rom_size <= sizeof(game_rom)) {
         SDL_RWread(rw, game_rom, game_rom_size, 1);
     }
-    SDL_RWclose(rw);
 
+    SDL_RWclose(rw);
+}
+
+void gba_load(const char *rom_path) {
+    if (strstr(rom_path, ".gba") == NULL) return;
+
+    if (save_path != NULL) {
+        write_save_file();
+        free(save_path);
+    }
+    save_path = strdup(rom_path);
+    char *p_ext = strstr(save_path, ".gba");
+    *p_ext = '\0';
+    strcat(save_path, ".sav");
+
+    gba_reset(false);
+    load_rom_file(rom_path);
     gba_detect_cartridge_features();
+    read_save_file();
 }
 
 uint32_t rgb555(uint32_t pixel) {
@@ -1188,28 +1249,17 @@ void gba_emulate(void) {
     }
 }
 
-void load_bios(void) {
-    SDL_RWops *rw = SDL_RWFromFile("gba_bios.bin", "rb");
-    if (rw == NULL) {
-        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Missing BIOS file", "Failed to open BIOS file 'gba_bios.bin'.", NULL);
-        exit(EXIT_FAILURE);
-    }
-    SDL_RWread(rw, system_rom, sizeof(system_rom), 1);
-    SDL_RWclose(rw);
-}
-
 // Main code
 int main(int argc, char **argv) {
     arm_init_lookup();
     thumb_init_lookup();
 
-    load_bios();
+    load_bios_file();
+    gba_reset(false);
 
     if (argc == 2) {
         skip_bios = true;
         gba_load(argv[1]);
-    } else {
-        gba_reset(false);
     }
 
     // Setup SDL
@@ -1552,34 +1602,8 @@ int main(int argc, char **argv) {
         if (ImGui::Button("Reset")) {
             gba_reset(true);
         }
-        if (ImGui::Button("Load")) {
-            SDL_RWops *rw = SDL_RWFromFile("save.bin", "rb");
-            assert(rw != NULL);
-            if (has_eeprom) {
-                SDL_RWread(rw, backup_eeprom, sizeof(backup_eeprom), 1);
-            }
-            if (has_flash) {
-                SDL_RWread(rw, backup_flash, sizeof(backup_flash), 1);
-            }
-            if (has_sram) {
-                SDL_RWread(rw, backup_sram, sizeof(backup_sram), 1);
-            }
-            SDL_RWclose(rw);
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Save")) {
-            SDL_RWops *rw = SDL_RWFromFile("save.bin", "wb");
-            assert(rw != NULL);
-            if (has_eeprom) {
-                SDL_RWwrite(rw, backup_eeprom, sizeof(backup_eeprom), 1);
-            }
-            if (has_flash) {
-                SDL_RWwrite(rw, backup_flash, sizeof(backup_flash), 1);
-            }
-            if (has_sram) {
-                SDL_RWwrite(rw, backup_sram, sizeof(backup_sram), 1);
-            }
-            SDL_RWclose(rw);
+        if (ImGui::Button("Manual save")) {
+            write_save_file();
         }
         ImGui::End();
 
@@ -1590,6 +1614,10 @@ int main(int argc, char **argv) {
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         SDL_GL_SwapWindow(window);
+    }
+
+    if (save_path != NULL) {
+        write_save_file();
     }
 
     // Cleanup
