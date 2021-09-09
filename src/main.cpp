@@ -1,10 +1,6 @@
 // Copyright (c) 2021 Ridge Shrubsall
 // SPDX-License-Identifier: BSD-3-Clause
 
-#ifdef WIN32
-#define _CRT_SECURE_NO_WARNINGS
-#endif
-
 #include "imgui.h"
 #include "imgui_impl_sdl.h"
 #include "imgui_impl_opengl3.h"
@@ -624,17 +620,17 @@ void gba_load(const char *filename) {
 
     memset(game_rom, 0, sizeof(game_rom));
 
-    FILE *fp = fopen(filename, "rb");
-    assert(fp != NULL);
-    fseek(fp, 0, SEEK_END);
-    game_rom_size = ftell(fp);
+    SDL_RWops *rw = SDL_RWFromFile(filename, "rb");
+    assert(rw != NULL);
+    SDL_RWseek(rw, 0, RW_SEEK_END);
+    game_rom_size = SDL_RWtell(rw);
     assert(game_rom_size != 0);
     game_rom_mask = next_power_of_2(game_rom_size) - 1;
-    fseek(fp, 0, SEEK_SET);
+    SDL_RWseek(rw, 0, RW_SEEK_SET);
     if (game_rom_size <= sizeof(game_rom)) {
-        fread(game_rom, 1, game_rom_size, fp);
+        SDL_RWread(rw, game_rom, game_rom_size, 1);
     }
-    fclose(fp);
+    SDL_RWclose(rw);
 
     gba_detect_cartridge_features();
 }
@@ -1193,13 +1189,13 @@ void gba_emulate(void) {
 }
 
 void load_bios(void) {
-    FILE *fp = fopen("gba_bios.bin", "rb");
-    if (fp == NULL) {
+    SDL_RWops *rw = SDL_RWFromFile("gba_bios.bin", "rb");
+    if (rw == NULL) {
         SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Missing BIOS file", "Failed to open BIOS file 'gba_bios.bin'.", NULL);
         exit(EXIT_FAILURE);
     }
-    fread(system_rom, 1, sizeof(system_rom), fp);
-    fclose(fp);
+    SDL_RWread(rw, system_rom, sizeof(system_rom), 1);
+    SDL_RWclose(rw);
 }
 
 // Main code
@@ -1557,33 +1553,33 @@ int main(int argc, char **argv) {
             gba_reset(true);
         }
         if (ImGui::Button("Load")) {
-            FILE *fp = fopen("save.bin", "rb");
-            assert(fp != NULL);
+            SDL_RWops *rw = SDL_RWFromFile("save.bin", "rb");
+            assert(rw != NULL);
             if (has_eeprom) {
-                fread(backup_eeprom, 1, sizeof(backup_eeprom), fp);
+                SDL_RWread(rw, backup_eeprom, sizeof(backup_eeprom), 1);
             }
             if (has_flash) {
-                fread(backup_flash, 1, sizeof(backup_flash), fp);
+                SDL_RWread(rw, backup_flash, sizeof(backup_flash), 1);
             }
             if (has_sram) {
-                fread(backup_sram, 1, sizeof(backup_sram), fp);
+                SDL_RWread(rw, backup_sram, sizeof(backup_sram), 1);
             }
-            fclose(fp);
+            SDL_RWclose(rw);
         }
         ImGui::SameLine();
         if (ImGui::Button("Save")) {
-            FILE *fp = fopen("save.bin", "wb");
-            assert(fp != NULL);
+            SDL_RWops *rw = SDL_RWFromFile("save.bin", "wb");
+            assert(rw != NULL);
             if (has_eeprom) {
-                fwrite(backup_eeprom, 1, sizeof(backup_eeprom), fp);
+                SDL_RWwrite(rw, backup_eeprom, sizeof(backup_eeprom), 1);
             }
             if (has_flash) {
-                fwrite(backup_flash, 1, sizeof(backup_flash), fp);
+                SDL_RWwrite(rw, backup_flash, sizeof(backup_flash), 1);
             }
             if (has_sram) {
-                fwrite(backup_sram, 1, sizeof(backup_sram), fp);
+                SDL_RWwrite(rw, backup_sram, sizeof(backup_sram), 1);
             }
-            fclose(fp);
+            SDL_RWclose(rw);
         }
         ImGui::End();
 
