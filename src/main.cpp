@@ -516,17 +516,19 @@ void gba_draw_obj(uint16_t mode, int pri, int y) {
 
         int row = y - oy;
         int row_vflip = oh - 1 - row;
-        if (colors_256) tile_no /= 2;
-        int tile_ptr = tile_no + ((vflip ? row_vflip : row) / 8) * (obj_1d ? (ow / 8) : (colors_256 ? 16 : 32));
-        if (hflip) tile_ptr += (ow / 8) - 1;
+        int stride = (obj_1d ? ow / 8 : 32);
+        int increment = (colors_256 ? 2 : 1);
+
+        int tile_ptr = tile_no + ((vflip ? row_vflip : row) / 8) * stride * increment;
+        if (hflip) tile_ptr += (stride - 1) * increment;
         tile_ptr &= 0x3ff;
         for (int x = ox; x < ox + ow; x += 8) {
-            uint32_t tile_address = 0x10000 + tile_ptr * (colors_256 ? 64 : 32);
+            uint32_t tile_address = 0x10000 + tile_ptr * 32;
             if (!bitmap_mode || tile_ptr >= 512) {
                 gba_draw_tile(4, tile_address, x, y, 0, row, hflip, vflip, palette_no, colors_256, true);
             }
-            if (!hflip) tile_ptr++;
-            else tile_ptr--;
+            if (!hflip) tile_ptr += increment;
+            else tile_ptr -= increment;
             tile_ptr &= 0x3ff;
         }
     }
