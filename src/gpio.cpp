@@ -5,7 +5,7 @@
 #include <time.h>
 
 #include "gpio.h"
-#include "main.h"
+#include "memory.h"
 
 bool has_rtc = false;
 

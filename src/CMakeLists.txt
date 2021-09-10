@@ -13,6 +13,8 @@ add_executable(ygba WIN32
     io.h
     main.cpp
     main.h
+    memory.cpp
+    memory.h
 )
 
 target_link_libraries(ygba PRIVATE imgui SDL2::SDL2 SDL2::SDL2main)
