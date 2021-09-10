@@ -516,7 +516,7 @@ void gba_draw_obj(uint16_t mode, int pri, int y) {
 
         int row = y - oy;
         int row_vflip = oh - 1 - row;
-        int stride = (obj_1d ? ow / 8 : 32);
+        int stride = (obj_1d ? (ow / 8) : (colors_256 ? 16 : 32));
         int increment = (colors_256 ? 2 : 1);
 
         int tile_ptr = tile_no + ((vflip ? row_vflip : row) / 8) * stride * increment;
