@@ -15,4 +15,4 @@ add_executable(ygba WIN32
     main.h
 )
 
-target_link_libraries(ygba PRIVATE gl3w imgui SDL2::SDL2 SDL2::SDL2main)
+target_link_libraries(ygba PRIVATE imgui SDL2::SDL2 SDL2::SDL2main)

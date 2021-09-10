@@ -7,33 +7,9 @@
 #include "imgui_memory_editor.h"
 #include <stdio.h>
 #include <SDL.h>
-
+#include <SDL_opengl.h>
 #if defined(IMGUI_IMPL_OPENGL_ES2)
-#include <GLES2/gl2.h>
-// About Desktop OpenGL function loaders:
-//  Modern desktop OpenGL doesn't have a standard portable header file to load OpenGL function pointers.
-//  Helper libraries are often used for this purpose! Here we are supporting a few common ones (gl3w, glew, glad).
-//  You may use another loader/header of your choice (glext, glLoadGen, etc.), or choose to manually implement your own.
-#elif defined(IMGUI_IMPL_OPENGL_LOADER_GL3W)
-#include <GL/gl3w.h>  // Initialize with gl3wInit()
-#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLEW)
-#include <GL/glew.h>  // Initialize with glewInit()
-#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLAD)
-#include <glad/glad.h>  // Initialize with gladLoadGL()
-#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLAD2)
-#include <glad/gl.h>  // Initialize with gladLoadGL(...) or gladLoaderLoadGL()
-#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLBINDING2)
-#define GLFW_INCLUDE_NONE  // GLFW including OpenGL headers causes ambiguity or multiple definition errors.
-#include <glbinding/Binding.h>  // Initialize with glbinding::Binding::initialize()
-#include <glbinding/gl/gl.h>
-using namespace gl;
-#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLBINDING3)
-#define GLFW_INCLUDE_NONE  // GLFW including OpenGL headers causes ambiguity or multiple definition errors.
-#include <glbinding/glbinding.h>  // Initialize with glbinding::initialize()
-#include <glbinding/gl/gl.h>
-using namespace gl;
-#else
-#include IMGUI_IMPL_OPENGL_LOADER_CUSTOM
+#include <SDL_opengles2.h>
 #endif
 
 #include <assert.h>
@@ -1325,28 +1301,6 @@ int main(int argc, char **argv) {
         }
     }
 
-    // Initialize OpenGL loader
-#if defined(IMGUI_IMPL_OPENGL_LOADER_GL3W)
-    bool err = gl3wInit() != 0;
-#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLEW)
-    bool err = glewInit() != GLEW_OK;
-#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLAD)
-    bool err = gladLoadGL() == 0;
-#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLAD2)
-    bool err = gladLoadGL((GLADloadfunc) SDL_GL_GetProcAddress) == 0;  // glad2 recommend using the windowing library loader instead of the (optionally) bundled one.
-#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLBINDING2)
-    bool err = false;
-    glbinding::Binding::initialize();
-#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLBINDING3)
-    bool err = false;
-    glbinding::initialize([](const char *name) { return (glbinding::ProcAddress) SDL_GL_GetProcAddress(name); });
-#else
-    bool err = false;  // If you use IMGUI_IMPL_OPENGL_LOADER_CUSTOM, your loader is likely to require some form of initialization.
-#endif
-    if (err) {
-        SDL_Log("Failed to initialize OpenGL loader");
-        exit(EXIT_FAILURE);
-    }
     SDL_Log("OpenGL version: %s", (char *) glGetString(GL_VERSION));
 
     // Create textures
@@ -1412,7 +1366,7 @@ int main(int argc, char **argv) {
 
         // Start the Dear ImGui frame
         ImGui_ImplOpenGL3_NewFrame();
-        ImGui_ImplSDL2_NewFrame(window);
+        ImGui_ImplSDL2_NewFrame();
         ImGui::NewFrame();
 
         // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).

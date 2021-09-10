@@ -46,6 +46,5 @@ endforeach()
 find_package(Freetype REQUIRED)
 find_package(SDL2 REQUIRED)
 
-add_subdirectory(lib/gl3w)
 add_subdirectory(lib/imgui)
 add_subdirectory(src)
