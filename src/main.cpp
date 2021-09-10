@@ -520,7 +520,7 @@ void gba_draw_obj(uint16_t mode, int pri, int y) {
         int increment = (colors_256 ? 2 : 1);
 
         int tile_ptr = tile_no + ((vflip ? row_vflip : row) / 8) * stride * increment;
-        if (hflip) tile_ptr += (stride - 1) * increment;
+        if (hflip) tile_ptr += ((ow / 8) - 1) * increment;
         tile_ptr &= 0x3ff;
         for (int x = ox; x < ox + ow; x += 8) {
             uint32_t tile_address = 0x10000 + tile_ptr * 32;
