@@ -1513,7 +1513,7 @@ int main(int argc, char **argv) {
                         ImGui::TableNextColumn();
                         arm_disasm(address, op, disasm_text);
                     }
-                    ImGui::Text(disasm_text);
+                    ImGui::Text("%s", disasm_text);
                 }
                 ImGui::EndTable();
             }

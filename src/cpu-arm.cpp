@@ -310,6 +310,9 @@ int arm_data_processing_immediate(uint32_t op) {
 }
 
 void arm_load_store_word_or_byte_register_disasm(uint32_t address, uint32_t op, char *s) {
+    UNUSED(address);
+    UNUSED(op);
+
     strcpy(s, "???");
 }
 
@@ -360,6 +363,9 @@ int arm_load_store_word_or_byte_register(uint32_t op) {
 }
 
 void arm_load_store_word_or_byte_immediate_disasm(uint32_t address, uint32_t op, char *s) {
+    UNUSED(address);
+    UNUSED(op);
+
     strcpy(s, "???");
 }
 
@@ -652,6 +658,9 @@ int arm_multiply_long(uint32_t op) {
 }
 
 void arm_load_store_halfword_register_disasm(uint32_t address, uint32_t op, char *s) {
+    UNUSED(address);
+    UNUSED(op);
+
     strcpy(s, "???");
 }
 
@@ -691,6 +700,9 @@ int arm_load_store_halfword_register(uint32_t op) {
 }
 
 void arm_load_store_halfword_immediate_disasm(uint32_t address, uint32_t op, char *s) {
+    UNUSED(address);
+    UNUSED(op);
+
     strcpy(s, "???");
 }
 
@@ -727,6 +739,9 @@ int arm_load_store_halfword_immediate(uint32_t op) {
 }
 
 void arm_load_signed_halfword_or_signed_byte_register_disasm(uint32_t address, uint32_t op, char *s) {
+    UNUSED(address);
+    UNUSED(op);
+
     strcpy(s, "???");
 }
 
@@ -777,6 +792,9 @@ int arm_load_signed_halfword_or_signed_byte_register(uint32_t op) {
 }
 
 void arm_load_signed_halfword_or_signed_byte_immediate_disasm(uint32_t address, uint32_t op, char *s) {
+    UNUSED(address);
+    UNUSED(op);
+
     strcpy(s, "???");
 }
 
