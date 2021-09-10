@@ -5,7 +5,7 @@
 #include "imgui_impl_sdl.h"
 #include "imgui_impl_opengl3.h"
 #include "imgui_memory_editor.h"
-#include <stdio.h>
+
 #include <SDL.h>
 #include <SDL_opengl.h>
 #if defined(IMGUI_IMPL_OPENGL_ES2)
@@ -13,8 +13,7 @@
 #endif
 
 #include <assert.h>
-#include <stdbool.h>
-#include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "algorithms.h"

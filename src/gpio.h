@@ -4,6 +4,8 @@
 #ifndef GPIO_H
 #define GPIO_H
 
+#include <stdint.h>
+
 // Real-time clock (Seiko S-3511A)
 #define RTC_SCK       1
 #define RTC_SIO       2

@@ -4,6 +4,9 @@
 #ifndef MAIN_H
 #define MAIN_H
 
+#include <stdbool.h>
+#include <stdint.h>
+
 #define DCNT_GB         (1 << 3)
 #define DCNT_PAGE       (1 << 4)
 #define DCNT_OAM_HBL    (1 << 5)

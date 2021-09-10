@@ -1,7 +1,6 @@
 // Copyright (c) 2021 Ridge Shrubsall
 // SPDX-License-Identifier: BSD-3-Clause
 
-#include <stdint.h>
 #include <stdio.h>
 
 #include "io.h"

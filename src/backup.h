@@ -4,6 +4,9 @@
 #ifndef BACKUP_H
 #define BACKUP_H
 
+#include <stdbool.h>
+#include <stdint.h>
+
 #define MANUFACTURER_ATMEL     0x1f
 #define DEVICE_AT29LV512       0x3d  // 512 Kbit
 

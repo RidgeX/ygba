@@ -4,6 +4,9 @@
 #ifndef CPU_H
 #define CPU_H
 
+#include <stdbool.h>
+#include <stdint.h>
+
 #define UNUSED(x) (void)(x)
 
 #define BIT(x, i) (((x) >> (i)) & 1)
