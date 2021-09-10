@@ -177,10 +177,10 @@ SDL_AudioDeviceID gba_audio_init(void) {
 }
 
 void gba_check_keypad_interrupt(void) {
-    if (ioreg.keycnt.w & 0x4000) {
+    if (BIT(ioreg.keycnt.w, 14)) {
         uint16_t held = ~ioreg.keyinput.w & 0x3ff;
         uint16_t mask = ioreg.keycnt.w & 0x3ff;
-        if (ioreg.keycnt.w & 0x8000) {
+        if (BIT(ioreg.keycnt.w, 15)) {
             if ((held & mask) == mask) {  // All keys held
                 ioreg.irq.w |= INT_BUTTON;
             }
@@ -397,9 +397,9 @@ void gba_draw_blank(int y, bool forced_blank) {
 void gba_draw_pixel_culled(int bg, int x, int y, uint32_t pixel) {
     if (x < 0 || x >= SCREEN_WIDTH) return;
 
-    bool enable_win0 = (ioreg.dispcnt.w & DCNT_WIN0) != 0;
-    bool enable_win1 = (ioreg.dispcnt.w & DCNT_WIN1) != 0;
-    bool enable_winobj = (ioreg.dispcnt.w & DCNT_WINOBJ) != 0;
+    bool enable_win0 = (ioreg.dispcnt.w & DCNT_WIN0);
+    bool enable_win1 = (ioreg.dispcnt.w & DCNT_WIN1);
+    bool enable_winobj = (ioreg.dispcnt.w & DCNT_WINOBJ);
     bool enable_winout = (enable_win0 || enable_win1 || enable_winobj);
 
     bool inside_win0 = (enable_win0 && is_point_in_window(x, y, win0));
@@ -407,13 +407,13 @@ void gba_draw_pixel_culled(int bg, int x, int y, uint32_t pixel) {
     bool inside_winobj = false;  // FIXME
 
     if (inside_win0) {
-        if ((ioreg.winin.w & (1 << bg)) == 0) return;
+        if (!BIT(ioreg.winin.w, bg)) return;
     } else if (inside_win1) {
-        if ((ioreg.winin.w & (1 << (8 + bg))) == 0) return;
+        if (!BIT(ioreg.winin.w, 8 + bg)) return;
     } else if (inside_winobj) {
-        if ((ioreg.winout.w & (1 << (8 + bg))) == 0) return;
+        if (!BIT(ioreg.winout.w, 8 + bg)) return;
     } else if (enable_winout) {
-        if ((ioreg.winout.w & (1 << bg)) == 0) return;
+        if (!BIT(ioreg.winout.w, bg)) return;
     }
 
     screen_pixels[y][x] = rgb555(pixel);
@@ -458,22 +458,22 @@ void gba_draw_obj(uint16_t mode, int pri, int y) {
         uint16_t attr1 = *(uint16_t *)&object_ram[(n * 4 + 1) * 2];
         uint16_t attr2 = *(uint16_t *)&object_ram[(n * 4 + 2) * 2];
 
-        int oy = attr0 & 0xff;
-        int obj_mode = (attr0 >> 8) & 3;
-        //int gfx_mode = (attr0 >> 10) & 3;
-        //bool mosaic = (attr0 & (1 << 12)) != 0;
-        bool colors_256 = (attr0 & (1 << 13)) != 0;
-        int shape = (attr0 >> 14) & 3;
+        int oy = BITS(attr0, 0, 7);
+        int obj_mode = BITS(attr0, 8, 9);
+        //int gfx_mode = BITS(attr0, 10, 11);
+        //bool mosaic = BIT(attr0, 12);
+        bool colors_256 = BIT(attr0, 13);
+        int shape = BITS(attr0, 14, 15);
 
-        int ox = attr1 & 0x1ff;
-        //int aff_index = (attr1 >> 9) & 0x1f;
-        bool hflip = (attr1 & (1 << 12)) != 0;
-        bool vflip = (attr1 & (1 << 13)) != 0;
-        int size = (attr1 >> 14) & 3;
+        int ox = BITS(attr1, 0, 8);
+        //int aff_index = BITS(attr1, 9, 13);
+        bool hflip = BIT(attr1, 12);
+        bool vflip = BIT(attr1, 13);
+        int size = BITS(attr1, 14, 15);
 
-        int tile_no = attr2 & 0x3ff;
-        int priority = (attr2 >> 10) & 3;
-        int palette_no = (attr2 >> 12) & 0xf;
+        int tile_no = BITS(attr2, 0, 9);
+        int priority = BITS(attr2, 10, 11);
+        int palette_no = BITS(attr2, 12, 15);
 
         int ow = 8;
         int oh = 8;
@@ -509,7 +509,7 @@ void gba_draw_obj(uint16_t mode, int pri, int y) {
         }
 
         bool bitmap_mode = (mode >= 3 && mode <= 5);
-        bool obj_1d = (ioreg.dispcnt.w & DCNT_OBJ_1D) != 0;
+        bool obj_1d = (ioreg.dispcnt.w & DCNT_OBJ_1D);
 
         if (obj_mode == 2 || priority != pri) continue;
         if (y < oy || y >= oy + oh) continue;
@@ -546,7 +546,7 @@ void gba_draw_bitmap(uint16_t mode, int y) {
                 pixel = *(uint16_t *)&palette_ram[0];
             }
         } else if (mode == 4) {
-            bool pflip = (ioreg.dispcnt.w & DCNT_PAGE) != 0;
+            bool pflip = (ioreg.dispcnt.w & DCNT_PAGE);
             uint8_t pixel_index = video_ram[(pflip ? 0xa000 : 0) + y * SCREEN_WIDTH + x];
             pixel = *(uint16_t *)&palette_ram[pixel_index * 2];
         }
@@ -566,11 +566,11 @@ void gba_draw_tiled_bg(uint16_t mode, int bg, int y) {
     int hofs = ioreg.bg_text[bg].x.w;
     int vofs = ioreg.bg_text[bg].y.w;
 
-    uint32_t tile_base = ((bgcnt >> 2) & 3) * 16384;
-    uint32_t map_base = ((bgcnt >> 8) & 0x1f) * 2048;
-    bool overflow_wraps = (bgcnt & (1 << 13)) != 0;
-    uint32_t screen_size = (bgcnt >> 14) & 3;
-    bool colors_256 = (bgcnt & (1 << 7)) != 0;
+    uint32_t tile_base = BITS(bgcnt, 2, 3) * 0x4000;
+    uint32_t map_base = BITS(bgcnt, 8, 12) * 0x800;
+    bool overflow_wraps = BIT(bgcnt, 13);
+    uint32_t screen_size = BITS(bgcnt, 14, 15);
+    bool colors_256 = BIT(bgcnt, 7);
 
     bool is_affine = ((mode == 1 && bg == 2) || (mode == 2 && (bg == 2 || bg == 3)));
     if (is_affine) colors_256 = true;
@@ -625,10 +625,10 @@ void gba_draw_tiled_bg(uint16_t mode, int bg, int y) {
             int quad_y = 32 * 32 * (screen_size == 3 ? 2 : 1);
             uint32_t map_index = (map_y / 32) * quad_y + (map_x / 32) * quad_x + (map_y % 32) * 32 + (map_x % 32);
             uint16_t info = *(uint16_t *)&video_ram[map_base + map_index * 2];
-            tile_no = info & 0x3ff;
-            hflip = (info & (1 << 10)) != 0;
-            vflip = (info & (1 << 11)) != 0;
-            palette_no = (info >> 12) & 0xf;
+            tile_no = BITS(info, 0, 9);
+            hflip = BIT(info, 10);
+            vflip = BIT(info, 11);
+            palette_no = BITS(info, 12, 15);
         }
 
         if (tile_no == -1) continue;
@@ -641,13 +641,13 @@ void gba_draw_tiled_bg(uint16_t mode, int bg, int y) {
 void gba_draw_tiled(uint16_t mode, int y) {
     for (int pri = 3; pri >= 0; pri--) {
         for (int bg = 3; bg >= 0; bg--) {
-            bool bg_visible = (ioreg.dispcnt.w & (1 << (8 + bg))) != 0;
+            bool bg_visible = BIT(ioreg.dispcnt.w, 8 + bg);
             if (!bg_visible) continue;
-            uint16_t priority = ioreg.bgcnt[bg].w & 3;
+            uint16_t priority = BITS(ioreg.bgcnt[bg].w, 0, 1);
             if (priority != pri) continue;
             gba_draw_tiled_bg(mode, bg, y);
         }
-        bool obj_visible = (ioreg.dispcnt.w & DCNT_OBJ) != 0;
+        bool obj_visible = (ioreg.dispcnt.w & DCNT_OBJ);
         if (!obj_visible) continue;
         gba_draw_obj(mode, pri, y);
     }
@@ -663,11 +663,11 @@ void gba_draw_scanline(void) {
     win1.bottom = ioreg.winv[1].b.b0;
     win1.top = ioreg.winv[1].b.b1;
 
-    bool forced_blank = (ioreg.dispcnt.w & DCNT_BLANK) != 0;
+    bool forced_blank = (ioreg.dispcnt.w & DCNT_BLANK);
     gba_draw_blank(ioreg.vcount.w, forced_blank);
     if (forced_blank) return;
 
-    uint16_t mode = ioreg.dispcnt.w & 7;
+    uint16_t mode = BITS(ioreg.dispcnt.w, 0, 2);
     switch (mode) {
         case 0:
         case 1:
@@ -698,20 +698,20 @@ void gba_ppu_update(void) {
         ioreg.vcount.w = (ioreg.vcount.w + 1) % 228;
         if (ioreg.vcount.w == 227) {
             ioreg.dispstat.w &= ~DSTAT_IN_VBL;
-        } else if (ioreg.vcount.w == 161) {
-            if ((ioreg.dispstat.w & DSTAT_VBL_IRQ) != 0) {
+        } else if (ioreg.vcount.w == 161) {  // FIXME
+            if (ioreg.dispstat.w & DSTAT_VBL_IRQ) {
                 ioreg.irq.w |= INT_VBLANK;
             }
         } else if (ioreg.vcount.w == 160) {
-            if ((ioreg.dispstat.w & DSTAT_IN_VBL) == 0) {
+            if (!(ioreg.dispstat.w & DSTAT_IN_VBL)) {
                 ioreg.dispstat.w |= DSTAT_IN_VBL;
                 gba_dma_update(DMA_AT_VBLANK);
             }
         }
         if (ioreg.vcount.w == ioreg.dispstat.b.b1) {
-            if ((ioreg.dispstat.w & DSTAT_IN_VCT) == 0) {
+            if (!(ioreg.dispstat.w & DSTAT_IN_VCT)) {
                 ioreg.dispstat.w |= DSTAT_IN_VCT;
-                if ((ioreg.dispstat.w & DSTAT_VCT_IRQ) != 0) {
+                if (ioreg.dispstat.w & DSTAT_VCT_IRQ) {
                     ioreg.irq.w |= INT_VCOUNT;
                 }
             }
@@ -721,9 +721,9 @@ void gba_ppu_update(void) {
     }
     ppu_cycles = (ppu_cycles + 1) % 280896;
     if (ppu_cycles % 1232 == 1006) {
-        if ((ioreg.dispstat.w & DSTAT_IN_HBL) == 0) {
+        if (!(ioreg.dispstat.w & DSTAT_IN_HBL)) {
             ioreg.dispstat.w |= DSTAT_IN_HBL;
-            if ((ioreg.dispstat.w & DSTAT_HBL_IRQ) != 0) {
+            if (ioreg.dispstat.w & DSTAT_HBL_IRQ) {
                 ioreg.irq.w |= INT_HBLANK;
             }
             if (ppu_cycles < 197120) {
@@ -846,7 +846,7 @@ void gba_dma_update(uint32_t current_timing) {
         uint32_t dst_ctrl = BITS(cnt, 21, 22);
         uint32_t src_ctrl = BITS(cnt, 23, 24);
         if (*src_addr >= 0x08000000 && *src_addr < 0x0e000000) src_ctrl = DMA_INC;
-        bool word_size = cnt & DMA_32;
+        bool word_size = (cnt & DMA_32);
 
         if (start_timing == DMA_AT_VBLANK) assert(ioreg.vcount.w == 160);
         if (start_timing == DMA_AT_HBLANK) assert(ppu_cycles < 197120 && ppu_cycles % 1232 == 1006);
@@ -918,7 +918,7 @@ void gba_emulate(void) {
             idle_loop_last_irq = ioreg.irq.w;
         }
 
-        if (!branch_taken && (cpsr & PSR_I) == 0 && ioreg.ime.w != 0 && (ioreg.irq.w & ioreg.ie.w) != 0) {
+        if (!branch_taken && !(cpsr & PSR_I) && ioreg.ime.w && (ioreg.irq.w & ioreg.ie.w)) {
             arm_hardware_interrupt();
             halted = false;
         }
@@ -1120,8 +1120,8 @@ int main(int argc, char **argv) {
         keys[8] |= (bool) key_state[SDL_SCANCODE_S];          // Button R
         keys[9] |= (bool) key_state[SDL_SCANCODE_A];          // Button L
         if (game_controller != NULL) {
-            keys[0] |= (bool) SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_B);              // Button A
-            keys[1] |= (bool) SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_A);              // Button B
+            keys[0] |= (bool) SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_A);              // Button A
+            keys[1] |= (bool) SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_B);              // Button B
             keys[2] |= (bool) SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_BACK);           // Select
             keys[3] |= (bool) SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_START);          // Start
             keys[4] |= (bool) SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_DPAD_RIGHT);     // Right
