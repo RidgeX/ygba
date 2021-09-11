@@ -512,8 +512,8 @@ void gba_draw_sprites(int mode, int pri, int y) {
 
         int sprite_cx = sprite_width / 2;
         int sprite_cy = sprite_height / 2;
-        int bbox_cx = (bbox_width) / 2;
-        int bbox_cy = (bbox_height) / 2;
+        int bbox_cx = bbox_width / 2;
+        int bbox_cy = bbox_height / 2;
 
         double pa, pb, pc, pd;
         if (is_affine) {
@@ -529,8 +529,8 @@ void gba_draw_sprites(int mode, int pri, int y) {
         }
 
         for (int i = 0; i < bbox_width; i++) {
-            int texture_x = sprite_cx + (int)(pa * (i - bbox_cx) + pb * (y - sprite_y - bbox_cy));
-            int texture_y = sprite_cy + (int)(pc * (i - bbox_cx) + pd * (y - sprite_y - bbox_cy));
+            int texture_x = sprite_cx + floor(pa * (i - bbox_cx) + pb * (y - sprite_y - bbox_cy));
+            int texture_y = sprite_cy + floor(pc * (i - bbox_cx) + pd * (y - sprite_y - bbox_cy));
             uint16_t pixel;
             bool ok = sprite_access(tile_no, texture_x, texture_y, sprite_width, sprite_height, hflip, vflip, colors_256, palette_no, mode, &pixel);
             if (ok) gba_draw_pixel_culled(4, sprite_x + i, y, pixel);
