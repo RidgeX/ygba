@@ -70,9 +70,13 @@ bool is_point_in_window(int x, int y, lcd_window win) {
     return (x_ok && y_ok);
 }
 
+double fixed8p8_to_double(int16_t x) {
+    return (x >> 8) + ((x & 0xff) / 256.0);
+}
+
 double fixed24p8_to_double(uint32_t x) {
     double result = (x >> 8) + ((x & 0xff) / 256.0);
-    if (result > 524288.0) result -= 1048576.0;
+    if (result > 524288.0) result -= 1048576.0;  // FIXME
     return result;
 }
 
@@ -420,8 +424,7 @@ void gba_draw_pixel_culled(int bg, int x, int y, uint32_t pixel) {
 }
 
 bool tile_access(uint32_t tile_address, int x, int y, bool hflip, bool vflip, bool colors_256, uint32_t palette_offset, int palette_no, uint16_t *pixel) {
-    assert(x >= 0 && x < 8);
-    assert(y >= 0 && y < 8);
+    assert(x >= 0 && x < 8 && y >= 0 && y < 8);
 
     if (hflip) x = 7 - x;
     if (vflip) y = 7 - y;
@@ -448,9 +451,8 @@ bool tile_access(uint32_t tile_address, int x, int y, bool hflip, bool vflip, bo
     return false;
 }
 
-bool obj_access(int tile_no, int x, int y, int w, int h, bool hflip, bool vflip, bool colors_256, int palette_no, int mode, uint16_t *pixel) {
-    assert(x >= 0 && x < w);
-    assert(y >= 0 && y < h);
+bool sprite_access(int tile_no, int x, int y, int w, int h, bool hflip, bool vflip, bool colors_256, int palette_no, int mode, uint16_t *pixel) {
+    if (x < 0 || x >= w || y < 0 || y >= h) return false;
 
     if (hflip) x = w - 1 - x;
     if (vflip) y = h - 1 - y;
@@ -467,21 +469,24 @@ bool obj_access(int tile_no, int x, int y, int w, int h, bool hflip, bool vflip,
     return tile_access(0x10000 + tile_no * 32, x % 8, y % 8, false, false, colors_256, 0x200, palette_no, pixel);
 }
 
-void gba_draw_obj(int mode, int pri, int y) {
+int sprite_width_lookup[4][4] = {{8, 16, 32, 64}, {16, 32, 32, 64}, {8, 8, 16, 32}, {8, 8, 8, 8}};
+int sprite_height_lookup[4][4] = {{8, 16, 32, 64}, {8, 8, 16, 32}, {16, 32, 32, 64}, {8, 8, 8, 8}};
+
+void gba_draw_sprites(int mode, int pri, int y) {
     for (int n = 127; n >= 0; n--) {
         uint16_t attr0 = *(uint16_t *)&object_ram[n * 8];
         uint16_t attr1 = *(uint16_t *)&object_ram[n * 8 + 2];
         uint16_t attr2 = *(uint16_t *)&object_ram[n * 8 + 4];
 
-        int oy = BITS(attr0, 0, 7);
+        int sprite_y = BITS(attr0, 0, 7);
         int obj_mode = BITS(attr0, 8, 9);
         //int gfx_mode = BITS(attr0, 10, 11);
         //bool mosaic = BIT(attr0, 12);
         bool colors_256 = BIT(attr0, 13);
         int shape = BITS(attr0, 14, 15);
 
-        int ox = BITS(attr1, 0, 8);
-        //int aff_index = BITS(attr1, 9, 13);
+        int sprite_x = BITS(attr1, 0, 8);
+        int affine_index = BITS(attr1, 9, 13);
         bool hflip = BIT(attr1, 12);
         bool vflip = BIT(attr1, 13);
         int size = BITS(attr1, 14, 15);
@@ -492,45 +497,43 @@ void gba_draw_obj(int mode, int pri, int y) {
 
         if (obj_mode == 2 || priority != pri) continue;
 
-        int ow = 8;
-        int oh = 8;
-        if (shape == 0) {
-            if (size == 0) { ow = 8; oh = 8; }
-            else if (size == 1) { ow = 16; oh = 16; }
-            else if (size == 2) { ow = 32; oh = 32; }
-            else if (size == 3) { ow = 64; oh = 64; }
-        } else if (shape == 1) {
-            if (size == 0) { ow = 16; oh = 8; }
-            else if (size == 1) { ow = 32; oh = 8; }
-            else if (size == 2) { ow = 32; oh = 16; }
-            else if (size == 3) { ow = 64; oh = 32; }
-        } else if (shape == 2) {
-            if (size == 0) { ow = 8; oh = 16; }
-            else if (size == 1) { ow = 8; oh = 32; }
-            else if (size == 2) { ow = 16; oh = 32; }
-            else if (size == 3) { ow = 32; oh = 64; }
-        } else if (shape == 3) {
-            // Fall through
-        }
+        bool is_affine = (obj_mode == 1 || obj_mode == 3);
+        int bbox_scale = (obj_mode == 3 ? 2 : 1);
 
-        if (ox + ow > 511) ox -= 512;
-        if (oy + oh > 255) oy -= 256;
+        int sprite_width = sprite_width_lookup[shape][size];
+        int sprite_height = sprite_height_lookup[shape][size];
+        int bbox_width = sprite_width * bbox_scale;
+        int bbox_height = sprite_height * bbox_scale;
 
-        if (obj_mode == 1 || obj_mode == 3) {
+        if (sprite_x + bbox_width >= 512) sprite_x -= 512;
+        if (sprite_y + bbox_height >= 256) sprite_y -= 256;
+
+        if (y < sprite_y || y >= sprite_y + bbox_height) continue;
+
+        int sprite_cx = sprite_width / 2;
+        int sprite_cy = sprite_height / 2;
+        int bbox_cx = (bbox_width) / 2;
+        int bbox_cy = (bbox_height) / 2;
+
+        double pa, pb, pc, pd;
+        if (is_affine) {
+            pa = fixed8p8_to_double(*(uint16_t *)&object_ram[affine_index * 32 + 6]);
+            pb = fixed8p8_to_double(*(uint16_t *)&object_ram[affine_index * 32 + 14]);
+            pc = fixed8p8_to_double(*(uint16_t *)&object_ram[affine_index * 32 + 22]);
+            pd = fixed8p8_to_double(*(uint16_t *)&object_ram[affine_index * 32 + 30]);
             hflip = false;
             vflip = false;
-        }
-        if (obj_mode == 3) {  // FIXME
-            ox += ow / 2;
-            oy += oh / 2;
+        } else {
+            pa = 1.0; pb = 0.0;
+            pc = 0.0; pd = 1.0;
         }
 
-        if (y < oy || y >= oy + oh) continue;
-
-        for (int i = 0; i < ow; i++) {
+        for (int i = 0; i < bbox_width; i++) {
+            int texture_x = sprite_cx + (int)(pa * (i - bbox_cx) + pb * (y - sprite_y - bbox_cy));
+            int texture_y = sprite_cy + (int)(pc * (i - bbox_cx) + pd * (y - sprite_y - bbox_cy));
             uint16_t pixel;
-            bool ok = obj_access(tile_no, i, y - oy, ow, oh, hflip, vflip, colors_256, palette_no, mode, &pixel);
-            if (ok) gba_draw_pixel_culled(4, ox + i, y, pixel);
+            bool ok = sprite_access(tile_no, texture_x, texture_y, sprite_width, sprite_height, hflip, vflip, colors_256, palette_no, mode, &pixel);
+            if (ok) gba_draw_pixel_culled(4, sprite_x + i, y, pixel);
         }
     }
 }
@@ -555,7 +558,7 @@ void gba_draw_bitmap(int mode, int y) {
     }
 
     for (int pri = 3; pri >= 0; pri--) {
-        gba_draw_obj(mode, pri, y);
+        gba_draw_sprites(mode, pri, y);
     }
 }
 
@@ -658,7 +661,7 @@ void gba_draw_tiled(int mode, int y) {
         }
         bool obj_visible = (ioreg.dispcnt.w & DCNT_OBJ);
         if (!obj_visible) continue;
-        gba_draw_obj(mode, pri, y);
+        gba_draw_sprites(mode, pri, y);
     }
 }
 
