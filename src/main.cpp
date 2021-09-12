@@ -251,6 +251,12 @@ void gba_detect_cartridge_features(void) {
     game_code[4] = '\0';
     game_version = game_rom[0xbc];
 
+    // Advance Wars (USA)
+    if (strcmp(game_title, "ADVANCEWARS")  == 0 && strcmp(game_code, "AWRE") == 0 && game_version == 0) idle_loop_address = 0x80387ec;
+    // Advance Wars (USA) (Rev 1)
+    if (strcmp(game_title, "ADVANCEWARS")  == 0 && strcmp(game_code, "AWRE") == 0 && game_version == 1) idle_loop_address = 0x8038818;
+    // Advance Wars 2 - Black Hole Rising (USA, Australia)
+    if (strcmp(game_title, "ADVANCEWARS2") == 0 && strcmp(game_code, "AW2E") == 0 && game_version == 0) idle_loop_address = 0x8036e0c;
     // Pokemon - Emerald Version (USA, Europe)
     if (strcmp(game_title, "POKEMON EMER") == 0 && strcmp(game_code, "BPEE") == 0 && game_version == 0) idle_loop_address = 0x80008c6;
     // Pokemon - FireRed Version (USA)
