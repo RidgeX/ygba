@@ -160,6 +160,7 @@ uint16_t gpio_read_halfword(uint32_t address) {
             case 0xc4: return gpio_data;
             case 0xc6: return gpio_direction;
             case 0xc8: return gpio_read_enable;
+            default: break;
         }
     }
     return rom_read_halfword(address);
@@ -195,6 +196,9 @@ void gpio_write_halfword(uint32_t address, uint16_t value) {
 
         case 0xc8:
             gpio_read_enable = value & 1;
+            break;
+
+        default:
             break;
     }
 }

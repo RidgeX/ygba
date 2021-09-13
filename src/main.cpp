@@ -87,7 +87,7 @@ double cubic_interpolate(int8_t *history, double mu) {
     return A * mu * mu * mu + B * mu * mu + C * mu + D;
 }
 
-int16_t clamp_i16(int16_t x, int16_t min, int16_t max) {
+int16_t clamp_i16(int32_t x, int16_t min, int16_t max) {
     x = x < min ? min : x;
     x = x > max ? max : x;
     return x;
@@ -373,6 +373,7 @@ void gba_load(const char *rom_path) {
         free(save_path);
     }
     save_path = strdup(rom_path);
+    assert(save_path != NULL);
     char *p_ext = strstr(save_path, ".gba");
     *p_ext = '\0';
     strcat(save_path, ".sav");
@@ -760,12 +761,13 @@ void gba_timer_update(uint32_t cycles) {
             increment = (overflow ? 1 : 0);
         } else {
             *elapsed += cycles;
-            uint32_t freq = 1;
+            uint32_t freq;
             switch (*control & TM_FREQ_MASK) {
                 case TM_FREQ_1: freq = 1; break;
                 case TM_FREQ_64: freq = 64; break;
                 case TM_FREQ_256: freq = 256; break;
                 case TM_FREQ_1024: freq = 1024; break;
+                default: abort();
             }
             if (*elapsed >= freq) {
                 increment = *elapsed / freq;

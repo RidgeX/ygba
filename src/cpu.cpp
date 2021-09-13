@@ -3,6 +3,7 @@
 
 #include <assert.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "cpu.h"
@@ -283,8 +284,10 @@ void lookup_bind(void (**lookup)(void), const char *mask, void (*f)(void)) {
         n <<= 1;
         m <<= 1;
         switch (*p) {
+            case '0': break;
             case '1': n |= 1; break;
             case 'x': m |= 1; break;
+            default: abort();
         }
     }
 
@@ -386,17 +389,21 @@ void print_arm_condition(char *s, uint32_t op) {
         case COND_LT: strcat(s, "lt"); break;
         case COND_GT: strcat(s, "gt"); break;
         case COND_LE: strcat(s, "le"); break;
+        case COND_AL: break;
+        case COND_NV: strcat(s, "nv"); break;
+        default: abort();
     }
 }
 
 void print_register(char *s, uint32_t i) {
     char temp[4];
 
+    assert(i < 16);
     switch (i) {
         case 13: strcpy(temp, "sp"); break;
         case 14: strcpy(temp, "lr"); break;
         case 15: strcpy(temp, "pc"); break;
-        default: sprintf(temp, "r%d", i); break;
+        default: sprintf(temp, "r%u", i); break;
     }
     strcat(s, temp);
 }
@@ -407,7 +414,7 @@ void print_immediate(char *s, uint32_t i) {
     if (i > 9) {
         sprintf(temp, "#0x%X", i);
     } else {
-        sprintf(temp, "#%d", i);
+        sprintf(temp, "#%u", i);
     }
     strcat(s, temp);
 }
@@ -422,7 +429,7 @@ void print_address(char *s, uint32_t i) {
 static void print_shift_amount(char *s, uint32_t i) {
     char temp[12];
 
-    sprintf(temp, "#%d", i);
+    sprintf(temp, "#%u", i);
     strcat(s, temp);
 }
 
@@ -469,8 +476,7 @@ void print_arm_shift(char *s, uint32_t shop, uint32_t shamt, uint32_t shreg, uin
             break;
 
         default:
-            assert(false);
-            break;
+            abort();
     }
 }
 

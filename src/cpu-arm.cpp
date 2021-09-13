@@ -157,6 +157,7 @@ void arm_data_processing_register_disasm(uint32_t address, uint32_t op, char *s)
         case ARM_MOV: strcpy(s, S ? "movs" : "mov"); break;
         case ARM_BIC: strcpy(s, S ? "bics" : "bic"); break;
         case ARM_MVN: strcpy(s, S ? "mvns" : "mvn"); break;
+        default: abort();
     }
     print_arm_condition(s, op);
     strcat(s, " ");
@@ -254,6 +255,7 @@ void arm_data_processing_immediate_disasm(uint32_t address, uint32_t op, char *s
         case ARM_MOV: strcpy(s, S ? "movs" : "mov"); break;
         case ARM_BIC: strcpy(s, S ? "bics" : "bic"); break;
         case ARM_MVN: strcpy(s, S ? "mvns" : "mvn"); break;
+        default: abort();
     }
     print_arm_condition(s, op);
     strcat(s, " ");

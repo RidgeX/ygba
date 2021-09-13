@@ -3,6 +3,7 @@
 
 #include <assert.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "cpu.h"
@@ -19,6 +20,7 @@ void thumb_shift_by_immediate_disasm(uint32_t address, uint16_t op, char *s) {
         case SHIFT_LSL: strcpy(s, "lsl"); break;
         case SHIFT_LSR: strcpy(s, "lsr"); break;
         case SHIFT_ASR: strcpy(s, "asr"); break;
+        default: abort();
     }
     strcat(s, " ");
     print_register(s, Rd);
@@ -39,6 +41,7 @@ int thumb_shift_by_immediate(uint16_t op) {
         case SHIFT_LSL: arm_op |= SHIFT_LSL << 5; break;
         case SHIFT_LSR: arm_op |= SHIFT_LSR << 5; break;
         case SHIFT_ASR: arm_op |= SHIFT_ASR << 5; break;
+        default: abort();
     }
     return arm_data_processing_register(arm_op);
 }
@@ -54,6 +57,7 @@ void thumb_add_or_subtract_register_disasm(uint32_t address, uint16_t op, char *
     switch (opc) {
         case 0: strcpy(s, "add"); break;
         case 1: strcpy(s, "sub"); break;
+        default: abort();
     }
     strcat(s, " ");
     print_register(s, Rd);
@@ -73,6 +77,7 @@ int thumb_add_or_subtract_register(uint16_t op) {
     switch (opc) {
         case 0: arm_op |= ARM_ADD << 21; break;
         case 1: arm_op |= ARM_SUB << 21; break;
+        default: abort();
     }
     return arm_data_processing_register(arm_op);
 }
@@ -88,6 +93,7 @@ void thumb_add_or_subtract_immediate_disasm(uint32_t address, uint16_t op, char 
     switch (opc) {
         case 0: strcpy(s, "add"); break;
         case 1: strcpy(s, "sub"); break;
+        default: abort();
     }
     strcat(s, " ");
     print_register(s, Rd);
@@ -107,6 +113,7 @@ int thumb_add_or_subtract_immediate(uint16_t op) {
     switch (opc) {
         case 0: arm_op |= ARM_ADD << 21; break;
         case 1: arm_op |= ARM_SUB << 21; break;
+        default: abort();
     }
     return arm_data_processing_immediate(arm_op);
 }
@@ -123,6 +130,7 @@ void thumb_add_subtract_compare_or_move_immediate_disasm(uint32_t address, uint1
         case 1: strcpy(s, "cmp"); break;
         case 2: strcpy(s, "add"); break;
         case 3: strcpy(s, "sub"); break;
+        default: abort();
     }
     strcat(s, " ");
     print_register(s, Rdn);
@@ -141,6 +149,7 @@ int thumb_add_subtract_compare_or_move_immediate(uint16_t op) {
         case 1: arm_op |= ARM_CMP << 21 | Rdn << 16; break;
         case 2: arm_op |= ARM_ADD << 21 | Rdn << 16 | Rdn << 12; break;
         case 3: arm_op |= ARM_SUB << 21 | Rdn << 16 | Rdn << 12; break;
+        default: abort();
     }
     return arm_data_processing_immediate(arm_op);
 }
@@ -169,6 +178,7 @@ void thumb_data_processing_register_disasm(uint32_t address, uint16_t op, char *
         case THUMB_MUL: strcpy(s, "mul"); break;
         case THUMB_BIC: strcpy(s, "bic"); break;
         case THUMB_MVN: strcpy(s, "mvn"); break;
+        default: abort();
     }
     strcat(s, " ");
     print_register(s, Rdn);
@@ -199,6 +209,7 @@ int thumb_data_processing_register(uint16_t op) {
         case THUMB_MUL: arm_op |= Rdn << 16 | Rdn << 8 | 0x9 << 4 | Rms; break;
         case THUMB_BIC: arm_op |= ARM_BIC << 21 | Rdn << 16 | Rdn << 12 | Rms; break;
         case THUMB_MVN: arm_op |= ARM_MVN << 21 | Rdn << 12 | Rms; break;
+        default: abort();
     }
     if (opc == THUMB_MUL) {
         return arm_multiply(arm_op);
@@ -220,6 +231,7 @@ void thumb_special_data_processing_disasm(uint32_t address, uint16_t op, char *s
         case 0: strcpy(s, "add"); break;
         case 1: strcpy(s, "cmp"); break;
         case 2: strcpy(s, "mov"); break;
+        default: abort();
     }
     strcat(s, " ");
     print_register(s, Rdn);
@@ -239,6 +251,7 @@ int thumb_special_data_processing(uint16_t op) {
         case 0: arm_op |= ARM_ADD << 21 | Rdn << 16 | Rdn << 12; break;
         case 1: arm_op |= ARM_CMP << 21 | 0x01 << 20 | Rdn << 16; break;
         case 2: arm_op |= ARM_MOV << 21 | Rdn << 12; break;
+        default: abort();
     }
     return arm_data_processing_register(arm_op);
 }
@@ -309,6 +322,7 @@ void thumb_load_store_register_disasm(uint32_t address, uint16_t op, char *s) {
         case 5: strcpy(s, "ldrh"); break;
         case 6: strcpy(s, "ldrb"); break;
         case 7: strcpy(s, "ldrsh"); break;
+        default: abort();
     }
     strcat(s, " ");
     print_register(s, Rd);
@@ -335,6 +349,7 @@ int thumb_load_store_register(uint16_t op) {
         case 5: arm_op |= 0x19 << 20 | 0xb << 4; break;
         case 6: arm_op |= 0x7d << 20; break;
         case 7: arm_op |= 0x19 << 20 | 0xf << 4; break;
+        default: abort();
     }
     if (opc == 1 || opc == 5) {
         return arm_load_store_halfword_register(arm_op);
@@ -487,6 +502,7 @@ void thumb_adjust_stack_pointer_disasm(uint32_t address, uint16_t op, char *s) {
     switch (opc) {
         case 0: strcpy(s, "add"); break;
         case 1: strcpy(s, "sub"); break;
+        default: abort();
     }
     strcat(s, " ");
     print_register(s, REG_SP);
@@ -596,6 +612,7 @@ void thumb_conditional_branch_disasm(uint32_t address, uint16_t op, char *s) {
         case COND_LT: strcpy(s, "blt"); break;
         case COND_GT: strcpy(s, "bgt"); break;
         case COND_LE: strcpy(s, "ble"); break;
+        default: abort();
     }
     strcat(s, " ");
     uint32_t pc_rel_address = address + 4 + (imm << 1);
