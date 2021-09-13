@@ -31,7 +31,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 foreach(lang C CXX)
     if(MSVC)
-        string(APPEND CMAKE_${lang}_FLAGS " /W4")
+        string(APPEND CMAKE_${lang}_FLAGS " /W4 /D_CRT_SECURE_NO_WARNINGS")
         string(REPLACE " /DNDEBUG" "" CMAKE_${lang}_FLAGS_MINSIZEREL "${CMAKE_${lang}_FLAGS_MINSIZEREL}")
         string(REPLACE " /DNDEBUG" "" CMAKE_${lang}_FLAGS_RELEASE "${CMAKE_${lang}_FLAGS_RELEASE}")
         string(REPLACE " /DNDEBUG" "" CMAKE_${lang}_FLAGS_RELWITHDEBINFO "${CMAKE_${lang}_FLAGS_RELWITHDEBINFO}")
