@@ -98,8 +98,8 @@ void gba_audio_callback(void *userdata, uint8_t *stream_u8, int len_u8) {
     int16_t *stream = (int16_t *) stream_u8;
     int len = len_u8 / 2;
 
-    uint16_t a_timer = BIT(ioreg.io_soundcnt_h, 10);
-    uint16_t b_timer = BIT(ioreg.io_soundcnt_h, 14);
+    uint16_t a_timer = BIT(ioreg.soundcnt_h.w, 10);
+    uint16_t b_timer = BIT(ioreg.soundcnt_h.w, 14);
     uint16_t a_control = ioreg.timer[a_timer].control.w;
     uint16_t b_control = ioreg.timer[b_timer].control.w;
     uint16_t a_reload = ioreg.timer[a_timer].reload.w;
@@ -143,10 +143,10 @@ void gba_audio_callback(void *userdata, uint8_t *stream_u8, int len_u8) {
 
         int16_t left = 0;
         int16_t right = 0;
-        if (BIT(ioreg.io_soundcnt_h, 8)) right = clamp_i16(right + a, -512, 511);
-        if (BIT(ioreg.io_soundcnt_h, 9)) left = clamp_i16(left + a, -512, 511);
-        if (BIT(ioreg.io_soundcnt_h, 12)) right = clamp_i16(right + b, -512, 511);
-        if (BIT(ioreg.io_soundcnt_h, 13)) left = clamp_i16(left + b, -512, 511);
+        if (BIT(ioreg.soundcnt_h.w, 8)) right = clamp_i16(right + a, -512, 511);
+        if (BIT(ioreg.soundcnt_h.w, 9)) left = clamp_i16(left + a, -512, 511);
+        if (BIT(ioreg.soundcnt_h.w, 12)) right = clamp_i16(right + b, -512, 511);
+        if (BIT(ioreg.soundcnt_h.w, 13)) left = clamp_i16(left + b, -512, 511);
         stream[i] = left << 7;
         stream[i + 1] = right << 7;
     }
@@ -780,8 +780,8 @@ void gba_timer_update(uint32_t cycles) {
         overflow = *counter < last_counter;
         if (overflow) {
             *counter += *reload;
-            bool fifo_a_tick = BIT(ioreg.io_soundcnt_h, 10) == i;
-            bool fifo_b_tick = BIT(ioreg.io_soundcnt_h, 14) == i;
+            bool fifo_a_tick = BIT(ioreg.soundcnt_h.w, 10) == i;
+            bool fifo_b_tick = BIT(ioreg.soundcnt_h.w, 14) == i;
             if (fifo_a_tick) {
                 ioreg.fifo_a_ticks = (ioreg.fifo_a_ticks + 1) % 16;
                 if (ioreg.fifo_a_ticks == 0) ioreg.fifo_a_refill = true;

@@ -4,6 +4,7 @@
 #ifndef IO_H
 #define IO_H
 
+#include <stdbool.h>
 #include <stdint.h>
 
 #define FIFO_SIZE 8192
@@ -58,16 +59,16 @@ typedef struct {
     io_union16 bldy;
 
     // Sound Registers
-    uint16_t io_sound1cnt_l, io_sound1cnt_h, io_sound1cnt_x;
-    uint16_t io_sound2cnt_l, io_sound2cnt_h;
-    uint16_t io_sound3cnt_l, io_sound3cnt_h, io_sound3cnt_x;
-    uint16_t io_sound4cnt_l, io_sound4cnt_h;
-    uint16_t io_soundcnt_l, io_soundcnt_h, io_soundcnt_x;
-    uint16_t io_soundbias;
-    uint32_t io_wave_ram0;  // 32
-    uint32_t io_wave_ram1;  // 32
-    uint32_t io_wave_ram2;  // 32
-    uint32_t io_wave_ram3;  // 32
+    io_union16 sound1cnt_l, sound1cnt_h, sound1cnt_x;
+    io_union16 sound2cnt_l, sound2cnt_h;
+    io_union16 sound3cnt_l, sound3cnt_h, sound3cnt_x;
+    io_union16 sound4cnt_l, sound4cnt_h;
+    io_union16 soundcnt_l, soundcnt_h, soundcnt_x;
+    io_union16 soundbias;
+    io_union32 wave_ram0;
+    io_union32 wave_ram1;
+    io_union32 wave_ram2;
+    io_union32 wave_ram3;
     uint8_t fifo_a[FIFO_SIZE];
     uint8_t fifo_b[FIFO_SIZE];
     int fifo_a_r, fifo_b_r;
