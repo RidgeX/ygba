@@ -928,9 +928,11 @@ void gba_emulate(void) {
             idle_loop_last_irq = ioreg.irq.w;
         }
 
-        if (!branch_taken && !(cpsr & PSR_I) && ioreg.ime.w && (ioreg.irq.w & ioreg.ie.w)) {
-            arm_hardware_interrupt();
+        if (ioreg.irq.w & ioreg.ie.w) {
             halted = false;
+            if (!branch_taken && !(cpsr & PSR_I) && ioreg.ime.w) {
+                arm_hardware_interrupt();
+            }
         }
 
         gba_timer_update(1);  // FIXME
