@@ -29,7 +29,7 @@ static void set_sound_powered(bool flag) {
     }
 }
 
-uint8_t io_read_byte(uint32_t address) {
+static uint8_t _io_read_byte(uint32_t address) {
     switch (address) {
         case REG_DISPCNT + 0: return ioreg.dispcnt.b.b0;
         case REG_DISPCNT + 1: return ioreg.dispcnt.b.b1;
@@ -162,11 +162,6 @@ uint8_t io_read_byte(uint32_t address) {
         case REG_SIOMLT_SEND + 0: return ioreg.siomlt_send.b.b0;
         case REG_SIOMLT_SEND + 1: return ioreg.siomlt_send.b.b1;
 
-        case REG_KEYINPUT + 0: gba_check_keypad_interrupt(); return ioreg.keyinput.b.b0;
-        case REG_KEYINPUT + 1: gba_check_keypad_interrupt(); return ioreg.keyinput.b.b1;
-        case REG_KEYCNT + 0: return ioreg.keycnt.b.b0;
-        case REG_KEYCNT + 1: return ioreg.keycnt.b.b1;
-
         case REG_RCNT + 0: return ioreg.rcnt.b.b0;
         case REG_RCNT + 1: return ioreg.rcnt.b.b1;
         case REG_JOYCNT + 0: return ioreg.joycnt.b.b0;
@@ -195,7 +190,7 @@ uint8_t io_read_byte(uint32_t address) {
 
         default:
 #ifdef LOG_BAD_MEMORY_ACCESS
-            printf("io_read_byte(0x%08x);\n", address);
+            printf("_io_read_byte(0x%08x);\n", address);
 #endif
             break;
     }
@@ -203,7 +198,7 @@ uint8_t io_read_byte(uint32_t address) {
     return (uint8_t)(open_bus() >> 8 * (address & 3));
 }
 
-void io_write_byte(uint32_t address, uint8_t value) {
+static void _io_write_byte(uint32_t address, uint8_t value) {
     uint8_t old_value;
 
     switch (address) {
@@ -332,14 +327,6 @@ void io_write_byte(uint32_t address, uint8_t value) {
         case REG_WAVE_RAM3_L + 1: ioreg.wave_ram3.b.b1 = value; break;
         case REG_WAVE_RAM3_H + 0: ioreg.wave_ram3.b.b2 = value; break;
         case REG_WAVE_RAM3_H + 1: ioreg.wave_ram3.b.b3 = value; break;
-        case REG_FIFO_A_L + 0: gba_audio_fifo_a(value); break;
-        case REG_FIFO_A_L + 1: gba_audio_fifo_a(value << 8); break;
-        case REG_FIFO_A_H + 0: gba_audio_fifo_a(value << 16); break;
-        case REG_FIFO_A_H + 1: gba_audio_fifo_a(value << 24); break;
-        case REG_FIFO_B_L + 0: gba_audio_fifo_b(value); break;
-        case REG_FIFO_B_L + 1: gba_audio_fifo_b(value << 8); break;
-        case REG_FIFO_B_H + 0: gba_audio_fifo_b(value << 16); break;
-        case REG_FIFO_B_H + 1: gba_audio_fifo_b(value << 24); break;
 
         case REG_DMA0SAD_L + 0: ioreg.dma[0].sad.b.b0 = value; break;
         case REG_DMA0SAD_L + 1: ioreg.dma[0].sad.b.b1 = value; break;
@@ -420,9 +407,6 @@ void io_write_byte(uint32_t address, uint8_t value) {
         //case REG_SIOMLT_SEND + 0:
         //case REG_SIOMLT_SEND + 1:
 
-        case REG_KEYCNT + 0: ioreg.keycnt.b.b0 = value; gba_check_keypad_interrupt(); break;
-        case REG_KEYCNT + 1: ioreg.keycnt.b.b1 = value & 0xc3; gba_check_keypad_interrupt(); break;
-
         case REG_RCNT + 0: ioreg.rcnt.b.b0 = value; break;
         case REG_RCNT + 1: ioreg.rcnt.b.b1 = value & 0xc1; break;
         //case REG_JOYCNT + 0:
@@ -451,393 +435,97 @@ void io_write_byte(uint32_t address, uint8_t value) {
 
         default:
 #ifdef LOG_BAD_MEMORY_ACCESS
-            printf("io_write_byte(0x%08x, 0x%02x);\n", address, value);
+            printf("_io_write_byte(0x%08x, 0x%02x);\n", address, value);
 #endif
+            break;
+    }
+}
+
+uint8_t io_read_byte(uint32_t address) {
+    switch (address) {
+        case REG_KEYINPUT + 0: gba_check_keypad_interrupt(); return ioreg.keyinput.b.b0;
+        case REG_KEYINPUT + 1: gba_check_keypad_interrupt(); return ioreg.keyinput.b.b1;
+        case REG_KEYCNT + 0: return ioreg.keycnt.b.b0;
+        case REG_KEYCNT + 1: return ioreg.keycnt.b.b1;
+
+        default:
+            return _io_read_byte(address);
+    }
+}
+
+void io_write_byte(uint32_t address, uint8_t value) {
+    switch (address) {
+        case REG_FIFO_A_L + 0: gba_audio_fifo_a(value); break;
+        case REG_FIFO_A_L + 1: gba_audio_fifo_a(value << 8); break;
+        case REG_FIFO_A_H + 0: gba_audio_fifo_a(value << 16); break;
+        case REG_FIFO_A_H + 1: gba_audio_fifo_a(value << 24); break;
+        case REG_FIFO_B_L + 0: gba_audio_fifo_b(value); break;
+        case REG_FIFO_B_L + 1: gba_audio_fifo_b(value << 8); break;
+        case REG_FIFO_B_H + 0: gba_audio_fifo_b(value << 16); break;
+        case REG_FIFO_B_H + 1: gba_audio_fifo_b(value << 24); break;
+
+        case REG_KEYCNT + 0: ioreg.keycnt.b.b0 = value; gba_check_keypad_interrupt(); break;
+        case REG_KEYCNT + 1: ioreg.keycnt.b.b1 = value & 0xc3; gba_check_keypad_interrupt(); break;
+
+        default:
+            _io_write_byte(address, value);
             break;
     }
 }
 
 uint16_t io_read_halfword(uint32_t address) {
     switch (address) {
-        case REG_DISPCNT: return ioreg.dispcnt.w;
-        case REG_DISPSTAT: return ioreg.dispstat.w;
-        case REG_VCOUNT: return ioreg.vcount.w;
-        case REG_BG0CNT: return ioreg.bgcnt[0].w;
-        case REG_BG1CNT: return ioreg.bgcnt[1].w;
-        case REG_BG2CNT: return ioreg.bgcnt[2].w;
-        case REG_BG3CNT: return ioreg.bgcnt[3].w;
-        case REG_WININ: return ioreg.winin.w;
-        case REG_WINOUT: return ioreg.winout.w;
-        case REG_BLDCNT: return ioreg.bldcnt.w;
-        case REG_BLDALPHA: return ioreg.bldalpha.w;
-
-        case REG_SOUND1CNT_L: return ioreg.sound1cnt_l.w & 0x007f;
-        case REG_SOUND1CNT_H: return ioreg.sound1cnt_h.w & 0xffc0;
-        case REG_SOUND1CNT_X: return ioreg.sound1cnt_x.w & 0x4000;
-        case 0x66: return 0;
-        case REG_SOUND2CNT_L: return ioreg.sound2cnt_l.w & 0xffc0;
-        case 0x6a: return 0;
-        case REG_SOUND2CNT_H: return ioreg.sound2cnt_h.w & 0x4000;
-        case 0x6e: return 0;
-        case REG_SOUND3CNT_L: return ioreg.sound3cnt_l.w & 0x00e0;
-        case REG_SOUND3CNT_H: return ioreg.sound3cnt_h.w & 0xe000;
-        case REG_SOUND3CNT_X: return ioreg.sound3cnt_x.w & 0x4000;
-        case 0x76: return 0;
-        case REG_SOUND4CNT_L: return ioreg.sound4cnt_l.w & 0xff00;
-        case 0x7a: return 0;
-        case REG_SOUND4CNT_H: return ioreg.sound4cnt_h.w & 0x40ff;
-        case 0x7e: return 0;
-        case REG_SOUNDCNT_L: return ioreg.soundcnt_l.w & 0xff77;
-        case REG_SOUNDCNT_H: return ioreg.soundcnt_h.w & 0x770f;
-        case REG_SOUNDCNT_X: return ioreg.soundcnt_x.w & 0x008f;
-        case 0x86: return 0;
-        case REG_SOUNDBIAS: return ioreg.soundbias.w;
-        case 0x8a: return 0;
-        case REG_WAVE_RAM0_L: return ioreg.wave_ram0.w.w0;
-        case REG_WAVE_RAM0_H: return ioreg.wave_ram0.w.w1;
-        case REG_WAVE_RAM1_L: return ioreg.wave_ram1.w.w0;
-        case REG_WAVE_RAM1_H: return ioreg.wave_ram1.w.w1;
-        case REG_WAVE_RAM2_L: return ioreg.wave_ram2.w.w0;
-        case REG_WAVE_RAM2_H: return ioreg.wave_ram2.w.w1;
-        case REG_WAVE_RAM3_L: return ioreg.wave_ram3.w.w0;
-        case REG_WAVE_RAM3_H: return ioreg.wave_ram3.w.w1;
-
-        case REG_DMA0CNT_L: return 0;
-        case REG_DMA0CNT_H: return ioreg.dma[0].cnt.w.w1;
-        case REG_DMA1CNT_L: return 0;
-        case REG_DMA1CNT_H: return ioreg.dma[1].cnt.w.w1;
-        case REG_DMA2CNT_L: return 0;
-        case REG_DMA2CNT_H: return ioreg.dma[2].cnt.w.w1;
-        case REG_DMA3CNT_L: return 0;
-        case REG_DMA3CNT_H: return ioreg.dma[3].cnt.w.w1;
-
-        case REG_TM0CNT_L: return ioreg.timer[0].counter.w;
-        case REG_TM0CNT_H: return ioreg.timer[0].control.w;
-        case REG_TM1CNT_L: return ioreg.timer[1].counter.w;
-        case REG_TM1CNT_H: return ioreg.timer[1].control.w;
-        case REG_TM2CNT_L: return ioreg.timer[2].counter.w;
-        case REG_TM2CNT_H: return ioreg.timer[2].control.w;
-        case REG_TM3CNT_L: return ioreg.timer[3].counter.w;
-        case REG_TM3CNT_H: return ioreg.timer[3].control.w;
-
-        case REG_SIOMULTI0: return ioreg.siomulti[0].w;
-        case REG_SIOMULTI1: return ioreg.siomulti[1].w;
-        case REG_SIOMULTI2: return ioreg.siomulti[2].w;
-        case REG_SIOMULTI3: return ioreg.siomulti[3].w;
-        case REG_SIOCNT: return ioreg.siocnt.w;
-        case REG_SIOMLT_SEND: return ioreg.siomlt_send.w;
-
         case REG_KEYINPUT: gba_check_keypad_interrupt(); return ioreg.keyinput.w;
         case REG_KEYCNT: return ioreg.keycnt.w;
 
-        case REG_RCNT: return ioreg.rcnt.w;
-        case REG_JOYCNT: return ioreg.joycnt.w;
-        case REG_JOY_RECV_L: return ioreg.joy_recv.w.w0;
-        case REG_JOY_RECV_H: return ioreg.joy_recv.w.w1;
-        case REG_JOY_TRANS_L: return ioreg.joy_trans.w.w0;
-        case REG_JOY_TRANS_H: return ioreg.joy_trans.w.w1;
-        case REG_JOYSTAT: return ioreg.joystat.w;
-
-        case REG_IE: return ioreg.ie.w;
-        case REG_IF: return ioreg.irq.w;
-        case REG_WAITCNT: return ioreg.waitcnt.w;
-        case REG_IME: return ioreg.ime.w;
-        case REG_POSTFLG: return ioreg.postflg;
-
         default:
-#ifdef LOG_BAD_MEMORY_ACCESS
-            printf("io_read_halfword(0x%08x);\n", address);
-#endif
-            break;
+            uint16_t result = _io_read_byte(address);
+            result |= _io_read_byte(address + 1) << 8;
+            return result;
     }
-
-    return (uint16_t)(open_bus() >> 8 * (address & 2));
 }
 
 void io_write_halfword(uint32_t address, uint16_t value) {
-    uint16_t old_value;
-
     switch (address) {
-        case REG_DISPCNT: ioreg.dispcnt.w = (ioreg.dispcnt.w & 0x0008) | (value & 0xfff7); break;
-        case REG_DISPSTAT: ioreg.dispstat.w = (ioreg.dispstat.w & 0x0007) | (value & 0xff38); break;
-        case REG_BG0CNT: ioreg.bgcnt[0].w = value & 0xdfff; break;
-        case REG_BG1CNT: ioreg.bgcnt[1].w = value & 0xdfff; break;
-        case REG_BG2CNT: ioreg.bgcnt[2].w = value; break;
-        case REG_BG3CNT: ioreg.bgcnt[3].w = value; break;
-        case REG_BG0HOFS: ioreg.bg_text[0].x.w = value & 0x01ff; break;
-        case REG_BG0VOFS: ioreg.bg_text[0].y.w = value & 0x01ff; break;
-        case REG_BG1HOFS: ioreg.bg_text[1].x.w = value & 0x01ff; break;
-        case REG_BG1VOFS: ioreg.bg_text[1].y.w = value & 0x01ff; break;
-        case REG_BG2HOFS: ioreg.bg_text[2].x.w = value & 0x01ff; break;
-        case REG_BG2VOFS: ioreg.bg_text[2].y.w = value & 0x01ff; break;
-        case REG_BG3HOFS: ioreg.bg_text[3].x.w = value & 0x01ff; break;
-        case REG_BG3VOFS: ioreg.bg_text[3].y.w = value & 0x01ff; break;
-        case REG_BG2PA: ioreg.bg_affine[0].dx.w = value; break;
-        case REG_BG2PB: ioreg.bg_affine[0].dmx.w = value; break;
-        case REG_BG2PC: ioreg.bg_affine[0].dy.w = value; break;
-        case REG_BG2PD: ioreg.bg_affine[0].dmy.w = value; break;
-        case REG_BG2X_L: ioreg.bg_affine[0].x.w.w0 = value; break;
-        case REG_BG2X_H: ioreg.bg_affine[0].x.w.w1 = value & 0x0fff; break;
-        case REG_BG2Y_L: ioreg.bg_affine[0].y.w.w0 = value; break;
-        case REG_BG2Y_H: ioreg.bg_affine[0].y.w.w1 = value & 0x0fff; break;
-        case REG_BG3PA: ioreg.bg_affine[1].dx.w = value; break;
-        case REG_BG3PB: ioreg.bg_affine[1].dmx.w = value; break;
-        case REG_BG3PC: ioreg.bg_affine[1].dy.w = value; break;
-        case REG_BG3PD: ioreg.bg_affine[1].dmy.w = value; break;
-        case REG_BG3X_L: ioreg.bg_affine[1].x.w.w0 = value; break;
-        case REG_BG3X_H: ioreg.bg_affine[1].x.w.w1 = value & 0x0fff; break;
-        case REG_BG3Y_L: ioreg.bg_affine[1].y.w.w0 = value; break;
-        case REG_BG3Y_H: ioreg.bg_affine[1].y.w.w1 = value & 0x0fff; break;
-        case REG_WIN0H: ioreg.winh[0].w = value; break;
-        case REG_WIN1H: ioreg.winh[1].w = value; break;
-        case REG_WIN0V: ioreg.winv[0].w = value; break;
-        case REG_WIN1V: ioreg.winv[1].w = value; break;
-        case REG_WININ: ioreg.winin.w = value & 0x3f3f; break;
-        case REG_WINOUT: ioreg.winout.w = value & 0x3f3f; break;
-        case REG_MOSAIC: ioreg.mosaic.w = value; break;
-        case REG_BLDCNT: ioreg.bldcnt.w = value & 0x3fff; break;
-        case REG_BLDALPHA: ioreg.bldalpha.w = value & 0x1f1f; break;
-        case REG_BLDY: ioreg.bldy.w = value & 0x001f; break;
-
-        case REG_SOUND1CNT_L: if (sound_powered) { ioreg.sound1cnt_l.w = value & 0x007f; } break;
-        case REG_SOUND1CNT_H: if (sound_powered) { ioreg.sound1cnt_h.w = value; } break;
-        case REG_SOUND1CNT_X: if (sound_powered) { ioreg.sound1cnt_x.w = value & 0xc7ff; } break;
-        case REG_SOUND2CNT_L: if (sound_powered) { ioreg.sound2cnt_l.w = value; } break;
-        case REG_SOUND2CNT_H: if (sound_powered) { ioreg.sound2cnt_h.w = value & 0xc7ff; } break;
-        case REG_SOUND3CNT_L: if (sound_powered) { ioreg.sound3cnt_l.w = value & 0x00e0; } break;
-        case REG_SOUND3CNT_H: if (sound_powered) { ioreg.sound3cnt_h.w = value & 0xe0ff; } break;
-        case REG_SOUND3CNT_X: if (sound_powered) { ioreg.sound3cnt_x.w = value & 0xc7ff; } break;
-        case REG_SOUND4CNT_L: if (sound_powered) { ioreg.sound4cnt_l.w = value & 0xff3f; } break;
-        case REG_SOUND4CNT_H: if (sound_powered) { ioreg.sound4cnt_h.w = value & 0xc0ff; } break;
-        case REG_SOUNDCNT_L: if (sound_powered) { ioreg.soundcnt_l.w = value & 0xff77; } break;
-        case REG_SOUNDCNT_H: ioreg.soundcnt_h.w = value & 0xff0f; break;
-        case REG_SOUNDCNT_X: ioreg.soundcnt_x.w = (ioreg.soundcnt_x.w & 0x000f) | (value & 0x0080); set_sound_powered(value & 0x0080); break;
-        case REG_SOUNDBIAS: ioreg.soundbias.w = value & 0xc3fe; break;
-        case REG_WAVE_RAM0_L: ioreg.wave_ram0.w.w0 = value; break;
-        case REG_WAVE_RAM0_H: ioreg.wave_ram0.w.w1 = value; break;
-        case REG_WAVE_RAM1_L: ioreg.wave_ram1.w.w0 = value; break;
-        case REG_WAVE_RAM1_H: ioreg.wave_ram1.w.w1 = value; break;
-        case REG_WAVE_RAM2_L: ioreg.wave_ram2.w.w0 = value; break;
-        case REG_WAVE_RAM2_H: ioreg.wave_ram2.w.w1 = value; break;
-        case REG_WAVE_RAM3_L: ioreg.wave_ram3.w.w0 = value; break;
-        case REG_WAVE_RAM3_H: ioreg.wave_ram3.w.w1 = value; break;
         case REG_FIFO_A_L: gba_audio_fifo_a(value); break;
         case REG_FIFO_A_H: gba_audio_fifo_a(value << 16); break;
         case REG_FIFO_B_L: gba_audio_fifo_b(value); break;
         case REG_FIFO_B_H: gba_audio_fifo_b(value << 16); break;
 
-        case REG_DMA0SAD_L: ioreg.dma[0].sad.w.w0 = value; break;
-        case REG_DMA0SAD_H: ioreg.dma[0].sad.w.w1 = value; break;
-        case REG_DMA0DAD_L: ioreg.dma[0].dad.w.w0 = value; break;
-        case REG_DMA0DAD_H: ioreg.dma[0].dad.w.w1 = value; break;
-        case REG_DMA0CNT_L: ioreg.dma[0].cnt.w.w0 = value & 0x3fff; break;
-        case REG_DMA0CNT_H: old_value = ioreg.dma[0].cnt.w.w1; ioreg.dma[0].cnt.w.w1 = value & 0xf7e0; if (!(old_value & 0x8000) && (value & 0x8000)) { gba_dma_reset(0); gba_dma_update(DMA_NOW); } break;
-        case REG_DMA1SAD_L: ioreg.dma[1].sad.w.w0 = value; break;
-        case REG_DMA1SAD_H: ioreg.dma[1].sad.w.w1 = value; break;
-        case REG_DMA1DAD_L: ioreg.dma[1].dad.w.w0 = value; break;
-        case REG_DMA1DAD_H: ioreg.dma[1].dad.w.w1 = value; break;
-        case REG_DMA1CNT_L: ioreg.dma[1].cnt.w.w0 = value & 0x3fff; break;
-        case REG_DMA1CNT_H: old_value = ioreg.dma[1].cnt.w.w1; ioreg.dma[1].cnt.w.w1 = value & 0xf7e0; if (!(old_value & 0x8000) && (value & 0x8000)) { gba_dma_reset(1); gba_dma_update(DMA_NOW); } break;
-        case REG_DMA2SAD_L: ioreg.dma[2].sad.w.w0 = value; break;
-        case REG_DMA2SAD_H: ioreg.dma[2].sad.w.w1 = value; break;
-        case REG_DMA2DAD_L: ioreg.dma[2].dad.w.w0 = value; break;
-        case REG_DMA2DAD_H: ioreg.dma[2].dad.w.w1 = value; break;
-        case REG_DMA2CNT_L: ioreg.dma[2].cnt.w.w0 = value & 0x3fff; break;
-        case REG_DMA2CNT_H: old_value = ioreg.dma[2].cnt.w.w1; ioreg.dma[2].cnt.w.w1 = value & 0xf7e0; if (!(old_value & 0x8000) && (value & 0x8000)) { gba_dma_reset(2); gba_dma_update(DMA_NOW); } break;
-        case REG_DMA3SAD_L: ioreg.dma[3].sad.w.w0 = value; break;
-        case REG_DMA3SAD_H: ioreg.dma[3].sad.w.w1 = value; break;
-        case REG_DMA3DAD_L: ioreg.dma[3].dad.w.w0 = value; break;
-        case REG_DMA3DAD_H: ioreg.dma[3].dad.w.w1 = value; break;
-        case REG_DMA3CNT_L: ioreg.dma[3].cnt.w.w0 = value; break;
-        case REG_DMA3CNT_H: old_value = ioreg.dma[3].cnt.w.w1; ioreg.dma[3].cnt.w.w1 = value & 0xffe0; if (!(old_value & 0x8000) && (value & 0x8000)) { gba_dma_reset(3); gba_dma_update(DMA_NOW); } break;
-
-        case REG_TM0CNT_L: ioreg.timer[0].reload.w = value; break;
-        case REG_TM0CNT_H: old_value = ioreg.timer[0].control.w; ioreg.timer[0].control.w = value & 0x00c7; if (!(old_value & 0x80) && (value & 0x80)) { gba_timer_reset(0); } break;
-        case REG_TM1CNT_L: ioreg.timer[1].reload.w = value; break;
-        case REG_TM1CNT_H: old_value = ioreg.timer[1].control.w; ioreg.timer[1].control.w = value & 0x00c7; if (!(old_value & 0x80) && (value & 0x80)) { gba_timer_reset(1); } break;
-        case REG_TM2CNT_L: ioreg.timer[2].reload.w = value; break;
-        case REG_TM2CNT_H: old_value = ioreg.timer[2].control.w; ioreg.timer[2].control.w = value & 0x00c7; if (!(old_value & 0x80) && (value & 0x80)) { gba_timer_reset(2); } break;
-        case REG_TM3CNT_L: ioreg.timer[3].reload.w = value; break;
-        case REG_TM3CNT_H: old_value = ioreg.timer[3].control.w; ioreg.timer[3].control.w = value & 0x00c7; if (!(old_value & 0x80) && (value & 0x80)) { gba_timer_reset(3); } break;
-
-        //case REG_SIOMULTI0:
-        //case REG_SIOMULTI1:
-        //case REG_SIOMULTI2:
-        //case REG_SIOMULTI3:
-        //case REG_SIOCNT:
-        //case REG_SIOMLT_SEND:
-
         case REG_KEYCNT: ioreg.keycnt.w = value & 0xc3ff; gba_check_keypad_interrupt(); break;
 
-        case REG_RCNT: ioreg.rcnt.w = value & 0xc1ff; break;
-        //case REG_JOYCNT:
-        //case REG_JOY_RECV_L:
-        //case REG_JOY_RECV_H:
-        //case REG_JOY_TRANS_L:
-        //case REG_JOY_TRANS_H:
-        //case REG_JOYSTAT:
-
-        case REG_IE: ioreg.ie.w = value & 0x3fff; break;
-        case REG_IF: ioreg.irq.w &= ~value; break;
-        case REG_WAITCNT: ioreg.waitcnt.w = (ioreg.waitcnt.w & 0x8000) | (value & 0x5fff); break;
-        case REG_IME: ioreg.ime.w = value & 0x0001; break;
-        case REG_POSTFLG: ioreg.postflg = value & 0x01; ioreg.haltcnt = (value >> 8) & 0x80; halted = true; break;
-
         default:
-#ifdef LOG_BAD_MEMORY_ACCESS
-            printf("io_write_halfword(0x%08x, 0x%04x);\n", address, value);
-#endif
+            _io_write_byte(address, (uint8_t) value);
+            _io_write_byte(address + 1, (uint8_t)(value >> 8));
             break;
     }
 }
 
 uint32_t io_read_word(uint32_t address) {
     switch (address) {
-        case REG_DISPCNT: return ioreg.dispcnt.w | (open_bus() & 0xffff0000);
-        case REG_DISPSTAT: return ioreg.dispstat.w | ioreg.vcount.w << 16;
-        case REG_BG0CNT: return ioreg.bgcnt[0].w | ioreg.bgcnt[1].w << 16;
-        case REG_BG2CNT: return ioreg.bgcnt[2].w | ioreg.bgcnt[3].w << 16;
-        case REG_WININ: return ioreg.winin.w | ioreg.winout.w << 16;
-        case REG_BLDCNT: return ioreg.bldcnt.w | ioreg.bldalpha.w << 16;
-        case REG_BLDY: return ioreg.bldy.w | (open_bus() & 0xffff0000);
-
-        case REG_SOUND1CNT_L: return (ioreg.sound1cnt_l.w & 0x007f) | (ioreg.sound1cnt_h.w & 0xffc0) << 16;
-        case REG_SOUND1CNT_X: return ioreg.sound1cnt_x.w & 0x4000;
-        case REG_SOUND2CNT_L: return ioreg.sound2cnt_l.w & 0xffc0;
-        case REG_SOUND2CNT_H: return ioreg.sound2cnt_h.w & 0x4000;
-        case REG_SOUND3CNT_L: return (ioreg.sound3cnt_l.w & 0x00e0) | (ioreg.sound3cnt_h.w & 0xe000) << 16;
-        case REG_SOUND3CNT_X: return ioreg.sound3cnt_x.w & 0x4000;
-        case REG_SOUND4CNT_L: return ioreg.sound4cnt_l.w & 0xff00;
-        case REG_SOUND4CNT_H: return ioreg.sound4cnt_h.w & 0x40ff;
-        case REG_SOUNDCNT_L: return (ioreg.soundcnt_l.w & 0xff77) | (ioreg.soundcnt_h.w & 0x770f) << 16;
-        case REG_SOUNDCNT_X: return ioreg.soundcnt_x.w & 0x008f;
-        case REG_SOUNDBIAS: return ioreg.soundbias.w;
-        case REG_WAVE_RAM0_L: return ioreg.wave_ram0.dw;
-        case REG_WAVE_RAM1_L: return ioreg.wave_ram1.dw;
-        case REG_WAVE_RAM2_L: return ioreg.wave_ram2.dw;
-        case REG_WAVE_RAM3_L: return ioreg.wave_ram3.dw;
-
-        case REG_DMA0CNT_L: return ioreg.dma[0].cnt.w.w1 << 16;
-        case REG_DMA1CNT_L: return ioreg.dma[1].cnt.w.w1 << 16;
-        case REG_DMA2CNT_L: return ioreg.dma[2].cnt.w.w1 << 16;
-        case REG_DMA3CNT_L: return ioreg.dma[3].cnt.w.w1 << 16;
-
-        case REG_TM0CNT_L: return ioreg.timer[0].counter.w | ioreg.timer[0].control.w << 16;
-        case REG_TM1CNT_L: return ioreg.timer[1].counter.w | ioreg.timer[1].control.w << 16;
-        case REG_TM2CNT_L: return ioreg.timer[2].counter.w | ioreg.timer[2].control.w << 16;
-        case REG_TM3CNT_L: return ioreg.timer[3].counter.w | ioreg.timer[3].control.w << 16;
-
-        case REG_SIOMULTI0: return ioreg.siomulti[0].w | ioreg.siomulti[1].w << 16;
-        case REG_SIOMULTI2: return ioreg.siomulti[2].w | ioreg.siomulti[3].w << 16;
-        case REG_SIOCNT: return ioreg.siocnt.w | ioreg.siomlt_send.w << 16;
-
         case REG_KEYINPUT: gba_check_keypad_interrupt(); return ioreg.keyinput.w | ioreg.keycnt.w << 16;
 
-        case REG_RCNT: return ioreg.rcnt.w;
-        case REG_JOYCNT: return ioreg.joycnt.w;
-        case REG_JOY_RECV_L: return ioreg.joy_recv.dw;
-        case REG_JOY_TRANS_L: return ioreg.joy_trans.dw;
-        case REG_JOYSTAT: return ioreg.joystat.w;
-
-        case REG_IE: return ioreg.ie.w | ioreg.irq.w << 16;
-        case REG_WAITCNT: return ioreg.waitcnt.w;
-        case REG_IME: return ioreg.ime.w;
-        case REG_POSTFLG: return ioreg.postflg;
-
         default:
-#ifdef LOG_BAD_MEMORY_ACCESS
-            printf("io_read_word(0x%08x);\n", address);
-#endif
-            break;
+            uint32_t result = _io_read_byte(address);
+            result |= _io_read_byte(address + 1) << 8;
+            result |= _io_read_byte(address + 2) << 16;
+            result |= _io_read_byte(address + 3) << 24;
+            return result;
     }
-
-    return open_bus();
 }
 
 void io_write_word(uint32_t address, uint32_t value) {
-    uint32_t old_value;
-
     switch (address) {
-        case REG_DISPCNT: ioreg.dispcnt.w = (ioreg.dispcnt.w & 0x0008) | (value & 0xfff7); break;
-        case REG_DISPSTAT: ioreg.dispstat.w = (ioreg.dispstat.w & 0x0007) | (value & 0xff38); break;
-        case REG_BG0CNT: ioreg.bgcnt[0].w = value & 0xdfff; ioreg.bgcnt[1].w = (value >> 16) & 0xdfff; break;
-        case REG_BG2CNT: ioreg.bgcnt[2].w = value & 0xffff; ioreg.bgcnt[3].w = (value >> 16) & 0xffff; break;
-        case REG_BG0HOFS: ioreg.bg_text[0].x.w = value & 0x01ff; ioreg.bg_text[0].y.w = (value >> 16) & 0x01ff; break;
-        case REG_BG1HOFS: ioreg.bg_text[1].x.w = value & 0x01ff; ioreg.bg_text[1].y.w = (value >> 16) & 0x01ff; break;
-        case REG_BG2HOFS: ioreg.bg_text[2].x.w = value & 0x01ff; ioreg.bg_text[2].y.w = (value >> 16) & 0x01ff; break;
-        case REG_BG3HOFS: ioreg.bg_text[3].x.w = value & 0x01ff; ioreg.bg_text[3].y.w = (value >> 16) & 0x01ff; break;
-        case REG_BG2PA: ioreg.bg_affine[0].dx.w = value & 0xffff; ioreg.bg_affine[0].dmx.w = (value >> 16) & 0xffff; break;
-        case REG_BG2PC: ioreg.bg_affine[0].dy.w = value & 0xffff; ioreg.bg_affine[0].dmy.w = (value >> 16) & 0xffff; break;
-        case REG_BG2X_L: ioreg.bg_affine[0].x.dw = value & 0x0fffffff; break;
-        case REG_BG2Y_L: ioreg.bg_affine[0].y.dw = value & 0x0fffffff; break;
-        case REG_BG3PA: ioreg.bg_affine[1].dx.w = value & 0xffff; ioreg.bg_affine[1].dmx.w = (value >> 16) & 0xffff; break;
-        case REG_BG3PC: ioreg.bg_affine[1].dy.w = value & 0xffff; ioreg.bg_affine[1].dmy.w = (value >> 16) & 0xffff; break;
-        case REG_BG3X_L: ioreg.bg_affine[1].x.dw = value & 0x0fffffff; break;
-        case REG_BG3Y_L: ioreg.bg_affine[1].y.dw = value & 0x0fffffff; break;
-        case REG_WIN0H: ioreg.winh[0].w = value & 0xffff; ioreg.winh[1].w = (value >> 16) & 0xffff; break;
-        case REG_WIN0V: ioreg.winv[0].w = value & 0xffff; ioreg.winv[1].w = (value >> 16) & 0xffff; break;
-        case REG_WININ: ioreg.winin.w = value & 0x3f3f; ioreg.winout.w = (value >> 16) & 0x3f3f; break;
-        case REG_MOSAIC: ioreg.mosaic.w = value & 0xffff; break;
-        case REG_BLDCNT: ioreg.bldcnt.w = value & 0x3fff; ioreg.bldalpha.w = (value >> 16) & 0x1f1f; break;
-        case REG_BLDY: ioreg.bldy.w = value & 0x001f; break;
-
-        case REG_SOUND1CNT_L: if (sound_powered) { ioreg.sound1cnt_l.w = value & 0x007f; ioreg.sound1cnt_h.w = (value >> 16); } break;
-        case REG_SOUND1CNT_X: if (sound_powered) { ioreg.sound1cnt_x.w = value & 0xc7ff; } break;
-        case REG_SOUND2CNT_L: if (sound_powered) { ioreg.sound2cnt_l.w = value; } break;
-        case REG_SOUND2CNT_H: if (sound_powered) { ioreg.sound2cnt_h.w = value & 0xc7ff; } break;
-        case REG_SOUND3CNT_L: if (sound_powered) { ioreg.sound3cnt_l.w = value & 0x00e0; ioreg.sound3cnt_h.w = (value >> 16) & 0xe0ff; } break;
-        case REG_SOUND3CNT_X: if (sound_powered) { ioreg.sound3cnt_x.w = value & 0xc7ff; } break;
-        case REG_SOUND4CNT_L: if (sound_powered) { ioreg.sound4cnt_l.w = value & 0xff3f; } break;
-        case REG_SOUND4CNT_H: if (sound_powered) { ioreg.sound4cnt_h.w = value & 0xc0ff; } break;
-        case REG_SOUNDCNT_L: if (sound_powered) { ioreg.soundcnt_l.w = value & 0xff77; } ioreg.soundcnt_h.w = (value >> 16) & 0xff0f; break;
-        case REG_SOUNDCNT_X: ioreg.soundcnt_x.w = (ioreg.soundcnt_x.w & 0x000f) | (value & 0x0080); set_sound_powered(value & 0x0080); break;
-        case REG_SOUNDBIAS: ioreg.soundbias.w = value & 0xc3fe; break;
-        case REG_WAVE_RAM0_L: ioreg.wave_ram0.dw = value; break;
-        case REG_WAVE_RAM1_L: ioreg.wave_ram1.dw = value; break;
-        case REG_WAVE_RAM2_L: ioreg.wave_ram2.dw = value; break;
-        case REG_WAVE_RAM3_L: ioreg.wave_ram3.dw = value; break;
         case REG_FIFO_A_L: gba_audio_fifo_a(value); break;
         case REG_FIFO_B_L: gba_audio_fifo_b(value); break;
 
-        case REG_DMA0SAD_L: ioreg.dma[0].sad.dw = value; break;
-        case REG_DMA0DAD_L: ioreg.dma[0].dad.dw = value; break;
-        case REG_DMA0CNT_L: old_value = ioreg.dma[0].cnt.dw; ioreg.dma[0].cnt.dw = value & 0xf7e03fff; if (!(old_value & 0x80000000) && (value & 0x80000000)) { gba_dma_reset(0); gba_dma_update(DMA_NOW); } break;
-        case REG_DMA1SAD_L: ioreg.dma[1].sad.dw = value; break;
-        case REG_DMA1DAD_L: ioreg.dma[1].dad.dw = value; break;
-        case REG_DMA1CNT_L: old_value = ioreg.dma[1].cnt.dw; ioreg.dma[1].cnt.dw = value & 0xf7e03fff; if (!(old_value & 0x80000000) && (value & 0x80000000)) { gba_dma_reset(1); gba_dma_update(DMA_NOW); } break;
-        case REG_DMA2SAD_L: ioreg.dma[2].sad.dw = value; break;
-        case REG_DMA2DAD_L: ioreg.dma[2].dad.dw = value; break;
-        case REG_DMA2CNT_L: old_value = ioreg.dma[2].cnt.dw; ioreg.dma[2].cnt.dw = value & 0xf7e03fff; if (!(old_value & 0x80000000) && (value & 0x80000000)) { gba_dma_reset(2); gba_dma_update(DMA_NOW); } break;
-        case REG_DMA3SAD_L: ioreg.dma[3].sad.dw = value; break;
-        case REG_DMA3DAD_L: ioreg.dma[3].dad.dw = value; break;
-        case REG_DMA3CNT_L: old_value = ioreg.dma[3].cnt.dw; ioreg.dma[3].cnt.dw = value & 0xffe0ffff; if (!(old_value & 0x80000000) && (value & 0x80000000)) { gba_dma_reset(3); gba_dma_update(DMA_NOW); } break;
-
-        case REG_TM0CNT_L: ioreg.timer[0].reload.w = value & 0xffff; old_value = ioreg.timer[0].control.w; ioreg.timer[0].control.w = (value >> 16) & 0x00c7; if (!(old_value & 0x80) && ((value >> 16) & 0x80)) { gba_timer_reset(0); } break;
-        case REG_TM1CNT_L: ioreg.timer[1].reload.w = value & 0xffff; old_value = ioreg.timer[1].control.w; ioreg.timer[1].control.w = (value >> 16) & 0x00c7; if (!(old_value & 0x80) && ((value >> 16) & 0x80)) { gba_timer_reset(1); } break;
-        case REG_TM2CNT_L: ioreg.timer[2].reload.w = value & 0xffff; old_value = ioreg.timer[2].control.w; ioreg.timer[2].control.w = (value >> 16) & 0x00c7; if (!(old_value & 0x80) && ((value >> 16) & 0x80)) { gba_timer_reset(2); } break;
-        case REG_TM3CNT_L: ioreg.timer[3].reload.w = value & 0xffff; old_value = ioreg.timer[3].control.w; ioreg.timer[3].control.w = (value >> 16) & 0x00c7; if (!(old_value & 0x80) && ((value >> 16) & 0x80)) { gba_timer_reset(3); } break;
-
-        //case REG_SIOMULTI0:
-        //case REG_SIOMULTI2:
-        //case REG_SIOCNT:
-
         case REG_KEYINPUT: ioreg.keycnt.w = (value >> 16) & 0xc3ff; gba_check_keypad_interrupt(); break;
 
-        case REG_RCNT: ioreg.rcnt.w = value & 0xc1ff; break;
-        //case REG_JOYCNT:
-        //case REG_JOY_RECV_L:
-        //case REG_JOY_TRANS_L:
-        //case REG_JOYSTAT:
-
-        case REG_IE: ioreg.ie.w = value & 0x3fff; ioreg.irq.w &= ~(uint16_t)(value >> 16); break;
-        case REG_WAITCNT: ioreg.waitcnt.w = (ioreg.waitcnt.w & 0x8000) | (value & 0x5fff); break;
-        case REG_IME: ioreg.ime.w = value & 0x0001; break;
-        case REG_POSTFLG: ioreg.postflg = value & 0x01; ioreg.haltcnt = (value >> 8) & 0x80; halted = true; break;
-
         default:
-#ifdef LOG_BAD_MEMORY_ACCESS
-            printf("io_write_word(0x%08x, 0x%08x);\n", address, value);
-#endif
+            _io_write_byte(address, (uint8_t) value);
+            _io_write_byte(address + 1, (uint8_t)(value >> 8));
+            _io_write_byte(address + 2, (uint8_t)(value >> 16));
+            _io_write_byte(address + 3, (uint8_t)(value >> 24));
             break;
     }
 }
