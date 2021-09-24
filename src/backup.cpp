@@ -77,7 +77,10 @@ void backup_write_byte(uint32_t address, uint8_t value) {
             case 0:
             case 4:
             case 8:
-                if (address == 0x5555 && value == 0xaa) { flash_state++; break; }
+                if (address == 0x5555 && value == 0xaa) {
+                    flash_state++;
+                    break;
+                }
                 if (value != 0xf0) assert(false);
                 flash_state &= ~7;
                 break;
@@ -85,7 +88,10 @@ void backup_write_byte(uint32_t address, uint8_t value) {
             case 1:
             case 5:
             case 9:
-                if (address == 0x2aaa && value == 0x55) { flash_state++; break; }
+                if (address == 0x2aaa && value == 0x55) {
+                    flash_state++;
+                    break;
+                }
                 assert(false);
                 flash_state &= ~7;
                 break;
@@ -94,26 +100,43 @@ void backup_write_byte(uint32_t address, uint8_t value) {
             case 6:
             case 10:
                 if ((flash_state & ~3) == 0) {  // Normal mode
-                    if (address == 0x5555 && value == 0x80) { flash_state = 4; break; }
-                    if (address == 0x5555 && value == 0x90) { flash_state = 8; flash_id = true; break; }
-                    if (address == 0x5555 && value == 0xa0) { flash_state = 3; break; }
-                    if (address == 0x5555 && value == 0xb0) { flash_state = 7; break; }
+                    if (address == 0x5555 && value == 0x80) {
+                        flash_state = 4;
+                        break;
+                    }
+                    if (address == 0x5555 && value == 0x90) {
+                        flash_state = 8;
+                        flash_id = true;
+                        break;
+                    }
+                    if (address == 0x5555 && value == 0xa0) {
+                        flash_state = 3;
+                        break;
+                    }
+                    if (address == 0x5555 && value == 0xb0) {
+                        flash_state = 7;
+                        break;
+                    }
                     assert(false);
                 }
                 if (flash_state & 4) {  // Erase mode
-                    if (address == 0x5555 && value == 0x10) {  // Chip erase
-                        memset(backup_flash, 0xff, sizeof(backup_flash));
+                    if (address == 0x5555 && value == 0x10) {
+                        memset(backup_flash, 0xff, sizeof(backup_flash));  // Chip erase
                         break;
                     }
-                    if (value == 0x30) {  // Sector erase
+                    if (value == 0x30) {
                         uint32_t sector = address >> 12;
-                        memset(&backup_flash[flash_bank * 0x10000 + sector * 0x1000], 0xff, 0x1000);
+                        memset(&backup_flash[flash_bank * 0x10000 + sector * 0x1000], 0xff, 0x1000);  // Sector erase
                         break;
                     }
                     assert(false);
                 }
                 if (flash_state & 8) {  // Software ID mode
-                    if (address == 0x5555 && value == 0xf0) { flash_state = 0; flash_id = false; break; }
+                    if (address == 0x5555 && value == 0xf0) {
+                        flash_state = 0;
+                        flash_id = false;
+                        break;
+                    }
                     assert(false);
                 }
                 assert(false);
@@ -152,7 +175,7 @@ uint16_t backup_read_halfword(uint32_t address) {
 }
 
 void backup_write_halfword(uint32_t address, uint16_t value) {
-    backup_write_byte(address, (uint8_t)(value >> 8 * (address & 1)));
+    backup_write_byte(address, (uint8_t) (value >> 8 * (address & 1)));
 }
 
 uint32_t backup_read_word(uint32_t address) {
@@ -161,7 +184,7 @@ uint32_t backup_read_word(uint32_t address) {
 }
 
 void backup_write_word(uint32_t address, uint32_t value) {
-    backup_write_byte(address, (uint8_t)(value >> 8 * (address & 3)));
+    backup_write_byte(address, (uint8_t) (value >> 8 * (address & 3)));
 }
 
 uint16_t eeprom_read_bit(void) {
@@ -198,7 +221,7 @@ void eeprom_write_bit(uint16_t value) {
 
         case 2:  // Write request
             if (eeprom_num_wbits < eeprom_width) break;
-            eeprom_addr = (uint32_t)(eeprom_wbits * 8);
+            eeprom_addr = (uint32_t) (eeprom_wbits * 8);
             eeprom_rbits = 0;
             eeprom_num_rbits = 0;
             eeprom_state = 4;
@@ -208,7 +231,7 @@ void eeprom_write_bit(uint16_t value) {
 
         case 3:  // Read request
             if (eeprom_num_wbits < eeprom_width) break;
-            eeprom_addr = (uint32_t)(eeprom_wbits * 8);
+            eeprom_addr = (uint32_t) (eeprom_wbits * 8);
             eeprom_rbits = 0;
             eeprom_num_rbits = 68;
             for (int i = 0; i < 8; i++) {

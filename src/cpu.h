@@ -7,104 +7,112 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define UNUSED(x) (void)(x)
+#define UNUSED(x)     (void) (x)
 
-#define BIT(x, i) (((x) >> (i)) & 1)
+#define BIT(x, i)     (((x) >> (i)) & 1)
 #define BITS(x, i, j) (((x) >> (i)) & ((1 << ((j) - (i) + 1)) - 1))
 
-#define ASR(x, i) (((x) & (1 << 31)) != 0 ? ~(~(x) >> (i)) : (x) >> (i))
-#define ROR(x, i) (((x) >> (i)) | ((x) << (32 - (i))))
-#define SIGN_EXTEND(x, i) if ((x) & (1 << (i))) { (x) |= ~((1 << ((i) + 1)) - 1); }
+#define ASR(x, i)     (((x) & (1 << 31)) != 0 ? ~(~(x) >> (i)) : (x) >> (i))
+#define ROR(x, i)     (((x) >> (i)) | ((x) << (32 - (i))))
 
-#define FLAG_C() (cpsr & PSR_C ? true : false)
-#define FLAG_T() (cpsr & PSR_T ? true : false)
+#define SIGN_EXTEND(x, i)               \
+    if ((x) & (1 << (i))) {             \
+        (x) |= ~((1 << ((i) + 1)) - 1); \
+    }
 
-#define ASSIGN_N(x) if ((x)) { cpsr |= PSR_N; } else { cpsr &= ~PSR_N; }
-#define ASSIGN_Z(x) if ((x)) { cpsr |= PSR_Z; } else { cpsr &= ~PSR_Z; }
-#define ASSIGN_C(x) if ((x)) { cpsr |= PSR_C; } else { cpsr &= ~PSR_C; }
-#define ASSIGN_V(x) if ((x)) { cpsr |= PSR_V; } else { cpsr &= ~PSR_V; }
-#define ASSIGN_T(x) if ((x)) { cpsr |= PSR_T; } else { cpsr &= ~PSR_T; }
+// clang-format off
 
-#define CLEAR_C() cpsr &= ~PSR_C
+#define FLAG_C()           (cpsr & PSR_C ? true : false)
+#define FLAG_T()           (cpsr & PSR_T ? true : false)
 
-#define SIZEOF_INSTR (cpsr & PSR_T ? 2 : 4)
+#define ASSIGN_N(x)        if ((x)) { cpsr |= PSR_N; } else { cpsr &= ~PSR_N; }
+#define ASSIGN_Z(x)        if ((x)) { cpsr |= PSR_Z; } else { cpsr &= ~PSR_Z; }
+#define ASSIGN_C(x)        if ((x)) { cpsr |= PSR_C; } else { cpsr &= ~PSR_C; }
+#define ASSIGN_V(x)        if ((x)) { cpsr |= PSR_V; } else { cpsr &= ~PSR_V; }
+#define ASSIGN_T(x)        if ((x)) { cpsr |= PSR_T; } else { cpsr &= ~PSR_T; }
 
-#define ARM_AND 0
-#define ARM_EOR 1
-#define ARM_SUB 2
-#define ARM_RSB 3
-#define ARM_ADD 4
-#define ARM_ADC 5
-#define ARM_SBC 6
-#define ARM_RSC 7
-#define ARM_TST 8
-#define ARM_TEQ 9
-#define ARM_CMP 0xa
-#define ARM_CMN 0xb
-#define ARM_ORR 0xc
-#define ARM_MOV 0xd
-#define ARM_BIC 0xe
-#define ARM_MVN 0xf
+#define CLEAR_C()          cpsr &= ~PSR_C
 
-#define COND_EQ 0
-#define COND_NE 1
-#define COND_CS 2
-#define COND_CC 3
-#define COND_MI 4
-#define COND_PL 5
-#define COND_VS 6
-#define COND_VC 7
-#define COND_HI 8
-#define COND_LS 9
-#define COND_GE 0xa
-#define COND_LT 0xb
-#define COND_GT 0xc
-#define COND_LE 0xd
-#define COND_AL 0xe
-#define COND_NV 0xf
+// clang-format on
 
-#define PSR_N    (1 << 31)
-#define PSR_Z    (1 << 30)
-#define PSR_C    (1 << 29)
-#define PSR_V    (1 << 28)
-#define PSR_I    (1 << 7)
-#define PSR_F    (1 << 6)
-#define PSR_T    (1 << 5)
-#define PSR_MODE 0x1f
+#define SIZEOF_INSTR       (cpsr & PSR_T ? 2 : 4)
 
-#define PSR_MODE_USR 0x10
-#define PSR_MODE_FIQ 0x11
-#define PSR_MODE_IRQ 0x12
-#define PSR_MODE_SVC 0x13
-#define PSR_MODE_ABT 0x17
-#define PSR_MODE_UND 0x1b
-#define PSR_MODE_SYS 0x1f
+#define ARM_AND            0
+#define ARM_EOR            1
+#define ARM_SUB            2
+#define ARM_RSB            3
+#define ARM_ADD            4
+#define ARM_ADC            5
+#define ARM_SBC            6
+#define ARM_RSC            7
+#define ARM_TST            8
+#define ARM_TEQ            9
+#define ARM_CMP            0xa
+#define ARM_CMN            0xb
+#define ARM_ORR            0xc
+#define ARM_MOV            0xd
+#define ARM_BIC            0xe
+#define ARM_MVN            0xf
 
-#define REG_SP 13
-#define REG_LR 14
-#define REG_PC 15
+#define COND_EQ            0
+#define COND_NE            1
+#define COND_CS            2
+#define COND_CC            3
+#define COND_MI            4
+#define COND_PL            5
+#define COND_VS            6
+#define COND_VC            7
+#define COND_HI            8
+#define COND_LS            9
+#define COND_GE            0xa
+#define COND_LT            0xb
+#define COND_GT            0xc
+#define COND_LE            0xd
+#define COND_AL            0xe
+#define COND_NV            0xf
 
-#define SHIFT_LSL 0
-#define SHIFT_LSR 1
-#define SHIFT_ASR 2
-#define SHIFT_ROR 3
+#define PSR_N              (1 << 31)
+#define PSR_Z              (1 << 30)
+#define PSR_C              (1 << 29)
+#define PSR_V              (1 << 28)
+#define PSR_I              (1 << 7)
+#define PSR_F              (1 << 6)
+#define PSR_T              (1 << 5)
+#define PSR_MODE           0x1f
 
-#define THUMB_AND 0
-#define THUMB_EOR 1
-#define THUMB_LSL 2
-#define THUMB_LSR 3
-#define THUMB_ASR 4
-#define THUMB_ADC 5
-#define THUMB_SBC 6
-#define THUMB_ROR 7
-#define THUMB_TST 8
-#define THUMB_NEG 9
-#define THUMB_CMP 0xa
-#define THUMB_CMN 0xb
-#define THUMB_ORR 0xc
-#define THUMB_MUL 0xd
-#define THUMB_BIC 0xe
-#define THUMB_MVN 0xf
+#define PSR_MODE_USR       0x10
+#define PSR_MODE_FIQ       0x11
+#define PSR_MODE_IRQ       0x12
+#define PSR_MODE_SVC       0x13
+#define PSR_MODE_ABT       0x17
+#define PSR_MODE_UND       0x1b
+#define PSR_MODE_SYS       0x1f
+
+#define REG_SP             13
+#define REG_LR             14
+#define REG_PC             15
+
+#define SHIFT_LSL          0
+#define SHIFT_LSR          1
+#define SHIFT_ASR          2
+#define SHIFT_ROR          3
+
+#define THUMB_AND          0
+#define THUMB_EOR          1
+#define THUMB_LSL          2
+#define THUMB_LSR          3
+#define THUMB_ASR          4
+#define THUMB_ADC          5
+#define THUMB_SBC          6
+#define THUMB_ROR          7
+#define THUMB_TST          8
+#define THUMB_NEG          9
+#define THUMB_CMP          0xa
+#define THUMB_CMN          0xb
+#define THUMB_ORR          0xc
+#define THUMB_MUL          0xd
+#define THUMB_BIC          0xe
+#define THUMB_MVN          0xf
 
 #define VEC_RESET          0
 #define VEC_UNDEF          4

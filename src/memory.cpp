@@ -22,18 +22,18 @@ uint32_t game_rom_size = 0;
 uint32_t game_rom_mask = 0;
 
 uint8_t rom_read_byte(uint32_t address) {
-    if (address > game_rom_mask) return (uint8_t)((uint16_t)(address >> 1) >> 8 * (address & 1));
+    if (address > game_rom_mask) return (uint8_t) ((uint16_t) (address >> 1) >> 8 * (address & 1));
     return game_rom[address & game_rom_mask];
 }
 
 uint16_t rom_read_halfword(uint32_t address) {
-    if (address > game_rom_mask) return (uint16_t)(address >> 1);
-    return *(uint16_t *)&game_rom[address & (game_rom_mask & ~1)];
+    if (address > game_rom_mask) return (uint16_t) (address >> 1);
+    return *(uint16_t *) &game_rom[address & (game_rom_mask & ~1)];
 }
 
 uint32_t rom_read_word(uint32_t address) {
-    if (address > game_rom_mask) return (uint16_t)((address & ~2) >> 1) | (uint16_t)((address | 2) >> 1) << 16;
-    return *(uint32_t *)&game_rom[address & (game_rom_mask & ~3)];
+    if (address > game_rom_mask) return (uint16_t) ((address & ~2) >> 1) | (uint16_t) ((address | 2) >> 1) << 16;
+    return *(uint32_t *) &game_rom[address & (game_rom_mask & ~3)];
 }
 
 uint8_t memory_read_byte(uint32_t address) {
@@ -74,7 +74,7 @@ uint8_t memory_read_byte(uint32_t address) {
 #ifdef LOG_BAD_MEMORY_ACCESS
     printf("memory_read_byte(0x%08x);\n", address);
 #endif
-    return (uint8_t)(open_bus() >> 8 * (address & 3));
+    return (uint8_t) (open_bus() >> 8 * (address & 3));
 }
 
 void memory_write_byte(uint32_t address, uint8_t value) {
@@ -94,7 +94,7 @@ void memory_write_byte(uint32_t address, uint8_t value) {
         return;
     }
     if (address >= 0x05000000 && address < 0x06000000) {
-        *(uint16_t *)&palette_ram[address & 0x3fe] = value | value << 8;
+        *(uint16_t *) &palette_ram[address & 0x3fe] = value | value << 8;
         return;
     }
     if (address >= 0x06000000 && address < 0x07000000) {
@@ -102,9 +102,9 @@ void memory_write_byte(uint32_t address, uint8_t value) {
         bool bitmap_mode = (mode >= 3 && mode <= 5);
 
         address &= 0x1fffe;
-        if (bitmap_mode && address >= 0x18000) return;  // No VRAM OBJ mirror in bitmap mode
+        if (bitmap_mode && address >= 0x18000) return;             // No VRAM OBJ mirror in bitmap mode
         if (address >= (bitmap_mode ? 0x14000 : 0x10000)) return;  // VRAM OBJ 8-bit write ignored
-        *(uint16_t *)&video_ram[address] = value | value << 8;
+        *(uint16_t *) &video_ram[address] = value | value << 8;
         return;
     }
     if (address >= 0x07000000 && address < 0x08000000) {
@@ -125,19 +125,19 @@ void memory_write_byte(uint32_t address, uint8_t value) {
 uint16_t memory_read_halfword(uint32_t address) {
     if (address < 0x4000) {
         if (r[15] < 0x4000) last_bios_access = address & 0x3ffe;
-        return *(uint16_t *)&system_rom[last_bios_access];
+        return *(uint16_t *) &system_rom[last_bios_access];
     }
     if (address >= 0x02000000 && address < 0x03000000) {
-        return *(uint16_t *)&cpu_ewram[address & 0x3fffe];
+        return *(uint16_t *) &cpu_ewram[address & 0x3fffe];
     }
     if (address >= 0x03000000 && address < 0x04000000) {
-        return *(uint16_t *)&cpu_iwram[address & 0x7ffe];
+        return *(uint16_t *) &cpu_iwram[address & 0x7ffe];
     }
     if (address >= 0x04000000 && address < 0x05000000) {
         return io_read_halfword(address & 0x3fffffe);
     }
     if (address >= 0x05000000 && address < 0x06000000) {
-        return *(uint16_t *)&palette_ram[address & 0x3fe];
+        return *(uint16_t *) &palette_ram[address & 0x3fe];
     }
     if (address >= 0x06000000 && address < 0x07000000) {
         uint16_t mode = ioreg.dispcnt.w & 7;
@@ -146,10 +146,10 @@ uint16_t memory_read_halfword(uint32_t address) {
         address &= 0x1fffe;
         if (bitmap_mode && address >= 0x18000) return 0;  // No VRAM OBJ mirror in bitmap mode
         if (address >= 0x18000) address -= 0x8000;
-        return *(uint16_t *)&video_ram[address];
+        return *(uint16_t *) &video_ram[address];
     }
     if (address >= 0x07000000 && address < 0x08000000) {
-        return *(uint16_t *)&object_ram[address & 0x3fe];
+        return *(uint16_t *) &object_ram[address & 0x3fe];
     }
     if (address >= 0x08000000 && address < 0x0e000000) {
         if (has_eeprom && game_rom_size <= 0x1000000 && (address >= 0x0d000000 && address < 0x0e000000)) {
@@ -166,7 +166,7 @@ uint16_t memory_read_halfword(uint32_t address) {
 #ifdef LOG_BAD_MEMORY_ACCESS
     printf("memory_read_halfword(0x%08x);\n", address);
 #endif
-    return (uint16_t)(open_bus() >> 8 * (address & 2));
+    return (uint16_t) (open_bus() >> 8 * (address & 2));
 }
 
 void memory_write_halfword(uint32_t address, uint16_t value) {
@@ -174,11 +174,11 @@ void memory_write_halfword(uint32_t address, uint16_t value) {
         return;  // Read only
     }
     if (address >= 0x02000000 && address < 0x03000000) {
-        *(uint16_t *)&cpu_ewram[address & 0x3fffe] = value;
+        *(uint16_t *) &cpu_ewram[address & 0x3fffe] = value;
         return;
     }
     if (address >= 0x03000000 && address < 0x04000000) {
-        *(uint16_t *)&cpu_iwram[address & 0x7ffe] = value;
+        *(uint16_t *) &cpu_iwram[address & 0x7ffe] = value;
         return;
     }
     if (address >= 0x04000000 && address < 0x05000000) {
@@ -186,7 +186,7 @@ void memory_write_halfword(uint32_t address, uint16_t value) {
         return;
     }
     if (address >= 0x05000000 && address < 0x06000000) {
-        *(uint16_t *)&palette_ram[address & 0x3fe] = value;
+        *(uint16_t *) &palette_ram[address & 0x3fe] = value;
         return;
     }
     if (address >= 0x06000000 && address < 0x07000000) {
@@ -196,11 +196,11 @@ void memory_write_halfword(uint32_t address, uint16_t value) {
         address &= 0x1fffe;
         if (bitmap_mode && address >= 0x18000) return;  // No VRAM OBJ mirror in bitmap mode
         if (address >= 0x18000) address -= 0x8000;
-        *(uint16_t *)&video_ram[address] = value;
+        *(uint16_t *) &video_ram[address] = value;
         return;
     }
     if (address >= 0x07000000 && address < 0x08000000) {
-        *(uint16_t *)&object_ram[address & 0x3fe] = value;
+        *(uint16_t *) &object_ram[address & 0x3fe] = value;
         return;
     }
     if (address >= 0x08000000 && address < 0x0e000000) {
@@ -223,21 +223,21 @@ void memory_write_halfword(uint32_t address, uint16_t value) {
 }
 
 uint32_t memory_read_word(uint32_t address) {
-   if (address < 0x4000) {
+    if (address < 0x4000) {
         if (r[15] < 0x4000) last_bios_access = address & 0x3ffc;
-        return *(uint32_t *)&system_rom[last_bios_access];
+        return *(uint32_t *) &system_rom[last_bios_access];
     }
     if (address >= 0x02000000 && address < 0x03000000) {
-        return *(uint32_t *)&cpu_ewram[address & 0x3fffc];
+        return *(uint32_t *) &cpu_ewram[address & 0x3fffc];
     }
     if (address >= 0x03000000 && address < 0x04000000) {
-        return *(uint32_t *)&cpu_iwram[address & 0x7ffc];
+        return *(uint32_t *) &cpu_iwram[address & 0x7ffc];
     }
     if (address >= 0x04000000 && address < 0x05000000) {
         return io_read_word(address & 0x3fffffc);
     }
     if (address >= 0x05000000 && address < 0x06000000) {
-        return *(uint32_t*)&palette_ram[address & 0x3fc];
+        return *(uint32_t *) &palette_ram[address & 0x3fc];
     }
     if (address >= 0x06000000 && address < 0x07000000) {
         uint16_t mode = ioreg.dispcnt.w & 7;
@@ -246,10 +246,10 @@ uint32_t memory_read_word(uint32_t address) {
         address &= 0x1fffc;
         if (bitmap_mode && address >= 0x18000) return 0;  // No VRAM OBJ mirror in bitmap mode
         if (address >= 0x18000) address -= 0x8000;
-        return *(uint32_t *)&video_ram[address];
+        return *(uint32_t *) &video_ram[address];
     }
     if (address >= 0x07000000 && address < 0x08000000) {
-        return *(uint32_t *)&object_ram[address & 0x3fc];
+        return *(uint32_t *) &object_ram[address & 0x3fc];
     }
     if (address >= 0x08000000 && address < 0x0e000000) {
         return rom_read_word(address & 0x1fffffc);
@@ -268,11 +268,11 @@ void memory_write_word(uint32_t address, uint32_t value) {
         return;  // Read only
     }
     if (address >= 0x02000000 && address < 0x03000000) {
-        *(uint32_t *)&cpu_ewram[address & 0x3fffc] = value;
+        *(uint32_t *) &cpu_ewram[address & 0x3fffc] = value;
         return;
     }
     if (address >= 0x03000000 && address < 0x04000000) {
-        *(uint32_t *)&cpu_iwram[address & 0x7ffc] = value;
+        *(uint32_t *) &cpu_iwram[address & 0x7ffc] = value;
         return;
     }
     if (address >= 0x04000000 && address < 0x05000000) {
@@ -280,7 +280,7 @@ void memory_write_word(uint32_t address, uint32_t value) {
         return;
     }
     if (address >= 0x05000000 && address < 0x06000000) {
-        *(uint32_t *)&palette_ram[address & 0x3fc] = value;
+        *(uint32_t *) &palette_ram[address & 0x3fc] = value;
         return;
     }
     if (address >= 0x06000000 && address < 0x07000000) {
@@ -290,11 +290,11 @@ void memory_write_word(uint32_t address, uint32_t value) {
         address &= 0x1fffc;
         if (bitmap_mode && address >= 0x18000) return;  // No VRAM OBJ mirror in bitmap mode
         if (address >= 0x18000) address -= 0x8000;
-        *(uint32_t *)&video_ram[address] = value;
+        *(uint32_t *) &video_ram[address] = value;
         return;
     }
     if (address >= 0x07000000 && address < 0x08000000) {
-        *(uint32_t *)&object_ram[address & 0x3fc] = value;
+        *(uint32_t *) &object_ram[address & 0x3fc] = value;
         return;
     }
     if (address >= 0x08000000 && address < 0x0e000000) {

@@ -272,7 +272,7 @@ int thumb_branch_and_exchange(uint16_t op) {
     uint32_t Rm = BITS(op, 3, 6);
     uint32_t sbz = BITS(op, 0, 2);
 
-    assert(!L);  // unpredictable
+    assert(!L);        // unpredictable
     assert(sbz == 0);  // should be zero
 
     arm_op = COND_AL << 28 | 0x12 << 20 | 0xfff << 8 | 0x1 << 4 | Rm;

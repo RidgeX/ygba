@@ -203,7 +203,7 @@ static uint8_t _io_read_byte(uint32_t address) {
             break;
     }
 
-    return (uint8_t)(open_bus() >> 8 * (address & 3));
+    return (uint8_t) (open_bus() >> 8 * (address & 3));
 }
 
 static void _io_write_byte(uint32_t address, uint8_t value) {
@@ -291,32 +291,82 @@ static void _io_write_byte(uint32_t address, uint8_t value) {
         case REG_BLDY + 0: ioreg.bldy.b.b0 = value & 0x1f; break;
         case REG_BLDY + 1: break;
 
-        case REG_SOUND1CNT_L + 0: if (sound_powered) { ioreg.sound1cnt_l.b.b0 = value & 0x7f; } break;
-        case REG_SOUND1CNT_L + 1: break;
-        case REG_SOUND1CNT_H + 0: if (sound_powered) { ioreg.sound1cnt_h.b.b0 = value; } break;
-        case REG_SOUND1CNT_H + 1: if (sound_powered) { ioreg.sound1cnt_h.b.b1 = value; } break;
-        case REG_SOUND1CNT_X + 0: if (sound_powered) { ioreg.sound1cnt_x.b.b0 = value; } break;
-        case REG_SOUND1CNT_X + 1: if (sound_powered) { ioreg.sound1cnt_x.b.b1 = value & 0xc7; } break;
-        case REG_SOUND2CNT_L + 0: if (sound_powered) { ioreg.sound2cnt_l.b.b0 = value; } break;
-        case REG_SOUND2CNT_L + 1: if (sound_powered) { ioreg.sound2cnt_l.b.b1 = value; } break;
-        case REG_SOUND2CNT_H + 0: if (sound_powered) { ioreg.sound2cnt_h.b.b0 = value; } break;
-        case REG_SOUND2CNT_H + 1: if (sound_powered) { ioreg.sound2cnt_h.b.b1 = value & 0xc7; } break;
-        case REG_SOUND3CNT_L + 0: if (sound_powered) { ioreg.sound3cnt_l.b.b0 = value & 0xe0; } break;
-        case REG_SOUND3CNT_L + 1: break;
-        case REG_SOUND3CNT_H + 0: if (sound_powered) { ioreg.sound3cnt_h.b.b0 = value; } break;
-        case REG_SOUND3CNT_H + 1: if (sound_powered) { ioreg.sound3cnt_h.b.b1 = value & 0xe0; } break;
-        case REG_SOUND3CNT_X + 0: if (sound_powered) { ioreg.sound3cnt_x.b.b0 = value; } break;
-        case REG_SOUND3CNT_X + 1: if (sound_powered) { ioreg.sound3cnt_x.b.b1 = value & 0xc7; } break;
-        case REG_SOUND4CNT_L + 0: if (sound_powered) { ioreg.sound4cnt_l.b.b0 = value & 0x3f; } break;
-        case REG_SOUND4CNT_L + 1: if (sound_powered) { ioreg.sound4cnt_l.b.b1 = value; } break;
-        case REG_SOUND4CNT_H + 0: if (sound_powered) { ioreg.sound4cnt_h.b.b0 = value; } break;
-        case REG_SOUND4CNT_H + 1: if (sound_powered) { ioreg.sound4cnt_h.b.b1 = value & 0xc0; } break;
-        case REG_SOUNDCNT_L + 0: if (sound_powered) { ioreg.soundcnt_l.b.b0 = value & 0x77; } break;
-        case REG_SOUNDCNT_L + 1: if (sound_powered) { ioreg.soundcnt_l.b.b1 = value; } break;
-        case REG_SOUNDCNT_H + 0: ioreg.soundcnt_h.b.b0 = value & 0x0f; break;
-        case REG_SOUNDCNT_H + 1: ioreg.soundcnt_h.b.b1 = value; break;
-        case REG_SOUNDCNT_X + 0: ioreg.soundcnt_x.b.b0 = (ioreg.soundcnt_x.b.b0 & 0x0f) | (value & 0x80); set_sound_powered(value & 0x80); break;
-        case REG_SOUNDCNT_X + 1: break;
+        case REG_SOUND1CNT_L + 0:
+            if (sound_powered) ioreg.sound1cnt_l.b.b0 = value & 0x7f;
+            break;
+        case REG_SOUND1CNT_L + 1:
+            break;
+        case REG_SOUND1CNT_H + 0:
+            if (sound_powered) ioreg.sound1cnt_h.b.b0 = value;
+            break;
+        case REG_SOUND1CNT_H + 1:
+            if (sound_powered) ioreg.sound1cnt_h.b.b1 = value;
+            break;
+        case REG_SOUND1CNT_X + 0:
+            if (sound_powered) ioreg.sound1cnt_x.b.b0 = value;
+            break;
+        case REG_SOUND1CNT_X + 1:
+            if (sound_powered) ioreg.sound1cnt_x.b.b1 = value & 0xc7;
+            break;
+        case REG_SOUND2CNT_L + 0:
+            if (sound_powered) ioreg.sound2cnt_l.b.b0 = value;
+            break;
+        case REG_SOUND2CNT_L + 1:
+            if (sound_powered) ioreg.sound2cnt_l.b.b1 = value;
+            break;
+        case REG_SOUND2CNT_H + 0:
+            if (sound_powered) ioreg.sound2cnt_h.b.b0 = value;
+            break;
+        case REG_SOUND2CNT_H + 1:
+            if (sound_powered) ioreg.sound2cnt_h.b.b1 = value & 0xc7;
+            break;
+        case REG_SOUND3CNT_L + 0:
+            if (sound_powered) ioreg.sound3cnt_l.b.b0 = value & 0xe0;
+            break;
+        case REG_SOUND3CNT_L + 1:
+            break;
+        case REG_SOUND3CNT_H + 0:
+            if (sound_powered) ioreg.sound3cnt_h.b.b0 = value;
+            break;
+        case REG_SOUND3CNT_H + 1:
+            if (sound_powered) ioreg.sound3cnt_h.b.b1 = value & 0xe0;
+            break;
+        case REG_SOUND3CNT_X + 0:
+            if (sound_powered) ioreg.sound3cnt_x.b.b0 = value;
+            break;
+        case REG_SOUND3CNT_X + 1:
+            if (sound_powered) ioreg.sound3cnt_x.b.b1 = value & 0xc7;
+            break;
+        case REG_SOUND4CNT_L + 0:
+            if (sound_powered) ioreg.sound4cnt_l.b.b0 = value & 0x3f;
+            break;
+        case REG_SOUND4CNT_L + 1:
+            if (sound_powered) ioreg.sound4cnt_l.b.b1 = value;
+            break;
+        case REG_SOUND4CNT_H + 0:
+            if (sound_powered) ioreg.sound4cnt_h.b.b0 = value;
+            break;
+        case REG_SOUND4CNT_H + 1:
+            if (sound_powered) ioreg.sound4cnt_h.b.b1 = value & 0xc0;
+            break;
+        case REG_SOUNDCNT_L + 0:
+            if (sound_powered) ioreg.soundcnt_l.b.b0 = value & 0x77;
+            break;
+        case REG_SOUNDCNT_L + 1:
+            if (sound_powered) ioreg.soundcnt_l.b.b1 = value;
+            break;
+        case REG_SOUNDCNT_H + 0:
+            ioreg.soundcnt_h.b.b0 = value & 0x0f;
+            break;
+        case REG_SOUNDCNT_H + 1:
+            ioreg.soundcnt_h.b.b1 = value;
+            break;
+        case REG_SOUNDCNT_X + 0:
+            ioreg.soundcnt_x.b.b0 = (ioreg.soundcnt_x.b.b0 & 0x0f) | (value & 0x80);
+            set_sound_powered(value & 0x80);
+            break;
+        case REG_SOUNDCNT_X + 1:
+            break;
         case REG_SOUNDBIAS + 0: ioreg.soundbias.b.b0 = value & 0xfe; break;
         case REG_SOUNDBIAS + 1: ioreg.soundbias.b.b1 = value & 0xc3; break;
         case REG_WAVE_RAM0_L + 0: ioreg.wave_ram0.b.b0 = value; break;
@@ -347,7 +397,14 @@ static void _io_write_byte(uint32_t address, uint8_t value) {
         case REG_DMA0CNT_L + 0: ioreg.dma[0].cnt.b.b0 = value; break;
         case REG_DMA0CNT_L + 1: ioreg.dma[0].cnt.b.b1 = value & 0x3f; break;
         case REG_DMA0CNT_H + 0: ioreg.dma[0].cnt.b.b2 = value & 0xe0; break;
-        case REG_DMA0CNT_H + 1: old_value = ioreg.dma[0].cnt.b.b3; ioreg.dma[0].cnt.b.b3 = value & 0xf7; if (!(old_value & 0x80) && (value & 0x80)) { gba_dma_reset(0); gba_dma_update(DMA_NOW); } break;
+        case REG_DMA0CNT_H + 1:
+            old_value = ioreg.dma[0].cnt.b.b3;
+            ioreg.dma[0].cnt.b.b3 = value & 0xf7;
+            if (!(old_value & 0x80) && (value & 0x80)) {
+                gba_dma_reset(0);
+                gba_dma_update(DMA_NOW);
+            }
+            break;
         case REG_DMA1SAD_L + 0: ioreg.dma[1].sad.b.b0 = value; break;
         case REG_DMA1SAD_L + 1: ioreg.dma[1].sad.b.b1 = value; break;
         case REG_DMA1SAD_H + 0: ioreg.dma[1].sad.b.b2 = value; break;
@@ -359,7 +416,14 @@ static void _io_write_byte(uint32_t address, uint8_t value) {
         case REG_DMA1CNT_L + 0: ioreg.dma[1].cnt.b.b0 = value; break;
         case REG_DMA1CNT_L + 1: ioreg.dma[1].cnt.b.b1 = value & 0x3f; break;
         case REG_DMA1CNT_H + 0: ioreg.dma[1].cnt.b.b2 = value & 0xe0; break;
-        case REG_DMA1CNT_H + 1: old_value = ioreg.dma[1].cnt.b.b3; ioreg.dma[1].cnt.b.b3 = value & 0xf7; if (!(old_value & 0x80) && (value & 0x80)) { gba_dma_reset(1); gba_dma_update(DMA_NOW); } break;
+        case REG_DMA1CNT_H + 1:
+            old_value = ioreg.dma[1].cnt.b.b3;
+            ioreg.dma[1].cnt.b.b3 = value & 0xf7;
+            if (!(old_value & 0x80) && (value & 0x80)) {
+                gba_dma_reset(1);
+                gba_dma_update(DMA_NOW);
+            }
+            break;
         case REG_DMA2SAD_L + 0: ioreg.dma[2].sad.b.b0 = value; break;
         case REG_DMA2SAD_L + 1: ioreg.dma[2].sad.b.b1 = value; break;
         case REG_DMA2SAD_H + 0: ioreg.dma[2].sad.b.b2 = value; break;
@@ -371,7 +435,14 @@ static void _io_write_byte(uint32_t address, uint8_t value) {
         case REG_DMA2CNT_L + 0: ioreg.dma[2].cnt.b.b0 = value; break;
         case REG_DMA2CNT_L + 1: ioreg.dma[2].cnt.b.b1 = value & 0x3f; break;
         case REG_DMA2CNT_H + 0: ioreg.dma[2].cnt.b.b2 = value & 0xe0; break;
-        case REG_DMA2CNT_H + 1: old_value = ioreg.dma[2].cnt.b.b3; ioreg.dma[2].cnt.b.b3 = value & 0xf7; if (!(old_value & 0x80) && (value & 0x80)) { gba_dma_reset(2); gba_dma_update(DMA_NOW); } break;
+        case REG_DMA2CNT_H + 1:
+            old_value = ioreg.dma[2].cnt.b.b3;
+            ioreg.dma[2].cnt.b.b3 = value & 0xf7;
+            if (!(old_value & 0x80) && (value & 0x80)) {
+                gba_dma_reset(2);
+                gba_dma_update(DMA_NOW);
+            }
+            break;
         case REG_DMA3SAD_L + 0: ioreg.dma[3].sad.b.b0 = value; break;
         case REG_DMA3SAD_L + 1: ioreg.dma[3].sad.b.b1 = value; break;
         case REG_DMA3SAD_H + 0: ioreg.dma[3].sad.b.b2 = value; break;
@@ -383,52 +454,92 @@ static void _io_write_byte(uint32_t address, uint8_t value) {
         case REG_DMA3CNT_L + 0: ioreg.dma[3].cnt.b.b0 = value; break;
         case REG_DMA3CNT_L + 1: ioreg.dma[3].cnt.b.b1 = value; break;
         case REG_DMA3CNT_H + 0: ioreg.dma[3].cnt.b.b2 = value & 0xe0; break;
-        case REG_DMA3CNT_H + 1: old_value = ioreg.dma[3].cnt.b.b3; ioreg.dma[3].cnt.b.b3 = value; if (!(old_value & 0x80) && (value & 0x80)) { gba_dma_reset(3); gba_dma_update(DMA_NOW); } break;
+        case REG_DMA3CNT_H + 1:
+            old_value = ioreg.dma[3].cnt.b.b3;
+            ioreg.dma[3].cnt.b.b3 = value;
+            if (!(old_value & 0x80) && (value & 0x80)) {
+                gba_dma_reset(3);
+                gba_dma_update(DMA_NOW);
+            }
+            break;
 
         case REG_TM0CNT_L + 0: ioreg.timer[0].reload.b.b0 = value; break;
         case REG_TM0CNT_L + 1: ioreg.timer[0].reload.b.b1 = value; break;
-        case REG_TM0CNT_H + 0: old_value = ioreg.timer[0].control.b.b0; ioreg.timer[0].control.b.b0 = value & 0xc7; if (!(old_value & 0x80) && (value & 0x80)) { gba_timer_reset(0); } break;
-        case REG_TM0CNT_H + 1: break;
+        case REG_TM0CNT_H + 0:
+            old_value = ioreg.timer[0].control.b.b0;
+            ioreg.timer[0].control.b.b0 = value & 0xc7;
+            if (!(old_value & 0x80) && (value & 0x80)) {
+                gba_timer_reset(0);
+            }
+            break;
+        case REG_TM0CNT_H + 1:
+            break;
         case REG_TM1CNT_L + 0: ioreg.timer[1].reload.b.b0 = value; break;
         case REG_TM1CNT_L + 1: ioreg.timer[1].reload.b.b1 = value; break;
-        case REG_TM1CNT_H + 0: old_value = ioreg.timer[1].control.b.b0; ioreg.timer[1].control.b.b0 = value & 0xc7; if (!(old_value & 0x80) && (value & 0x80)) { gba_timer_reset(1); } break;
-        case REG_TM1CNT_H + 1: break;
+        case REG_TM1CNT_H + 0:
+            old_value = ioreg.timer[1].control.b.b0;
+            ioreg.timer[1].control.b.b0 = value & 0xc7;
+            if (!(old_value & 0x80) && (value & 0x80)) {
+                gba_timer_reset(1);
+            }
+            break;
+        case REG_TM1CNT_H + 1:
+            break;
         case REG_TM2CNT_L + 0: ioreg.timer[2].reload.b.b0 = value; break;
         case REG_TM2CNT_L + 1: ioreg.timer[2].reload.b.b1 = value; break;
-        case REG_TM2CNT_H + 0: old_value = ioreg.timer[2].control.b.b0; ioreg.timer[2].control.b.b0 = value & 0xc7; if (!(old_value & 0x80) && (value & 0x80)) { gba_timer_reset(2); } break;
-        case REG_TM2CNT_H + 1: break;
+        case REG_TM2CNT_H + 0:
+            old_value = ioreg.timer[2].control.b.b0;
+            ioreg.timer[2].control.b.b0 = value & 0xc7;
+            if (!(old_value & 0x80) && (value & 0x80)) {
+                gba_timer_reset(2);
+            }
+            break;
+        case REG_TM2CNT_H + 1:
+            break;
         case REG_TM3CNT_L + 0: ioreg.timer[3].reload.b.b0 = value; break;
         case REG_TM3CNT_L + 1: ioreg.timer[3].reload.b.b1 = value; break;
-        case REG_TM3CNT_H + 0: old_value = ioreg.timer[3].control.b.b0; ioreg.timer[3].control.b.b0 = value & 0xc7; if (!(old_value & 0x80) && (value & 0x80)) { gba_timer_reset(3); } break;
-        case REG_TM3CNT_H + 1: break;
+        case REG_TM3CNT_H + 0:
+            old_value = ioreg.timer[3].control.b.b0;
+            ioreg.timer[3].control.b.b0 = value & 0xc7;
+            if (!(old_value & 0x80) && (value & 0x80)) {
+                gba_timer_reset(3);
+            }
+            break;
+        case REG_TM3CNT_H + 1:
+            break;
 
-        //case REG_SIOMULTI0 + 0:
-        //case REG_SIOMULTI0 + 1:
-        //case REG_SIOMULTI1 + 0:
-        //case REG_SIOMULTI1 + 1:
-        //case REG_SIOMULTI2 + 0:
-        //case REG_SIOMULTI2 + 1:
-        //case REG_SIOMULTI3 + 0:
-        //case REG_SIOMULTI3 + 1:
-        //case REG_SIOCNT + 0:
-        //case REG_SIOCNT + 1:
-        //case REG_SIOMLT_SEND + 0:
-        //case REG_SIOMLT_SEND + 1:
+            //case REG_SIOMULTI0 + 0:
+            //case REG_SIOMULTI0 + 1:
+            //case REG_SIOMULTI1 + 0:
+            //case REG_SIOMULTI1 + 1:
+            //case REG_SIOMULTI2 + 0:
+            //case REG_SIOMULTI2 + 1:
+            //case REG_SIOMULTI3 + 0:
+            //case REG_SIOMULTI3 + 1:
+            //case REG_SIOCNT + 0:
+            //case REG_SIOCNT + 1:
+            //case REG_SIOMLT_SEND + 0:
+            //case REG_SIOMLT_SEND + 1:
 
-        case REG_RCNT + 0: ioreg.rcnt.b.b0 = value; break;
-        case REG_RCNT + 1: ioreg.rcnt.b.b1 = value & 0xc1; break;
-        //case REG_JOYCNT + 0:
-        //case REG_JOYCNT + 1:
-        //case REG_JOY_RECV_L + 0:
-        //case REG_JOY_RECV_L + 1:
-        //case REG_JOY_RECV_H + 0:
-        //case REG_JOY_RECV_H + 1:
-        //case REG_JOY_TRANS_L + 0:
-        //case REG_JOY_TRANS_L + 1:
-        //case REG_JOY_TRANS_H + 0:
-        //case REG_JOY_TRANS_H + 1:
-        //case REG_JOYSTAT + 0:
-        //case REG_JOYSTAT + 1:
+        case REG_RCNT + 0:
+            ioreg.rcnt.b.b0 = value;
+            break;
+        case REG_RCNT + 1:
+            ioreg.rcnt.b.b1 = value & 0xc1;
+            break;
+
+            //case REG_JOYCNT + 0:
+            //case REG_JOYCNT + 1:
+            //case REG_JOY_RECV_L + 0:
+            //case REG_JOY_RECV_L + 1:
+            //case REG_JOY_RECV_H + 0:
+            //case REG_JOY_RECV_H + 1:
+            //case REG_JOY_TRANS_L + 0:
+            //case REG_JOY_TRANS_L + 1:
+            //case REG_JOY_TRANS_H + 0:
+            //case REG_JOY_TRANS_H + 1:
+            //case REG_JOYSTAT + 0:
+            //case REG_JOYSTAT + 1:
 
         case REG_IE + 0: ioreg.ie.b.b0 = value; break;
         case REG_IE + 1: ioreg.ie.b.b1 = value & 0x3f; break;
@@ -439,7 +550,10 @@ static void _io_write_byte(uint32_t address, uint8_t value) {
         case REG_IME + 0: ioreg.ime.b.b0 = value & 0x01; break;
         case REG_IME + 1: break;
         case REG_POSTFLG: ioreg.postflg = value & 0x01; break;
-        case REG_HALTCNT: ioreg.haltcnt = value & 0x80; halted = true; break;
+        case REG_HALTCNT:
+            ioreg.haltcnt = value & 0x80;
+            halted = true;
+            break;
 
         default:
 #ifdef LOG_BAD_MEMORY_ACCESS
@@ -472,8 +586,14 @@ void io_write_byte(uint32_t address, uint8_t value) {
         case REG_FIFO_B_H + 0: gba_audio_fifo_b(value << 16); break;
         case REG_FIFO_B_H + 1: gba_audio_fifo_b(value << 24); break;
 
-        case REG_KEYCNT + 0: ioreg.keycnt.b.b0 = value; gba_check_keypad_interrupt(); break;
-        case REG_KEYCNT + 1: ioreg.keycnt.b.b1 = value & 0xc3; gba_check_keypad_interrupt(); break;
+        case REG_KEYCNT + 0:
+            ioreg.keycnt.b.b0 = value;
+            gba_check_keypad_interrupt();
+            break;
+        case REG_KEYCNT + 1:
+            ioreg.keycnt.b.b1 = value & 0xc3;
+            gba_check_keypad_interrupt();
+            break;
 
         default:
             _io_write_byte(address, value);
@@ -500,11 +620,14 @@ void io_write_halfword(uint32_t address, uint16_t value) {
         case REG_FIFO_B_L: gba_audio_fifo_b(value); break;
         case REG_FIFO_B_H: gba_audio_fifo_b(value << 16); break;
 
-        case REG_KEYCNT: ioreg.keycnt.w = value & 0xc3ff; gba_check_keypad_interrupt(); break;
+        case REG_KEYCNT:
+            ioreg.keycnt.w = value & 0xc3ff;
+            gba_check_keypad_interrupt();
+            break;
 
         default:
             _io_write_byte(address, (uint8_t) value);
-            _io_write_byte(address + 1, (uint8_t)(value >> 8));
+            _io_write_byte(address + 1, (uint8_t) (value >> 8));
             break;
     }
 }
@@ -527,13 +650,16 @@ void io_write_word(uint32_t address, uint32_t value) {
         case REG_FIFO_A_L: gba_audio_fifo_a(value); break;
         case REG_FIFO_B_L: gba_audio_fifo_b(value); break;
 
-        case REG_KEYINPUT: ioreg.keycnt.w = (value >> 16) & 0xc3ff; gba_check_keypad_interrupt(); break;
+        case REG_KEYINPUT:
+            ioreg.keycnt.w = (value >> 16) & 0xc3ff;
+            gba_check_keypad_interrupt();
+            break;
 
         default:
             _io_write_byte(address, (uint8_t) value);
-            _io_write_byte(address + 1, (uint8_t)(value >> 8));
-            _io_write_byte(address + 2, (uint8_t)(value >> 16));
-            _io_write_byte(address + 3, (uint8_t)(value >> 24));
+            _io_write_byte(address + 1, (uint8_t) (value >> 8));
+            _io_write_byte(address + 2, (uint8_t) (value >> 16));
+            _io_write_byte(address + 3, (uint8_t) (value >> 24));
             break;
     }
 }

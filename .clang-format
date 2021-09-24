@@ -1,0 +1,14 @@
+Language: Cpp
+BasedOnStyle: LLVM
+AlignConsecutiveMacros: AcrossEmptyLinesAndComments
+AllowShortCaseLabelsOnASingleLine: true
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: WithoutElse
+AllowShortLoopsOnASingleLine: true
+ColumnLimit: 0
+CommentPragmas: '^[^ ]'
+IndentCaseLabels: true
+IndentWidth: 4
+SortIncludes: false
+SpaceAfterCStyleCast: true
+SpacesBeforeTrailingComments: 2

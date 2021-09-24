@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 
 #include "imgui.h"
-#include "imgui_impl_sdl.h"
 #include "imgui_impl_opengl3.h"
+#include "imgui_impl_sdl.h"
 #include "imgui_memory_editor.h"
 
 #include <SDL.h>
@@ -153,12 +153,12 @@ void gba_audio_callback(void *userdata, uint8_t *stream_u8, int len_u8) {
 }
 
 void gba_audio_fifo_a(uint32_t sample) {
-    *(uint32_t *)&ioreg.fifo_a[ioreg.fifo_a_w] = sample;
+    *(uint32_t *) &ioreg.fifo_a[ioreg.fifo_a_w] = sample;
     ioreg.fifo_a_w = (ioreg.fifo_a_w + 4) % FIFO_SIZE;
 }
 
 void gba_audio_fifo_b(uint32_t sample) {
-    *(uint32_t *)&ioreg.fifo_b[ioreg.fifo_b_w] = sample;
+    *(uint32_t *) &ioreg.fifo_b[ioreg.fifo_b_w] = sample;
     ioreg.fifo_b_w = (ioreg.fifo_b_w + 4) % FIFO_SIZE;
 }
 
@@ -219,31 +219,43 @@ void gba_detect_cartridge_features(void) {
 
     uint8_t *eeprom_v = (uint8_t *) "EEPROM_V";
     match = boyer_moore_matcher(game_rom, game_rom_size, eeprom_v, 8);
-    if (match) { has_eeprom = true; }
+    if (match) has_eeprom = true;
 
     uint8_t *flash_v = (uint8_t *) "FLASH_V";
     match = boyer_moore_matcher(game_rom, game_rom_size, flash_v, 7);
-    if (match) { has_flash = true; flash_manufacturer = MANUFACTURER_PANASONIC; flash_device = DEVICE_MN63F805MNP; }
+    if (match) {
+        has_flash = true;
+        flash_manufacturer = MANUFACTURER_PANASONIC;
+        flash_device = DEVICE_MN63F805MNP;
+    }
 
     uint8_t *flash512_v = (uint8_t *) "FLASH512_V";
     match = boyer_moore_matcher(game_rom, game_rom_size, flash512_v, 10);
-    if (match) { has_flash = true; flash_manufacturer = MANUFACTURER_PANASONIC; flash_device = DEVICE_MN63F805MNP; }
+    if (match) {
+        has_flash = true;
+        flash_manufacturer = MANUFACTURER_PANASONIC;
+        flash_device = DEVICE_MN63F805MNP;
+    }
 
     uint8_t *flash1m_v = (uint8_t *) "FLASH1M_V";
     match = boyer_moore_matcher(game_rom, game_rom_size, flash1m_v, 9);
-    if (match) { has_flash = true; flash_manufacturer = MANUFACTURER_SANYO; flash_device = DEVICE_LE26FV10N1TS; }
+    if (match) {
+        has_flash = true;
+        flash_manufacturer = MANUFACTURER_SANYO;
+        flash_device = DEVICE_LE26FV10N1TS;
+    }
 
     uint8_t *sram_v = (uint8_t *) "SRAM_V";
     match = boyer_moore_matcher(game_rom, game_rom_size, sram_v, 6);
-    if (match) { has_sram = true; }
+    if (match) has_sram = true;
 
     uint8_t *sram_f_v = (uint8_t *) "SRAM_F_V";
     match = boyer_moore_matcher(game_rom, game_rom_size, sram_f_v, 8);
-    if (match) { has_sram = true; }
+    if (match) has_sram = true;
 
     uint8_t *siirtc_v = (uint8_t *) "SIIRTC_V";
     match = boyer_moore_matcher(game_rom, game_rom_size, siirtc_v, 8);
-    if (match) { has_rtc = true; }
+    if (match) has_rtc = true;
 
     memcpy(game_title, game_rom + 0xa0, 12);
     game_title[12] = '\0';
@@ -252,9 +264,9 @@ void gba_detect_cartridge_features(void) {
     game_version = game_rom[0xbc];
 
     // Advance Wars (USA)
-    if (strcmp(game_title, "ADVANCEWARS")  == 0 && strcmp(game_code, "AWRE") == 0 && game_version == 0) idle_loop_address = 0x80387ec;
+    if (strcmp(game_title, "ADVANCEWARS") == 0 && strcmp(game_code, "AWRE") == 0 && game_version == 0) idle_loop_address = 0x80387ec;
     // Advance Wars (USA) (Rev 1)
-    if (strcmp(game_title, "ADVANCEWARS")  == 0 && strcmp(game_code, "AWRE") == 0 && game_version == 1) idle_loop_address = 0x8038818;
+    if (strcmp(game_title, "ADVANCEWARS") == 0 && strcmp(game_code, "AWRE") == 0 && game_version == 1) idle_loop_address = 0x8038818;
     // Advance Wars 2 - Black Hole Rising (USA, Australia)
     if (strcmp(game_title, "ADVANCEWARS2") == 0 && strcmp(game_code, "AW2E") == 0 && game_version == 0) idle_loop_address = 0x8036e0c;
     // Pokemon - Emerald Version (USA, Europe)
@@ -396,7 +408,7 @@ uint32_t rgb555(uint32_t pixel) {
 }
 
 void gba_draw_blank(int y, bool forced_blank) {
-    uint16_t pixel = *(uint16_t *)&palette_ram[0];
+    uint16_t pixel = *(uint16_t *) &palette_ram[0];
     uint32_t clear_color = rgb555(forced_blank ? 0x7fff : pixel);
 
     for (int x = 0; x < SCREEN_WIDTH; x++) {
@@ -442,7 +454,7 @@ bool tile_access(uint32_t tile_address, int x, int y, bool hflip, bool vflip, bo
         uint32_t tile_offset = y * 8 + x;
         uint8_t pixel_index = tile[tile_offset];
         if (pixel_index != 0) {
-            *pixel = *(uint16_t *)&palette_ram[palette_offset + pixel_index * 2];
+            *pixel = *(uint16_t *) &palette_ram[palette_offset + pixel_index * 2];
             return true;
         }
     } else {
@@ -450,7 +462,7 @@ bool tile_access(uint32_t tile_address, int x, int y, bool hflip, bool vflip, bo
         uint8_t pixel_indexes = tile[tile_offset];
         uint8_t pixel_index = (pixel_indexes >> (x % 2 == 1 ? 4 : 0)) & 0xf;
         if (pixel_index != 0) {
-            *pixel = *(uint16_t *)&palette_ram[palette_offset + palette_no * 32 + pixel_index * 2];
+            *pixel = *(uint16_t *) &palette_ram[palette_offset + palette_no * 32 + pixel_index * 2];
             return true;
         }
     }
@@ -466,7 +478,7 @@ bool bg_regular_access(int x, int y, int w, int h, uint32_t tile_base, uint32_t 
     int quad_x = 32 * 32;
     int quad_y = 32 * 32 * (screen_size == 3 ? 2 : 1);
     uint32_t map_index = (map_y / 32) * quad_y + (map_x / 32) * quad_x + (map_y % 32) * 32 + (map_x % 32);
-    uint16_t info = *(uint16_t *)&video_ram[map_base + map_index * 2];
+    uint16_t info = *(uint16_t *) &video_ram[map_base + map_index * 2];
     int tile_no = BITS(info, 0, 9);
     bool hflip = BIT(info, 10);
     bool vflip = BIT(info, 11);
@@ -515,9 +527,9 @@ int sprite_height_lookup[4][4] = {{8, 16, 32, 64}, {8, 8, 16, 32}, {16, 32, 32, 
 
 void gba_draw_sprites(int mode, int pri, int y) {
     for (int n = 127; n >= 0; n--) {
-        uint16_t attr0 = *(uint16_t *)&object_ram[n * 8];
-        uint16_t attr1 = *(uint16_t *)&object_ram[n * 8 + 2];
-        uint16_t attr2 = *(uint16_t *)&object_ram[n * 8 + 4];
+        uint16_t attr0 = *(uint16_t *) &object_ram[n * 8];
+        uint16_t attr1 = *(uint16_t *) &object_ram[n * 8 + 2];
+        uint16_t attr2 = *(uint16_t *) &object_ram[n * 8 + 4];
 
         int sprite_y = BITS(attr0, 0, 7);
         int obj_mode = BITS(attr0, 8, 9);
@@ -558,15 +570,15 @@ void gba_draw_sprites(int mode, int pri, int y) {
 
         double pa, pb, pc, pd;
         if (is_affine) {
-            pa = fixed8p8_to_double(*(uint16_t *)&object_ram[affine_index * 32 + 6]);
-            pb = fixed8p8_to_double(*(uint16_t *)&object_ram[affine_index * 32 + 14]);
-            pc = fixed8p8_to_double(*(uint16_t *)&object_ram[affine_index * 32 + 22]);
-            pd = fixed8p8_to_double(*(uint16_t *)&object_ram[affine_index * 32 + 30]);
+            pa = fixed8p8_to_double(*(uint16_t *) &object_ram[affine_index * 32 + 6]);
+            pb = fixed8p8_to_double(*(uint16_t *) &object_ram[affine_index * 32 + 14]);
+            pc = fixed8p8_to_double(*(uint16_t *) &object_ram[affine_index * 32 + 22]);
+            pd = fixed8p8_to_double(*(uint16_t *) &object_ram[affine_index * 32 + 30]);
             hflip = false;
             vflip = false;
         } else {
-            pa = 1.0; pb = 0.0;
-            pc = 0.0; pd = 1.0;
+            pa = pd = 1.0;
+            pb = pc = 0.0;
         }
 
         int j = y - sprite_y;
@@ -587,14 +599,14 @@ void gba_draw_bitmap(int mode, int y) {
         uint16_t pixel = 0;
         if (mode == 3 || mode == 5) {
             if (x < width && (mode == 3 || y < 128)) {
-                pixel = *(uint16_t *)&video_ram[(y * width + x) * 2];
+                pixel = *(uint16_t *) &video_ram[(y * width + x) * 2];
             } else {
-                pixel = *(uint16_t *)&palette_ram[0];
+                pixel = *(uint16_t *) &palette_ram[0];
             }
         } else if (mode == 4) {
             bool pflip = (ioreg.dispcnt.w & DCNT_PAGE);
             uint8_t pixel_index = video_ram[(pflip ? 0xa000 : 0) + y * SCREEN_WIDTH + x];
-            pixel = *(uint16_t *)&palette_ram[pixel_index * 2];
+            pixel = *(uint16_t *) &palette_ram[pixel_index * 2];
         }
         screen_pixels[y][x] = rgb555(pixel);
     }
@@ -681,8 +693,8 @@ void gba_draw_scanline(void) {
         case 0:
         case 1:
         case 2:
-        //case 6:
-        //case 7:
+            //case 6:
+            //case 7:
             gba_draw_tiled(mode, ioreg.vcount.w);
             break;
 
@@ -822,10 +834,16 @@ void gba_dma_transfer(int ch, uint32_t dst_ctrl, uint32_t src_ctrl, uint32_t *ds
             if (!bad_dst_addr) memory_write_halfword(*dst_addr & ~1, value);
         }
 
-        if (dst_ctrl == DMA_INC || dst_ctrl == DMA_RELOAD) *dst_addr += size;
-        else if (dst_ctrl == DMA_DEC) *dst_addr -= size;
-        if (src_ctrl == DMA_INC) *src_addr += size;
-        else if (src_ctrl == DMA_DEC) *src_addr -= size;
+        if (dst_ctrl == DMA_INC || dst_ctrl == DMA_RELOAD) {
+            *dst_addr += size;
+        } else if (dst_ctrl == DMA_DEC) {
+            *dst_addr -= size;
+        }
+        if (src_ctrl == DMA_INC) {
+            *src_addr += size;
+        } else if (src_ctrl == DMA_DEC) {
+            *src_addr -= size;
+        }
     }
 }
 
@@ -990,7 +1008,7 @@ int main(int argc, char **argv) {
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
     SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
-    SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
+    SDL_WindowFlags window_flags = (SDL_WindowFlags) (SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
     SDL_Window *window = SDL_CreateWindow("ygba", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 800, window_flags);
     if (window == NULL) {
         SDL_Log("Failed to create window: %s", SDL_GetError());
@@ -1097,13 +1115,13 @@ int main(int argc, char **argv) {
 
             ImGui::Begin("Hello, world!");  // Create a window called "Hello, world!" and append into it.
 
-            ImGui::Text("This is some useful text.");  // Display some text (you can use format strings too)
+            ImGui::Text("This is some useful text.");           // Display some text (you can use format strings too)
             ImGui::Checkbox("Demo Window", &show_demo_window);  // Edit bools storing our window open/close state
             ImGui::Checkbox("Debugger Window", &show_debugger_window);
             ImGui::SameLine();
             ImGui::Checkbox("Memory Window", &show_memory_window);
 
-            ImGui::SliderFloat("float", &f, 0.0f, 1.0f);  // Edit 1 float using a slider from 0.0f to 1.0f
+            ImGui::SliderFloat("float", &f, 0.0f, 1.0f);               // Edit 1 float using a slider from 0.0f to 1.0f
             ImGui::ColorEdit3("clear color", (float *) &clear_color);  // Edit 3 floats representing a color
 
             if (ImGui::Button("Button")) {  // Buttons return true when clicked (most widgets return true when edited/activated)
@@ -1143,8 +1161,8 @@ int main(int argc, char **argv) {
             keys[8] |= (bool) SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER);  // Button R
             keys[9] |= (bool) SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_LEFTSHOULDER);   // Button L
         }
-        if (keys[4] && keys[5]) { keys[4] = false; keys[5] = false; }  // Disallow opposing directions
-        if (keys[6] && keys[7]) { keys[6] = false; keys[7] = false; }
+        if (keys[4] && keys[5]) keys[4] = keys[5] = false;  // Disallow opposing directions
+        if (keys[6] && keys[7]) keys[6] = keys[7] = false;
         ioreg.keyinput.w = 0x3ff;
         for (int i = 0; i < 10; i++) {
             if (keys[i]) {
@@ -1168,7 +1186,7 @@ int main(int argc, char **argv) {
         ImGui::Begin("Screen");
         ImGui::SliderInt("Scale", &screen_scale, 1, 5);
         ImVec2 screen_size = ImVec2((float) SCREEN_WIDTH * screen_scale, (float) SCREEN_HEIGHT * screen_scale);
-        ImGui::Image((void *)(intptr_t) screen_texture, screen_size);
+        ImGui::Image((void *) (intptr_t) screen_texture, screen_size);
         ImGui::End();
 
         // Debugger

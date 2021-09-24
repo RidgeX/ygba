@@ -335,7 +335,7 @@ void arm_init_lookup(void) {
     BIND("000xx1xx11x1", arm_load_signed_halfword_or_signed_byte_immediate);
     BIND("00010x001001", arm_swap);
     BIND("000100100001", arm_branch_and_exchange);
-  //BIND("00010x10xxx1", arm_branch_and_exchange);
+    //BIND("00010x10xxx1", arm_branch_and_exchange);
     BIND("00110x10xxxx", arm_special_data_processing_immediate);
 
 #undef BIND

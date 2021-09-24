@@ -33,7 +33,7 @@ static uint64_t arm_alu_op(uint32_t opc, uint64_t n, uint64_t m) {
 
 static void arm_alu_flags(uint32_t opc, uint32_t n, uint32_t m, uint64_t result) {
     uint32_t result_lo = (uint32_t) result;
-    uint32_t result_hi = (uint32_t)(result >> 32);
+    uint32_t result_hi = (uint32_t) (result >> 32);
     bool sign_first = BIT(n, 31);
     bool sign_second = BIT(m, 31);
     bool sign_result = BIT(result_lo, 31);
@@ -217,7 +217,7 @@ int arm_data_processing_register(uint32_t op) {
             if (S) write_cpsr(read_spsr());
         }
     } else {
-        if (Rd == REG_PC) {  // ARMv2 mode change (obsolete)
+        if (Rd == REG_PC) {           // ARMv2 mode change (obsolete)
             write_cpsr(read_spsr());  // Restores SPSR on ARMv4
         }
     }
@@ -647,7 +647,7 @@ int arm_multiply_long(uint32_t op) {
     uint64_t result = m * s;
     if (A) result += (uint64_t) r[RdLo] | (uint64_t) r[RdHi] << 32;
     r[RdLo] = (uint32_t) result;
-    r[RdHi] = (uint32_t)(result >> 32);
+    r[RdHi] = (uint32_t) (result >> 32);
 
     if (S) {
         ASSIGN_N(BIT(r[RdHi], 31));
