@@ -535,3 +535,62 @@ bool print_arm_rlist(char *s, uint32_t rlist) {
 bool print_thumb_rlist(char *s, uint32_t rlist) {
     return print_rlist(s, rlist, 8);
 }
+
+static const char *bios_function_names[43] = {
+    "SoftReset",                // 0x00
+    "RegisterRamReset",         // 0x01
+    "Halt",                     // 0x02
+    "Stop",                     // 0x03
+    "IntrWait",                 // 0x04
+    "VBlankIntrWait",           // 0x05
+    "Div",                      // 0x06
+    "DivArm",                   // 0x07
+    "Sqrt",                     // 0x08
+    "ArcTan",                   // 0x09
+    "ArcTan2",                  // 0x0a
+    "CpuSet",                   // 0x0b
+    "CpuFastSet",               // 0x0c
+    "GetBiosChecksum",          // 0x0d
+    "BgAffineSet",              // 0x0e
+    "ObjAffineSet",             // 0x0f
+    "BitUnPack",                // 0x10
+    "LZ77UnCompWram",           // 0x11
+    "LZ77UnCompVram",           // 0x12
+    "HuffUnComp",               // 0x13
+    "RLUnCompWram",             // 0x14
+    "RLUnCompVram",             // 0x15
+    "Diff8bitUnFilterWram",     // 0x16
+    "Diff8bitUnFilterVram",     // 0x17
+    "Diff16bitUnFilter",        // 0x18
+    "SoundBiasChange",          // 0x19
+    "SoundDriverInit",          // 0x1a
+    "SoundDriverMode",          // 0x1b
+    "SoundDriverMain",          // 0x1c
+    "SoundDriverVSync",         // 0x1d
+    "SoundChannelClear",        // 0x1e
+    "MidiKey2Freq",             // 0x1f
+    "MusicPlayerOpen",          // 0x20
+    "MusicPlayerStart",         // 0x21
+    "MusicPlayerStop",          // 0x22
+    "MusicPlayerContinue",      // 0x23
+    "MusicPlayerFadeOut",       // 0x24
+    "MultiBoot",                // 0x25
+    "HardReset",                // 0x26
+    "CustomHalt",               // 0x27
+    "SoundDriverVSyncOff",      // 0x28
+    "SoundDriverVSyncOn",       // 0x29
+    "MusicPlayerJumpTableCopy"  // 0x2a
+};
+
+static const size_t num_bios_functions = sizeof(bios_function_names) / sizeof(bios_function_names[0]);
+
+void print_bios_function_name(char *s, uint8_t i) {
+    char temp[5];
+
+    if (i < num_bios_functions) {
+        strcat(s, bios_function_names[i]);
+    } else {
+        sprintf(temp, "0x%02X", i);
+        strcat(s, temp);
+    }
+}

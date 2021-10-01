@@ -639,7 +639,7 @@ void thumb_software_interrupt_disasm(uint32_t address, uint16_t op, char *s) {
 
     strcpy(s, "swi");
     strcat(s, " ");
-    print_address(s, imm);
+    print_bios_function_name(s, imm);
 }
 
 int thumb_software_interrupt(uint16_t op) {

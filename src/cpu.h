@@ -164,6 +164,7 @@ void print_address(char *s, uint32_t i);
 void print_arm_shift(char *s, uint32_t shop, uint32_t shamt, uint32_t shreg, uint32_t Rs);
 bool print_arm_rlist(char *s, uint32_t rlist);
 bool print_thumb_rlist(char *s, uint32_t rlist);
+void print_bios_function_name(char *s, uint8_t i);
 
 // cpu-arm.c
 void arm_data_processing_register_disasm(uint32_t address, uint32_t op, char *s);

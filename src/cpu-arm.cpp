@@ -576,10 +576,12 @@ int arm_branch(uint32_t op) {
 void arm_software_interrupt_disasm(uint32_t address, uint32_t op, char *s) {
     UNUSED(address);
 
+    uint32_t imm = BITS(op, 0, 23);
+
     strcpy(s, "swi");
     print_arm_condition(s, op);
     strcat(s, " ");
-    print_address(s, BITS(op, 0, 23));
+    print_bios_function_name(s, imm >> 16);
 }
 
 int arm_software_interrupt(uint32_t op) {
