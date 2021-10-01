@@ -331,8 +331,8 @@ void arm_init_lookup(void) {
     BIND("00001xxx1001", arm_multiply_long);
     BIND("000xx0xx1011", arm_load_store_halfword_register);
     BIND("000xx1xx1011", arm_load_store_halfword_immediate);
-    BIND("000xx0xx11x1", arm_load_signed_halfword_or_signed_byte_register);
-    BIND("000xx1xx11x1", arm_load_signed_halfword_or_signed_byte_immediate);
+    BIND("000xx0x111x1", arm_load_signed_halfword_or_signed_byte_register);
+    BIND("000xx1x111x1", arm_load_signed_halfword_or_signed_byte_immediate);
     BIND("00010x001001", arm_swap);
     BIND("000100100001", arm_branch_and_exchange);
     //BIND("00010x10xxx1", arm_branch_and_exchange);
@@ -419,6 +419,25 @@ void print_immediate(char *s, uint32_t i) {
     strcat(s, temp);
 }
 
+void print_immediate_signed(char *s, uint32_t i, bool sign) {
+    char temp[13];
+
+    if (sign) {
+        if (i > 9) {
+            sprintf(temp, "#-0x%X", i);
+        } else {
+            sprintf(temp, "#-%u", i);
+        }
+    } else {
+        if (i > 9) {
+            sprintf(temp, "#0x%X", i);
+        } else {
+            sprintf(temp, "#%u", i);
+        }
+    }
+    strcat(s, temp);
+}
+
 void print_address(char *s, uint32_t i) {
     char temp[11];
 
@@ -488,15 +507,15 @@ static bool print_rlist(char *s, uint32_t rlist, uint32_t max) {
             uint32_t j = i + 1;
             while (BIT(rlist, j)) j++;
             if (j == i + 1) {
-                if (!first) strcat(s, ",");
+                if (!first) strcat(s, ", ");
                 print_register(s, i);
             } else if (j == i + 2) {
-                if (!first) strcat(s, ",");
+                if (!first) strcat(s, ", ");
                 print_register(s, i);
-                strcat(s, ",");
+                strcat(s, ", ");
                 print_register(s, j - 1);
             } else {
-                if (!first) strcat(s, ",");
+                if (!first) strcat(s, ", ");
                 print_register(s, i);
                 strcat(s, "-");
                 print_register(s, j - 1);

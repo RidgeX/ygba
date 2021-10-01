@@ -538,7 +538,7 @@ void thumb_push_or_pop_register_list_disasm(uint32_t address, uint16_t op, char 
     strcat(s, "{");
     bool first = print_thumb_rlist(s, rlist);
     if (R) {
-        if (!first) strcat(s, ",");
+        if (!first) strcat(s, ", ");
         print_register(s, L ? REG_PC : REG_LR);
     }
     strcat(s, "}");

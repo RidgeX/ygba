@@ -311,9 +311,40 @@ int arm_data_processing_immediate(uint32_t op) {
 
 void arm_load_store_word_or_byte_register_disasm(uint32_t address, uint32_t op, char *s) {
     UNUSED(address);
-    UNUSED(op);
 
-    strcpy(s, "???");
+    bool P = BIT(op, 24);
+    bool U = BIT(op, 23);
+    bool B = BIT(op, 22);
+    bool W = BIT(op, 21);
+    bool L = BIT(op, 20);
+    uint32_t Rn = BITS(op, 16, 19);
+    uint32_t Rd = BITS(op, 12, 15);
+    uint32_t shamt = BITS(op, 7, 11);
+    uint32_t shop = BITS(op, 5, 6);
+    uint32_t Rm = BITS(op, 0, 3);
+
+    bool T = !P && W;
+
+    if ((shop == SHIFT_LSR || shop == SHIFT_ASR) && shamt == 0) {
+        shamt = 32;  // LSR #0 -> LSR #32, ASR #0 -> ASR #32
+    }
+
+    strcpy(s, L ? "ldr" : "str");
+    if (B) strcat(s, "b");
+    if (T) strcat(s, "t");
+    print_arm_condition(s, op);
+    strcat(s, " ");
+    print_register(s, Rd);
+    strcat(s, ", [");
+    print_register(s, Rn);
+    strcat(s, P ? ", " : "], ");
+    if (!U) strcat(s, "-");
+    print_register(s, Rm);
+    print_arm_shift(s, shop, shamt, false, 0);
+    if (P) {
+        strcat(s, "]");
+        if (W) strcat(s, "!");
+    }
 }
 
 int arm_load_store_word_or_byte_register(uint32_t op) {
@@ -364,9 +395,32 @@ int arm_load_store_word_or_byte_register(uint32_t op) {
 
 void arm_load_store_word_or_byte_immediate_disasm(uint32_t address, uint32_t op, char *s) {
     UNUSED(address);
-    UNUSED(op);
 
-    strcpy(s, "???");
+    bool P = BIT(op, 24);
+    bool U = BIT(op, 23);
+    bool B = BIT(op, 22);
+    bool W = BIT(op, 21);
+    bool L = BIT(op, 20);
+    uint32_t Rn = BITS(op, 16, 19);
+    uint32_t Rd = BITS(op, 12, 15);
+    uint32_t imm = BITS(op, 0, 11);
+
+    bool T = !P && W;
+
+    strcpy(s, L ? "ldr" : "str");
+    if (B) strcat(s, "b");
+    if (T) strcat(s, "t");
+    print_arm_condition(s, op);
+    strcat(s, " ");
+    print_register(s, Rd);
+    strcat(s, ", [");
+    print_register(s, Rn);
+    strcat(s, P ? ", " : "], ");
+    print_immediate_signed(s, imm, !U);
+    if (P) {
+        strcat(s, "]");
+        if (W) strcat(s, "!");
+    }
 }
 
 int arm_load_store_word_or_byte_immediate(uint32_t op) {
@@ -659,9 +713,28 @@ int arm_multiply_long(uint32_t op) {
 
 void arm_load_store_halfword_register_disasm(uint32_t address, uint32_t op, char *s) {
     UNUSED(address);
-    UNUSED(op);
 
-    strcpy(s, "???");
+    bool P = BIT(op, 24);
+    bool U = BIT(op, 23);
+    bool W = BIT(op, 21);
+    bool L = BIT(op, 20);
+    uint32_t Rn = BITS(op, 16, 19);
+    uint32_t Rd = BITS(op, 12, 15);
+    uint32_t Rm = BITS(op, 0, 3);
+
+    strcpy(s, L ? "ldrh" : "strh");
+    print_arm_condition(s, op);
+    strcat(s, " ");
+    print_register(s, Rd);
+    strcat(s, ", [");
+    print_register(s, Rn);
+    strcat(s, P ? ", " : "], ");
+    if (!U) strcat(s, "-");
+    print_register(s, Rm);
+    if (P) {
+        strcat(s, "]");
+        if (W) strcat(s, "!");
+    }
 }
 
 int arm_load_store_halfword_register(uint32_t op) {
@@ -701,9 +774,27 @@ int arm_load_store_halfword_register(uint32_t op) {
 
 void arm_load_store_halfword_immediate_disasm(uint32_t address, uint32_t op, char *s) {
     UNUSED(address);
-    UNUSED(op);
 
-    strcpy(s, "???");
+    bool P = BIT(op, 24);
+    bool U = BIT(op, 23);
+    bool W = BIT(op, 21);
+    bool L = BIT(op, 20);
+    uint32_t Rn = BITS(op, 16, 19);
+    uint32_t Rd = BITS(op, 12, 15);
+    uint32_t imm = BITS(op, 8, 11) << 4 | BITS(op, 0, 3);
+
+    strcpy(s, L ? "ldrh" : "strh");
+    print_arm_condition(s, op);
+    strcat(s, " ");
+    print_register(s, Rd);
+    strcat(s, ", [");
+    print_register(s, Rn);
+    strcat(s, P ? ", " : "], ");
+    print_immediate_signed(s, imm, !U);
+    if (P) {
+        strcat(s, "]");
+        if (W) strcat(s, "!");
+    }
 }
 
 int arm_load_store_halfword_immediate(uint32_t op) {
@@ -740,9 +831,32 @@ int arm_load_store_halfword_immediate(uint32_t op) {
 
 void arm_load_signed_halfword_or_signed_byte_register_disasm(uint32_t address, uint32_t op, char *s) {
     UNUSED(address);
-    UNUSED(op);
 
-    strcpy(s, "???");
+    bool P = BIT(op, 24);
+    bool U = BIT(op, 23);
+    bool W = BIT(op, 21);
+    uint32_t Rn = BITS(op, 16, 19);
+    uint32_t Rd = BITS(op, 12, 15);
+    uint32_t opc = BITS(op, 4, 7);
+    uint32_t Rm = BITS(op, 0, 3);
+
+    switch (opc) {
+        case 0xd: strcpy(s, "ldrsb"); break;
+        case 0xf: strcpy(s, "ldrsh"); break;
+        default: abort();
+    }
+    print_arm_condition(s, op);
+    strcat(s, " ");
+    print_register(s, Rd);
+    strcat(s, ", [");
+    print_register(s, Rn);
+    strcat(s, P ? ", " : "], ");
+    if (!U) strcat(s, "-");
+    print_register(s, Rm);
+    if (P) {
+        strcat(s, "]");
+        if (W) strcat(s, "!");
+    }
 }
 
 int arm_load_signed_halfword_or_signed_byte_register(uint32_t op) {
@@ -793,9 +907,31 @@ int arm_load_signed_halfword_or_signed_byte_register(uint32_t op) {
 
 void arm_load_signed_halfword_or_signed_byte_immediate_disasm(uint32_t address, uint32_t op, char *s) {
     UNUSED(address);
-    UNUSED(op);
 
-    strcpy(s, "???");
+    bool P = BIT(op, 24);
+    bool U = BIT(op, 23);
+    bool W = BIT(op, 21);
+    uint32_t Rn = BITS(op, 16, 19);
+    uint32_t Rd = BITS(op, 12, 15);
+    uint32_t opc = BITS(op, 4, 7);
+    uint32_t imm = BITS(op, 8, 11) << 4 | BITS(op, 0, 3);
+
+    switch (opc) {
+        case 0xd: strcpy(s, "ldrsb"); break;
+        case 0xf: strcpy(s, "ldrsh"); break;
+        default: abort();
+    }
+    print_arm_condition(s, op);
+    strcat(s, " ");
+    print_register(s, Rd);
+    strcat(s, ", [");
+    print_register(s, Rn);
+    strcat(s, P ? ", " : "], ");
+    print_immediate_signed(s, imm, !U);
+    if (P) {
+        strcat(s, "]");
+        if (W) strcat(s, "!");
+    }
 }
 
 int arm_load_signed_halfword_or_signed_byte_immediate(uint32_t op) {
@@ -1024,8 +1160,11 @@ int arm_branch_and_exchange(uint32_t op) {
 void arm_coprocessor_load_store_disasm(uint32_t address, uint32_t op, char *s) {
     UNUSED(address);
 
-    strcpy(s, (op & 0x100000) ? "ldc" : "stc");
+    bool L = BIT(op, 20);
+
+    strcpy(s, L ? "ldc" : "stc");
     print_arm_condition(s, op);
+    strcat(s, " ???");
 }
 
 int arm_coprocessor_load_store(uint32_t op) {
@@ -1038,12 +1177,15 @@ int arm_coprocessor_load_store(uint32_t op) {
 void arm_coprocessor_data_processing_disasm(uint32_t address, uint32_t op, char *s) {
     UNUSED(address);
 
-    if (op & 0x100) {
-        strcpy(s, (op & 0x100000) ? "mrc" : "mcr");
+    bool L = BIT(op, 20);
+
+    if (BIT(op, 4)) {
+        strcpy(s, L ? "mrc" : "mcr");
     } else {
         strcpy(s, "cdp");
     }
     print_arm_condition(s, op);
+    strcat(s, " ???");
 }
 
 int arm_coprocessor_data_processing(uint32_t op) {

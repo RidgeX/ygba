@@ -159,6 +159,7 @@ void thumb_init_lookup(void);
 void print_arm_condition(char *s, uint32_t op);
 void print_register(char *s, uint32_t i);
 void print_immediate(char *s, uint32_t i);
+void print_immediate_signed(char *s, uint32_t i, bool sign);
 void print_address(char *s, uint32_t i);
 void print_arm_shift(char *s, uint32_t shop, uint32_t shamt, uint32_t shreg, uint32_t Rs);
 bool print_arm_rlist(char *s, uint32_t rlist);
