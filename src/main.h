@@ -74,6 +74,7 @@ void gba_audio_fifo_b(uint32_t sample);
 void gba_check_keypad_interrupt(void);
 void gba_timer_reset(int i);
 uint32_t open_bus(void);
+void gba_affine_reset(void);
 void gba_dma_reset(int ch);
 void gba_dma_update(uint32_t current_timing);
 

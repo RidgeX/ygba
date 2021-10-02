@@ -42,12 +42,14 @@ typedef struct {
         io_union16 y;
     } bg_text[4];
     struct {
-        io_union16 dx;
-        io_union16 dmx;
-        io_union16 dy;
-        io_union16 dmy;
-        io_union32 x;
-        io_union32 y;
+        io_union16 pa;
+        io_union16 pb;
+        io_union16 pc;
+        io_union16 pd;
+        io_union32 x0;
+        io_union32 y0;
+        double x;
+        double y;
     } bg_affine[2];
     io_union16 winh[2];
     io_union16 winv[2];

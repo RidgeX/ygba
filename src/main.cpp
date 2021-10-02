@@ -302,10 +302,10 @@ void gba_reset(bool keep_backup) {
     halted = false;
 
     ioreg.dispcnt.w = 0x80;
-    ioreg.bg_affine[0].dx.w = 0x100;
-    ioreg.bg_affine[0].dmy.w = 0x100;
-    ioreg.bg_affine[1].dx.w = 0x100;
-    ioreg.bg_affine[1].dmy.w = 0x100;
+    ioreg.bg_affine[0].pa.w = 0x100;
+    ioreg.bg_affine[0].pd.w = 0x100;
+    ioreg.bg_affine[1].pa.w = 0x100;
+    ioreg.bg_affine[1].pd.w = 0x100;
     last_bios_access = 0;
 
     if (skip_bios) {
@@ -634,20 +634,30 @@ void gba_draw_tiled_bg(int mode, int bg, int y) {
     bool colors_256 = BIT(bgcnt, 7);
 
     bool is_affine = ((mode == 1 && bg == 2) || (mode == 2 && (bg == 2 || bg == 3)));
-
+    double affine_x, affine_y;
+    double pa, pc;
     if (is_affine) {
-        hofs = fixed20p8_to_double(ioreg.bg_affine[bg - 2].x.dw);
-        vofs = fixed20p8_to_double(ioreg.bg_affine[bg - 2].y.dw);
+        affine_x = ioreg.bg_affine[bg - 2].x;
+        affine_y = ioreg.bg_affine[bg - 2].y;
+        pa = fixed8p8_to_double(ioreg.bg_affine[bg - 2].pa.w);
+        pc = fixed8p8_to_double(ioreg.bg_affine[bg - 2].pc.w);
+    } else {
+        affine_x = 0.0;
+        affine_y = 0.0;
+        pa = 0.0;
+        pc = 0.0;
     }
 
     int bg_width = bg_width_lookup[is_affine][screen_size];
     int bg_height = bg_height_lookup[is_affine][screen_size];
 
-    int j = y + vofs;
-    if (!is_affine || overflow_wraps) j &= bg_height - 1;
     for (int x = 0; x < SCREEN_WIDTH; x++) {
-        int i = x + hofs;
-        if (!is_affine || overflow_wraps) i &= bg_width - 1;
+        int i = (is_affine ? floor(affine_x) : x + hofs);
+        int j = (is_affine ? floor(affine_y) : y + vofs);
+        if (!is_affine || overflow_wraps) {
+            i &= bg_width - 1;
+            j &= bg_height - 1;
+        }
         uint16_t pixel;
         bool ok;
         if (is_affine) {
@@ -656,6 +666,8 @@ void gba_draw_tiled_bg(int mode, int bg, int y) {
             ok = bg_regular_access(i, j, bg_width, bg_height, tile_base, map_base, screen_size, colors_256, &pixel);
         }
         if (ok) gba_draw_pixel_culled(bg, x, y, pixel);
+        affine_x += pa;
+        affine_y += pc;
     }
 }
 
@@ -710,11 +722,26 @@ void gba_draw_scanline(void) {
     }
 }
 
+void gba_affine_reset(void) {
+    for (int i = 0; i < 2; i++) {
+        ioreg.bg_affine[i].x = fixed20p8_to_double(ioreg.bg_affine[i].x0.dw);
+        ioreg.bg_affine[i].y = fixed20p8_to_double(ioreg.bg_affine[i].y0.dw);
+    }
+}
+
+void gba_affine_update(void) {
+    for (int i = 0; i < 2; i++) {
+        ioreg.bg_affine[i].x += fixed8p8_to_double(ioreg.bg_affine[i].pb.w);
+        ioreg.bg_affine[i].y += fixed8p8_to_double(ioreg.bg_affine[i].pd.w);
+    }
+}
+
 void gba_ppu_update(void) {
     if (ppu_cycles % 1232 == 0) {
         ioreg.dispstat.w &= ~DSTAT_IN_HBL;
         if (ioreg.vcount.w < SCREEN_HEIGHT) {
             gba_draw_scanline();
+            gba_affine_update();
         }
         ioreg.vcount.w = (ioreg.vcount.w + 1) % 228;
         if (ioreg.vcount.w == 227) {
@@ -728,6 +755,8 @@ void gba_ppu_update(void) {
                 ioreg.dispstat.w |= DSTAT_IN_VBL;
                 gba_dma_update(DMA_AT_VBLANK);
             }
+        } else if (ioreg.vcount.w == 0) {
+            gba_affine_reset();
         }
         if (ioreg.vcount.w == ioreg.dispstat.b.b1) {
             if (!(ioreg.dispstat.w & DSTAT_IN_VCT)) {

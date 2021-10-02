@@ -238,38 +238,86 @@ static void _io_write_byte(uint32_t address, uint8_t value) {
         case REG_BG3HOFS + 1: ioreg.bg_text[3].x.b.b1 = value & 0x01; break;
         case REG_BG3VOFS + 0: ioreg.bg_text[3].y.b.b0 = value; break;
         case REG_BG3VOFS + 1: ioreg.bg_text[3].y.b.b1 = value & 0x01; break;
-        case REG_BG2PA + 0: ioreg.bg_affine[0].dx.b.b0 = value; break;
-        case REG_BG2PA + 1: ioreg.bg_affine[0].dx.b.b1 = value; break;
-        case REG_BG2PB + 0: ioreg.bg_affine[0].dmx.b.b0 = value; break;
-        case REG_BG2PB + 1: ioreg.bg_affine[0].dmx.b.b1 = value; break;
-        case REG_BG2PC + 0: ioreg.bg_affine[0].dy.b.b0 = value; break;
-        case REG_BG2PC + 1: ioreg.bg_affine[0].dy.b.b1 = value; break;
-        case REG_BG2PD + 0: ioreg.bg_affine[0].dmy.b.b0 = value; break;
-        case REG_BG2PD + 1: ioreg.bg_affine[0].dmy.b.b1 = value; break;
-        case REG_BG2X_L + 0: ioreg.bg_affine[0].x.b.b0 = value; break;
-        case REG_BG2X_L + 1: ioreg.bg_affine[0].x.b.b1 = value; break;
-        case REG_BG2X_H + 0: ioreg.bg_affine[0].x.b.b2 = value; break;
-        case REG_BG2X_H + 1: ioreg.bg_affine[0].x.b.b3 = value & 0x0f; break;
-        case REG_BG2Y_L + 0: ioreg.bg_affine[0].y.b.b0 = value; break;
-        case REG_BG2Y_L + 1: ioreg.bg_affine[0].y.b.b1 = value; break;
-        case REG_BG2Y_H + 0: ioreg.bg_affine[0].y.b.b2 = value; break;
-        case REG_BG2Y_H + 1: ioreg.bg_affine[0].y.b.b3 = value & 0x0f; break;
-        case REG_BG3PA + 0: ioreg.bg_affine[1].dx.b.b0 = value; break;
-        case REG_BG3PA + 1: ioreg.bg_affine[1].dx.b.b1 = value; break;
-        case REG_BG3PB + 0: ioreg.bg_affine[1].dmx.b.b0 = value; break;
-        case REG_BG3PB + 1: ioreg.bg_affine[1].dmx.b.b1 = value; break;
-        case REG_BG3PC + 0: ioreg.bg_affine[1].dy.b.b0 = value; break;
-        case REG_BG3PC + 1: ioreg.bg_affine[1].dy.b.b1 = value; break;
-        case REG_BG3PD + 0: ioreg.bg_affine[1].dmy.b.b0 = value; break;
-        case REG_BG3PD + 1: ioreg.bg_affine[1].dmy.b.b1 = value; break;
-        case REG_BG3X_L + 0: ioreg.bg_affine[1].x.b.b0 = value; break;
-        case REG_BG3X_L + 1: ioreg.bg_affine[1].x.b.b1 = value; break;
-        case REG_BG3X_H + 0: ioreg.bg_affine[1].x.b.b2 = value; break;
-        case REG_BG3X_H + 1: ioreg.bg_affine[1].x.b.b3 = value & 0x0f; break;
-        case REG_BG3Y_L + 0: ioreg.bg_affine[1].y.b.b0 = value; break;
-        case REG_BG3Y_L + 1: ioreg.bg_affine[1].y.b.b1 = value; break;
-        case REG_BG3Y_H + 0: ioreg.bg_affine[1].y.b.b2 = value; break;
-        case REG_BG3Y_H + 1: ioreg.bg_affine[1].y.b.b3 = value & 0x0f; break;
+        case REG_BG2PA + 0: ioreg.bg_affine[0].pa.b.b0 = value; break;
+        case REG_BG2PA + 1: ioreg.bg_affine[0].pa.b.b1 = value; break;
+        case REG_BG2PB + 0: ioreg.bg_affine[0].pb.b.b0 = value; break;
+        case REG_BG2PB + 1: ioreg.bg_affine[0].pb.b.b1 = value; break;
+        case REG_BG2PC + 0: ioreg.bg_affine[0].pc.b.b0 = value; break;
+        case REG_BG2PC + 1: ioreg.bg_affine[0].pc.b.b1 = value; break;
+        case REG_BG2PD + 0: ioreg.bg_affine[0].pd.b.b0 = value; break;
+        case REG_BG2PD + 1: ioreg.bg_affine[0].pd.b.b1 = value; break;
+        case REG_BG2X_L + 0:
+            ioreg.bg_affine[0].x0.b.b0 = value;
+            gba_affine_reset();
+            break;
+        case REG_BG2X_L + 1:
+            ioreg.bg_affine[0].x0.b.b1 = value;
+            gba_affine_reset();
+            break;
+        case REG_BG2X_H + 0:
+            ioreg.bg_affine[0].x0.b.b2 = value;
+            gba_affine_reset();
+            break;
+        case REG_BG2X_H + 1:
+            ioreg.bg_affine[0].x0.b.b3 = value & 0x0f;
+            gba_affine_reset();
+            break;
+        case REG_BG2Y_L + 0:
+            ioreg.bg_affine[0].y0.b.b0 = value;
+            gba_affine_reset();
+            break;
+        case REG_BG2Y_L + 1:
+            ioreg.bg_affine[0].y0.b.b1 = value;
+            gba_affine_reset();
+            break;
+        case REG_BG2Y_H + 0:
+            ioreg.bg_affine[0].y0.b.b2 = value;
+            gba_affine_reset();
+            break;
+        case REG_BG2Y_H + 1:
+            ioreg.bg_affine[0].y0.b.b3 = value & 0x0f;
+            gba_affine_reset();
+            break;
+        case REG_BG3PA + 0: ioreg.bg_affine[1].pa.b.b0 = value; break;
+        case REG_BG3PA + 1: ioreg.bg_affine[1].pa.b.b1 = value; break;
+        case REG_BG3PB + 0: ioreg.bg_affine[1].pb.b.b0 = value; break;
+        case REG_BG3PB + 1: ioreg.bg_affine[1].pb.b.b1 = value; break;
+        case REG_BG3PC + 0: ioreg.bg_affine[1].pc.b.b0 = value; break;
+        case REG_BG3PC + 1: ioreg.bg_affine[1].pc.b.b1 = value; break;
+        case REG_BG3PD + 0: ioreg.bg_affine[1].pd.b.b0 = value; break;
+        case REG_BG3PD + 1: ioreg.bg_affine[1].pd.b.b1 = value; break;
+        case REG_BG3X_L + 0:
+            ioreg.bg_affine[1].x0.b.b0 = value;
+            gba_affine_reset();
+            break;
+        case REG_BG3X_L + 1:
+            ioreg.bg_affine[1].x0.b.b1 = value;
+            gba_affine_reset();
+            break;
+        case REG_BG3X_H + 0:
+            ioreg.bg_affine[1].x0.b.b2 = value;
+            gba_affine_reset();
+            break;
+        case REG_BG3X_H + 1:
+            ioreg.bg_affine[1].x0.b.b3 = value & 0x0f;
+            gba_affine_reset();
+            break;
+        case REG_BG3Y_L + 0:
+            ioreg.bg_affine[1].y0.b.b0 = value;
+            gba_affine_reset();
+            break;
+        case REG_BG3Y_L + 1:
+            ioreg.bg_affine[1].y0.b.b1 = value;
+            gba_affine_reset();
+            break;
+        case REG_BG3Y_H + 0:
+            ioreg.bg_affine[1].y0.b.b2 = value;
+            gba_affine_reset();
+            break;
+        case REG_BG3Y_H + 1:
+            ioreg.bg_affine[1].y0.b.b3 = value & 0x0f;
+            gba_affine_reset();
+            break;
         case REG_WIN0H + 0: ioreg.winh[0].b.b0 = value; break;
         case REG_WIN0H + 1: ioreg.winh[0].b.b1 = value; break;
         case REG_WIN1H + 0: ioreg.winh[1].b.b0 = value; break;
