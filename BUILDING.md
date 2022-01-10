@@ -33,5 +33,5 @@ $ ./build-unix.sh
 > bootstrap-vcpkg.bat
 > vcpkg install freetype sdl2 --triplet x64-windows
 > vcpkg integrate install
-> build-vs2019.bat
+> build-vs2022.bat
 ```
