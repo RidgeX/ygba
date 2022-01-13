@@ -4,9 +4,13 @@
 #include "main.h"
 
 #include <stdint.h>
+#include <algorithm>
 #include <cassert>
 #include <cstdlib>
 #include <cstring>
+#include <string>
+
+#include <fmt/core.h>
 
 #include "imgui.h"
 #include "imgui_impl_opengl3.h"
@@ -32,10 +36,7 @@ uint32_t ppu_cycles;
 bool halted;
 int active_dma;
 bool skip_bios;
-char *save_path;
-char game_title[13];
-char game_code[5];
-uint8_t game_version;
+std::string save_path;
 uint32_t idle_loop_address;
 uint16_t idle_loop_last_irq;
 
@@ -259,30 +260,34 @@ static void gba_detect_cartridge_features() {
     match = boyer_moore_matcher(game_rom, game_rom_size, siirtc_v, 8);
     if (match) has_rtc = true;
 
-    std::memcpy(game_title, game_rom + 0xa0, 12);
-    game_title[12] = '\0';
-    std::memcpy(game_code, game_rom + 0xac, 4);
-    game_code[4] = '\0';
-    game_version = game_rom[0xbc];
+    std::string game_title((char *) &game_rom[0xa0], 12);
+    if (auto it = std::find(game_title.begin(), game_title.end(), '\0'); it != game_title.end()) {
+        game_title.erase(it, game_title.end());
+    }
+    std::string game_code((char *) &game_rom[0xac], 4);
+    if (auto it = std::find(game_code.begin(), game_code.end(), '\0'); it != game_code.end()) {
+        game_code.erase(it, game_code.end());
+    }
+    uint8_t game_version = game_rom[0xbc];
 
     // Advance Wars (USA)
-    if (std::strcmp(game_title, "ADVANCEWARS") == 0 && std::strcmp(game_code, "AWRE") == 0 && game_version == 0) idle_loop_address = 0x80387ec;
+    if (game_title == "ADVANCEWARS" && game_code == "AWRE" && game_version == 0) idle_loop_address = 0x80387ec;
     // Advance Wars (USA) (Rev 1)
-    if (std::strcmp(game_title, "ADVANCEWARS") == 0 && std::strcmp(game_code, "AWRE") == 0 && game_version == 1) idle_loop_address = 0x8038818;
+    if (game_title == "ADVANCEWARS" && game_code == "AWRE" && game_version == 1) idle_loop_address = 0x8038818;
     // Advance Wars 2 - Black Hole Rising (USA, Australia)
-    if (std::strcmp(game_title, "ADVANCEWARS2") == 0 && std::strcmp(game_code, "AW2E") == 0 && game_version == 0) idle_loop_address = 0x8036e0c;
+    if (game_title == "ADVANCEWARS2" && game_code == "AW2E" && game_version == 0) idle_loop_address = 0x8036e0c;
     // Pokemon - Emerald Version (USA, Europe)
-    if (std::strcmp(game_title, "POKEMON EMER") == 0 && std::strcmp(game_code, "BPEE") == 0 && game_version == 0) idle_loop_address = 0x80008c6;
+    if (game_title == "POKEMON EMER" && game_code == "BPEE" && game_version == 0) idle_loop_address = 0x80008c6;
     // Pokemon - FireRed Version (USA)
-    if (std::strcmp(game_title, "POKEMON FIRE") == 0 && std::strcmp(game_code, "BPRE") == 0 && game_version == 0) idle_loop_address = 0x80008aa;
+    if (game_title == "POKEMON FIRE" && game_code == "BPRE" && game_version == 0) idle_loop_address = 0x80008aa;
     // Pokemon - FireRed Version (USA, Europe) (Rev 1)
-    if (std::strcmp(game_title, "POKEMON FIRE") == 0 && std::strcmp(game_code, "BPRE") == 0 && game_version == 1) idle_loop_address = 0x80008be;
+    if (game_title == "POKEMON FIRE" && game_code == "BPRE" && game_version == 1) idle_loop_address = 0x80008be;
     // Pokemon - LeafGreen Version (USA)
-    if (std::strcmp(game_title, "POKEMON LEAF") == 0 && std::strcmp(game_code, "BPGE") == 0 && game_version == 0) idle_loop_address = 0x80008aa;
+    if (game_title == "POKEMON LEAF" && game_code == "BPGE" && game_version == 0) idle_loop_address = 0x80008aa;
     // Pokemon - LeafGreen Version (USA, Europe) (Rev 1)
-    if (std::strcmp(game_title, "POKEMON LEAF") == 0 && std::strcmp(game_code, "BPGE") == 0 && game_version == 1) idle_loop_address = 0x80008be;
+    if (game_title == "POKEMON LEAF" && game_code == "BPGE" && game_version == 1) idle_loop_address = 0x80008be;
     // Super Monkey Ball Jr. (USA)
-    if (std::strcmp(game_title, "MONKEYBALLJR") == 0 && std::strcmp(game_code, "ALUE") == 0 && game_version == 0) has_flash = has_sram = false;
+    if (game_title == "MONKEYBALLJR" && game_code == "ALUE" && game_version == 0) has_flash = has_sram = false;
 }
 
 static void gba_reset(bool keep_backup) {
@@ -319,7 +324,7 @@ static void gba_reset(bool keep_backup) {
 }
 
 static void read_save_file() {
-    SDL_RWops *rw = SDL_RWFromFile(save_path, "rb");
+    SDL_RWops *rw = SDL_RWFromFile(save_path.c_str(), "rb");
     if (rw == nullptr) return;
 
     if (has_eeprom) {
@@ -336,7 +341,7 @@ static void read_save_file() {
 static void write_save_file() {
     if (!has_eeprom && !has_flash && !has_sram) return;
 
-    SDL_RWops *rw = SDL_RWFromFile(save_path, "wb");
+    SDL_RWops *rw = SDL_RWFromFile(save_path.c_str(), "wb");
     if (rw == nullptr) return;
 
     if (has_eeprom) {
@@ -362,10 +367,10 @@ static void read_bios_file() {
     SDL_RWclose(rw);
 }
 
-static void read_rom_file(const char *rom_path) {
+static void read_rom_file(const std::string &rom_path) {
     std::memset(game_rom, 0, sizeof(game_rom));
 
-    SDL_RWops *rw = SDL_RWFromFile(rom_path, "rb");
+    SDL_RWops *rw = SDL_RWFromFile(rom_path.c_str(), "rb");
     if (rw == nullptr) return;
 
     SDL_RWseek(rw, 0, RW_SEEK_END);
@@ -380,26 +385,16 @@ static void read_rom_file(const char *rom_path) {
     SDL_RWclose(rw);
 }
 
-static char *my_strdup(const char *src) {
-    std::size_t len = std::strlen(src) + 1;
-    char *dst = (char *) std::malloc(len);
-    if (dst == nullptr) return nullptr;
-    std::memcpy(dst, src, len);
-    return dst;
-}
+static void gba_load(const std::string &rom_path) {
+    const std::string rom_ext{".gba"};
+    if (!rom_path.ends_with(rom_ext)) return;
 
-static void gba_load(const char *rom_path) {
-    if (std::strstr(rom_path, ".gba") == nullptr) return;
-
-    if (save_path != nullptr) {
+    if (!save_path.empty()) {
         write_save_file();
-        std::free(save_path);
     }
-    save_path = my_strdup(rom_path);
-    assert(save_path != nullptr);
-    char *p_ext = std::strstr(save_path, ".gba");
-    *p_ext = '\0';
-    std::strcat(save_path, ".sav");
+    save_path = rom_path;
+    std::string::size_type n = save_path.rfind(rom_ext);
+    save_path.replace(n, rom_ext.length(), ".sav");
 
     gba_reset(false);
     read_rom_file(rom_path);
@@ -532,8 +527,8 @@ static bool sprite_access(int tile_no, int x, int y, int w, int h, bool hflip, b
     return tile_access(tile_address, x % 8, y % 8, false, false, colors_256, 0x200, palette_no, pixel);
 }
 
-static const int sprite_width_lookup[4][4] = {{8, 16, 32, 64}, {16, 32, 32, 64}, {8, 8, 16, 32}, {8, 8, 8, 8}};
-static const int sprite_height_lookup[4][4] = {{8, 16, 32, 64}, {8, 8, 16, 32}, {16, 32, 32, 64}, {8, 8, 8, 8}};
+const int sprite_width_lookup[4][4] = {{8, 16, 32, 64}, {16, 32, 32, 64}, {8, 8, 16, 32}, {8, 8, 8, 8}};
+const int sprite_height_lookup[4][4] = {{8, 16, 32, 64}, {8, 8, 16, 32}, {16, 32, 32, 64}, {8, 8, 8, 8}};
 
 static void gba_draw_sprites(int mode, int pri, int y) {
     for (int n = 127; n >= 0; n--) {
@@ -626,8 +621,8 @@ static void gba_draw_bitmap(int mode, int y) {
     }
 }
 
-static const int bg_width_lookup[2][4] = {{256, 512, 256, 512}, {128, 256, 512, 1024}};
-static const int bg_height_lookup[2][4] = {{256, 256, 512, 512}, {128, 256, 512, 1024}};
+const int bg_width_lookup[2][4] = {{256, 512, 256, 512}, {128, 256, 512, 1024}};
+const int bg_height_lookup[2][4] = {{256, 256, 512, 512}, {128, 256, 512, 1024}};
 
 static void gba_draw_tiled_bg(int mode, int bg, int y) {
     if (mode == 1 && bg == 3) return;
@@ -1008,7 +1003,8 @@ int main(int argc, char *argv[]) {
 
     if (argc == 2) {
         skip_bios = true;
-        gba_load(argv[1]);
+        const std::string rom_path(argv[1]);
+        gba_load(rom_path);
     }
 
     // Setup SDL
@@ -1132,7 +1128,8 @@ int main(int argc, char *argv[]) {
                 done = true;
             } else if (event.type == SDL_DROPFILE) {
                 char *dropped_file = event.drop.file;
-                gba_load(dropped_file);
+                const std::string rom_path(dropped_file);
+                gba_load(rom_path);
                 SDL_free(dropped_file);
             }
         }
@@ -1167,9 +1164,9 @@ int main(int argc, char *argv[]) {
                 counter++;
             }
             ImGui::SameLine();
-            ImGui::Text("counter = %d", counter);
+            ImGui::Text("%s", fmt::format("counter = {}", counter).c_str());
 
-            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+            ImGui::Text("%s", fmt::format("Application average {:.3f} ms/frame ({:.1f} FPS)", 1000.0f / io.Framerate, io.Framerate).c_str());
             ImGui::End();
         }
 
@@ -1230,34 +1227,35 @@ int main(int argc, char *argv[]) {
         ImGui::End();
 
         // Debugger
-        static char cpsr_flag_text[8];
-        static char cpsr_mode_text[11];
-        static char disasm_text[256];
         if (show_debugger_window) {
             ImGui::Begin("Debugger", &show_debugger_window);
-            ImGui::Text(" r0: %08X   r1: %08X   r2: %08X   r3: %08X", r[0], r[1], r[2], r[3]);
-            ImGui::Text(" r4: %08X   r5: %08X   r6: %08X   r7: %08X", r[4], r[5], r[6], r[7]);
-            ImGui::Text(" r8: %08X   r9: %08X  r10: %08X  r11: %08X", r[8], r[9], r[10], r[11]);
-            ImGui::Text("r12: %08X  r13: %08X  r14: %08X  r15: %08X", r[12], r[13], r[14], get_pc());
-            cpsr_flag_text[0] = (cpsr & PSR_N ? 'N' : '-');
-            cpsr_flag_text[1] = (cpsr & PSR_Z ? 'Z' : '-');
-            cpsr_flag_text[2] = (cpsr & PSR_C ? 'C' : '-');
-            cpsr_flag_text[3] = (cpsr & PSR_V ? 'V' : '-');
-            cpsr_flag_text[4] = (cpsr & PSR_I ? 'I' : '-');
-            cpsr_flag_text[5] = (cpsr & PSR_F ? 'F' : '-');
-            cpsr_flag_text[6] = (cpsr & PSR_T ? 'T' : '-');
-            cpsr_flag_text[7] = '\0';
+
+            ImGui::Text("%s", fmt::format(" r0: {:08X}   r1: {:08X}   r2: {:08X}   r3: {:08X}", r[0], r[1], r[2], r[3]).c_str());
+            ImGui::Text("%s", fmt::format(" r4: {:08X}   r5: {:08X}   r6: {:08X}   r7: {:08X}", r[4], r[5], r[6], r[7]).c_str());
+            ImGui::Text("%s", fmt::format(" r8: {:08X}   r9: {:08X}  r10: {:08X}  r11: {:08X}", r[8], r[9], r[10], r[11]).c_str());
+            ImGui::Text("%s", fmt::format("r12: {:08X}  r13: {:08X}  r14: {:08X}  r15: {:08X}", r[12], r[13], r[14], get_pc()).c_str());
+
+            std::string cpsr_flag_text;
+            std::string cpsr_mode_text;
+            cpsr_flag_text += (cpsr & PSR_N ? "N" : "-");
+            cpsr_flag_text += (cpsr & PSR_Z ? "Z" : "-");
+            cpsr_flag_text += (cpsr & PSR_C ? "C" : "-");
+            cpsr_flag_text += (cpsr & PSR_V ? "V" : "-");
+            cpsr_flag_text += (cpsr & PSR_I ? "I" : "-");
+            cpsr_flag_text += (cpsr & PSR_F ? "F" : "-");
+            cpsr_flag_text += (cpsr & PSR_T ? "T" : "-");
             switch (cpsr & PSR_MODE) {
-                case PSR_MODE_USR: std::strcpy(cpsr_mode_text, "User"); break;
-                case PSR_MODE_FIQ: std::strcpy(cpsr_mode_text, "FIQ"); break;
-                case PSR_MODE_IRQ: std::strcpy(cpsr_mode_text, "IRQ"); break;
-                case PSR_MODE_SVC: std::strcpy(cpsr_mode_text, "Supervisor"); break;
-                case PSR_MODE_ABT: std::strcpy(cpsr_mode_text, "Abort"); break;
-                case PSR_MODE_UND: std::strcpy(cpsr_mode_text, "Undefined"); break;
-                case PSR_MODE_SYS: std::strcpy(cpsr_mode_text, "System"); break;
-                default: std::strcpy(cpsr_mode_text, "Illegal"); break;
+                case PSR_MODE_USR: cpsr_mode_text = "User"; break;
+                case PSR_MODE_FIQ: cpsr_mode_text = "FIQ"; break;
+                case PSR_MODE_IRQ: cpsr_mode_text = "IRQ"; break;
+                case PSR_MODE_SVC: cpsr_mode_text = "Supervisor"; break;
+                case PSR_MODE_ABT: cpsr_mode_text = "Abort"; break;
+                case PSR_MODE_UND: cpsr_mode_text = "Undefined"; break;
+                case PSR_MODE_SYS: cpsr_mode_text = "System"; break;
+                default: cpsr_mode_text = "Illegal"; break;
             }
-            ImGui::Text("cpsr: %08X [%s] %s", cpsr, cpsr_flag_text, cpsr_mode_text);
+            ImGui::Text("%s", fmt::format("cpsr: {:08X} [{}] {}", cpsr, cpsr_flag_text, cpsr_mode_text).c_str());
+
             if (ImGui::Button("Run")) {
                 paused = false;
                 single_step = false;
@@ -1267,27 +1265,29 @@ int main(int argc, char *argv[]) {
                 paused = false;
                 single_step = true;
             }
+
             if (ImGui::BeginTable("disassembly", 3, ImGuiTableFlags_Borders | ImGuiTableFlags_Resizable)) {
                 uint32_t pc = get_pc();
                 for (int i = 0; i < 10; i++) {
                     uint32_t address = pc + i * SIZEOF_INSTR;
                     ImGui::TableNextRow();
                     ImGui::TableNextColumn();
-                    ImGui::Text("%08X", address);
+                    ImGui::Text("%s", fmt::format("{:08X}", address).c_str());
+                    std::string disasm_text;
                     if (FLAG_T()) {
                         uint16_t op = memory_read_halfword(address);
                         ImGui::TableNextColumn();
-                        ImGui::Text("%04X", op);
+                        ImGui::Text("%s", fmt::format("{:04X}", op).c_str());
                         ImGui::TableNextColumn();
                         thumb_disasm(address, op, disasm_text);
                     } else {
                         uint32_t op = memory_read_word(address);
                         ImGui::TableNextColumn();
-                        ImGui::Text("%08X", op);
+                        ImGui::Text("%s", fmt::format("{:08X}", op).c_str());
                         ImGui::TableNextColumn();
                         arm_disasm(address, op, disasm_text);
                     }
-                    ImGui::Text("%s", disasm_text);
+                    ImGui::Text("%s", disasm_text.c_str());
                 }
                 ImGui::EndTable();
             }
@@ -1296,8 +1296,8 @@ int main(int argc, char *argv[]) {
 
         // Memory
         static MemoryEditor mem_edit;
-        mem_edit.ReadFn = [](const uint8_t *data, size_t off) { UNUSED(data); return memory_read_byte(off); };
-        mem_edit.WriteFn = [](uint8_t *data, size_t off, uint8_t d) { UNUSED(data); memory_write_byte(off, d); };
+        mem_edit.ReadFn = [](const uint8_t *data, std::size_t off) { UNUSED(data); return memory_read_byte(off); };
+        mem_edit.WriteFn = [](uint8_t *data, std::size_t off, uint8_t d) { UNUSED(data); memory_write_byte(off, d); };
         if (show_memory_window) {
             ImGui::Begin("Memory", &show_memory_window);
             mem_edit.DrawContents(nullptr, 0x10000000);
@@ -1320,12 +1320,12 @@ int main(int argc, char *argv[]) {
         ImGui::Checkbox("Mute audio", &mute_audio);
         SDL_PauseAudioDevice(audio_device, mute_audio ? 1 : 0);
 
-        ImGui::Text("DMA1SAD: %08X", ioreg.dma[1].src_addr);
-        ImGui::Text("DMA2SAD: %08X", ioreg.dma[2].src_addr);
-        ImGui::Text("fifo_a_r: %d", ioreg.fifo_a_r);
-        ImGui::Text("fifo_a_w: %d", ioreg.fifo_a_w);
-        ImGui::Text("fifo_b_r: %d", ioreg.fifo_b_r);
-        ImGui::Text("fifo_b_w: %d", ioreg.fifo_b_w);
+        ImGui::Text("%s", fmt::format("DMA1SAD: {:08X}", ioreg.dma[1].src_addr).c_str());
+        ImGui::Text("%s", fmt::format("DMA2SAD: {:08X}", ioreg.dma[2].src_addr).c_str());
+        ImGui::Text("%s", fmt::format("fifo_a_r: {}", ioreg.fifo_a_r).c_str());
+        ImGui::Text("%s", fmt::format("fifo_a_w: {}", ioreg.fifo_a_w).c_str());
+        ImGui::Text("%s", fmt::format("fifo_b_r: {}", ioreg.fifo_b_r).c_str());
+        ImGui::Text("%s", fmt::format("fifo_b_w: {}", ioreg.fifo_b_w).c_str());
 
         if (ImGui::Button("Reset")) {
             gba_reset(true);
@@ -1344,7 +1344,7 @@ int main(int argc, char *argv[]) {
         SDL_GL_SwapWindow(window);
     }
 
-    if (save_path != nullptr) {
+    if (!save_path.empty()) {
         write_save_file();
     }
 

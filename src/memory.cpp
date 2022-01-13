@@ -4,7 +4,8 @@
 #include "memory.h"
 
 #include <stdint.h>
-#include <cstdio>
+
+#include <fmt/core.h>
 
 #include "backup.h"
 #include "cpu.h"
@@ -76,7 +77,7 @@ uint8_t memory_read_byte(uint32_t address) {
         return backup_read_byte(address & 0xffff);
     }
 #ifdef LOG_BAD_MEMORY_ACCESS
-    std::printf("memory_read_byte(0x%08x);\n", address);
+    fmt::print("memory_read_byte(0x{:08x});\n", address);
 #endif
     return (uint8_t) (gba_open_bus() >> 8 * (address & 3));
 }
@@ -122,7 +123,7 @@ void memory_write_byte(uint32_t address, uint8_t value) {
         return;
     }
 #ifdef LOG_BAD_MEMORY_ACCESS
-    std::printf("memory_write_byte(0x%08x, 0x%02x);\n", address, value);
+    fmt::print("memory_write_byte(0x{:08x}, 0x{:02x});\n", address, value);
 #endif
 }
 
@@ -168,7 +169,7 @@ uint16_t memory_read_halfword(uint32_t address) {
         return backup_read_halfword(address & 0xffff);
     }
 #ifdef LOG_BAD_MEMORY_ACCESS
-    std::printf("memory_read_halfword(0x%08x);\n", address);
+    fmt::print("memory_read_halfword(0x{:08x});\n", address);
 #endif
     return (uint16_t) (gba_open_bus() >> 8 * (address & 2));
 }
@@ -222,7 +223,7 @@ void memory_write_halfword(uint32_t address, uint16_t value) {
         backup_write_halfword(address & 0xffff, value);
     }
 #ifdef LOG_BAD_MEMORY_ACCESS
-    std::printf("memory_write_halfword(0x%08x, 0x%04x);\n", address, value);
+    fmt::print("memory_write_halfword(0x{:08x}, 0x{:04x});\n", address, value);
 #endif
 }
 
@@ -262,7 +263,7 @@ uint32_t memory_read_word(uint32_t address) {
         return backup_read_word(address & 0xffff);
     }
 #ifdef LOG_BAD_MEMORY_ACCESS
-    std::printf("memory_read_word(0x%08x);\n", address);
+    fmt::print("memory_read_word(0x{:08x});\n", address);
 #endif
     return gba_open_bus();
 }
@@ -308,6 +309,6 @@ void memory_write_word(uint32_t address, uint32_t value) {
         backup_write_word(address & 0xffff, value);
     }
 #ifdef LOG_BAD_MEMORY_ACCESS
-    std::printf("memory_write_word(0x%08x, 0x%08x);\n", address, value);
+    fmt::print("memory_write_word(0x{:08x}, 0x{:08x});\n", address, value);
 #endif
 }

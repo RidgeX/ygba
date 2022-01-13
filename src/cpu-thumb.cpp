@@ -5,13 +5,14 @@
 
 #include <stdint.h>
 #include <cassert>
-#include <cstdio>
 #include <cstdlib>
-#include <cstring>
+#include <string>
+
+#include <fmt/core.h>
 
 #include "memory.h"
 
-void thumb_shift_by_immediate_disasm(uint32_t address, uint16_t op, char *s) {
+void thumb_shift_by_immediate_disasm(uint32_t address, uint16_t op, std::string &s) {
     UNUSED(address);
 
     uint32_t opc = BITS(op, 11, 12);
@@ -20,16 +21,16 @@ void thumb_shift_by_immediate_disasm(uint32_t address, uint16_t op, char *s) {
     uint32_t Rd = BITS(op, 0, 2);
 
     switch (opc) {
-        case SHIFT_LSL: std::strcpy(s, "lsl"); break;
-        case SHIFT_LSR: std::strcpy(s, "lsr"); break;
-        case SHIFT_ASR: std::strcpy(s, "asr"); break;
+        case SHIFT_LSL: s += "lsl"; break;
+        case SHIFT_LSR: s += "lsr"; break;
+        case SHIFT_ASR: s += "asr"; break;
         default: std::abort();
     }
-    std::strcat(s, " ");
+    s += " ";
     print_register(s, Rd);
-    std::strcat(s, ", ");
+    s += ", ";
     print_register(s, Rm);
-    std::strcat(s, ", ");
+    s += ", ";
     print_immediate(s, imm);
 }
 
@@ -49,7 +50,7 @@ int thumb_shift_by_immediate(uint16_t op) {
     return arm_data_processing_register(arm_op);
 }
 
-void thumb_add_or_subtract_register_disasm(uint32_t address, uint16_t op, char *s) {
+void thumb_add_or_subtract_register_disasm(uint32_t address, uint16_t op, std::string &s) {
     UNUSED(address);
 
     uint32_t opc = BIT(op, 9);
@@ -58,15 +59,15 @@ void thumb_add_or_subtract_register_disasm(uint32_t address, uint16_t op, char *
     uint32_t Rd = BITS(op, 0, 2);
 
     switch (opc) {
-        case 0: std::strcpy(s, "add"); break;
-        case 1: std::strcpy(s, "sub"); break;
+        case 0: s += "add"; break;
+        case 1: s += "sub"; break;
         default: std::abort();
     }
-    std::strcat(s, " ");
+    s += " ";
     print_register(s, Rd);
-    std::strcat(s, ", ");
+    s += ", ";
     print_register(s, Rn);
-    std::strcat(s, ", ");
+    s += ", ";
     print_register(s, Rm);
 }
 
@@ -85,7 +86,7 @@ int thumb_add_or_subtract_register(uint16_t op) {
     return arm_data_processing_register(arm_op);
 }
 
-void thumb_add_or_subtract_immediate_disasm(uint32_t address, uint16_t op, char *s) {
+void thumb_add_or_subtract_immediate_disasm(uint32_t address, uint16_t op, std::string &s) {
     UNUSED(address);
 
     uint32_t opc = BIT(op, 9);
@@ -94,15 +95,15 @@ void thumb_add_or_subtract_immediate_disasm(uint32_t address, uint16_t op, char 
     uint32_t Rd = BITS(op, 0, 2);
 
     switch (opc) {
-        case 0: std::strcpy(s, "add"); break;
-        case 1: std::strcpy(s, "sub"); break;
+        case 0: s += "add"; break;
+        case 1: s += "sub"; break;
         default: std::abort();
     }
-    std::strcat(s, " ");
+    s += " ";
     print_register(s, Rd);
-    std::strcat(s, ", ");
+    s += ", ";
     print_register(s, Rn);
-    std::strcat(s, ", ");
+    s += ", ";
     print_immediate(s, imm);
 }
 
@@ -121,7 +122,7 @@ int thumb_add_or_subtract_immediate(uint16_t op) {
     return arm_data_processing_immediate(arm_op);
 }
 
-void thumb_add_subtract_compare_or_move_immediate_disasm(uint32_t address, uint16_t op, char *s) {
+void thumb_add_subtract_compare_or_move_immediate_disasm(uint32_t address, uint16_t op, std::string &s) {
     UNUSED(address);
 
     uint32_t opc = BITS(op, 11, 12);
@@ -129,15 +130,15 @@ void thumb_add_subtract_compare_or_move_immediate_disasm(uint32_t address, uint1
     uint32_t imm = BITS(op, 0, 7);
 
     switch (opc) {
-        case 0: std::strcpy(s, "mov"); break;
-        case 1: std::strcpy(s, "cmp"); break;
-        case 2: std::strcpy(s, "add"); break;
-        case 3: std::strcpy(s, "sub"); break;
+        case 0: s += "mov"; break;
+        case 1: s += "cmp"; break;
+        case 2: s += "add"; break;
+        case 3: s += "sub"; break;
         default: std::abort();
     }
-    std::strcat(s, " ");
+    s += " ";
     print_register(s, Rdn);
-    std::strcat(s, ", ");
+    s += ", ";
     print_immediate(s, imm);
 }
 
@@ -157,7 +158,7 @@ int thumb_add_subtract_compare_or_move_immediate(uint16_t op) {
     return arm_data_processing_immediate(arm_op);
 }
 
-void thumb_data_processing_register_disasm(uint32_t address, uint16_t op, char *s) {
+void thumb_data_processing_register_disasm(uint32_t address, uint16_t op, std::string &s) {
     UNUSED(address);
 
     uint32_t opc = BITS(op, 6, 9);
@@ -165,27 +166,27 @@ void thumb_data_processing_register_disasm(uint32_t address, uint16_t op, char *
     uint32_t Rdn = BITS(op, 0, 2);
 
     switch (opc) {
-        case THUMB_AND: std::strcpy(s, "and"); break;
-        case THUMB_EOR: std::strcpy(s, "eor"); break;
-        case THUMB_LSL: std::strcpy(s, "lsl"); break;
-        case THUMB_LSR: std::strcpy(s, "lsr"); break;
-        case THUMB_ASR: std::strcpy(s, "asr"); break;
-        case THUMB_ADC: std::strcpy(s, "adc"); break;
-        case THUMB_SBC: std::strcpy(s, "sbc"); break;
-        case THUMB_ROR: std::strcpy(s, "ror"); break;
-        case THUMB_TST: std::strcpy(s, "tst"); break;
-        case THUMB_NEG: std::strcpy(s, "neg"); break;
-        case THUMB_CMP: std::strcpy(s, "cmp"); break;
-        case THUMB_CMN: std::strcpy(s, "cmn"); break;
-        case THUMB_ORR: std::strcpy(s, "orr"); break;
-        case THUMB_MUL: std::strcpy(s, "mul"); break;
-        case THUMB_BIC: std::strcpy(s, "bic"); break;
-        case THUMB_MVN: std::strcpy(s, "mvn"); break;
+        case THUMB_AND: s += "and"; break;
+        case THUMB_EOR: s += "eor"; break;
+        case THUMB_LSL: s += "lsl"; break;
+        case THUMB_LSR: s += "lsr"; break;
+        case THUMB_ASR: s += "asr"; break;
+        case THUMB_ADC: s += "adc"; break;
+        case THUMB_SBC: s += "sbc"; break;
+        case THUMB_ROR: s += "ror"; break;
+        case THUMB_TST: s += "tst"; break;
+        case THUMB_NEG: s += "neg"; break;
+        case THUMB_CMP: s += "cmp"; break;
+        case THUMB_CMN: s += "cmn"; break;
+        case THUMB_ORR: s += "orr"; break;
+        case THUMB_MUL: s += "mul"; break;
+        case THUMB_BIC: s += "bic"; break;
+        case THUMB_MVN: s += "mvn"; break;
         default: std::abort();
     }
-    std::strcat(s, " ");
+    s += " ";
     print_register(s, Rdn);
-    std::strcat(s, ", ");
+    s += ", ";
     print_register(s, Rms);
 }
 
@@ -223,7 +224,7 @@ int thumb_data_processing_register(uint16_t op) {
     }
 }
 
-void thumb_special_data_processing_disasm(uint32_t address, uint16_t op, char *s) {
+void thumb_special_data_processing_disasm(uint32_t address, uint16_t op, std::string &s) {
     UNUSED(address);
 
     uint32_t opc = BITS(op, 8, 9);
@@ -231,14 +232,14 @@ void thumb_special_data_processing_disasm(uint32_t address, uint16_t op, char *s
     uint32_t Rdn = BIT(op, 7) << 3 | BITS(op, 0, 2);
 
     switch (opc) {
-        case 0: std::strcpy(s, "add"); break;
-        case 1: std::strcpy(s, "cmp"); break;
-        case 2: std::strcpy(s, "mov"); break;
+        case 0: s += "add"; break;
+        case 1: s += "cmp"; break;
+        case 2: s += "mov"; break;
         default: std::abort();
     }
-    std::strcat(s, " ");
+    s += " ";
     print_register(s, Rdn);
-    std::strcat(s, ", ");
+    s += ", ";
     print_register(s, Rm);
 }
 
@@ -259,14 +260,14 @@ int thumb_special_data_processing(uint16_t op) {
     return arm_data_processing_register(arm_op);
 }
 
-void thumb_branch_and_exchange_disasm(uint32_t address, uint16_t op, char *s) {
+void thumb_branch_and_exchange_disasm(uint32_t address, uint16_t op, std::string &s) {
     UNUSED(address);
 
     bool L = BIT(op, 7);
     uint32_t Rm = BITS(op, 3, 6);
 
-    std::strcpy(s, L ? "blx" : "bx");
-    std::strcat(s, " ");
+    s += (L ? "blx" : "bx");
+    s += " ";
     print_register(s, Rm);
 }
 
@@ -282,22 +283,18 @@ int thumb_branch_and_exchange(uint16_t op) {
     return arm_branch_and_exchange(arm_op);
 }
 
-void thumb_load_from_literal_pool_disasm(uint32_t address, uint16_t op, char *s) {
-    char temp[12];
-
+void thumb_load_from_literal_pool_disasm(uint32_t address, uint16_t op, std::string &s) {
     uint32_t Rd = BITS(op, 8, 10);
     uint32_t imm = BITS(op, 0, 7);
 
-    std::strcpy(s, "ldr");
-    std::strcat(s, " ");
+    s += "ldr";
+    s += " ";
     print_register(s, Rd);
-    std::strcat(s, ", ");
+    s += ", ";
     uint32_t pc_rel_address = (address & ~3) + 4 + (imm << 2);
-    std::sprintf(temp, "=0x%08X", memory_read_word(pc_rel_address));
-    std::strcat(s, temp);
-    std::strcat(s, "  @ ");
-    std::sprintf(temp, "0x%08X", pc_rel_address);
-    std::strcat(s, temp);
+    s += fmt::format("=0x{:08X}", memory_read_word(pc_rel_address));
+    s += "  @ ";
+    s += fmt::format("0x{:08X}", pc_rel_address);
 }
 
 int thumb_load_from_literal_pool(uint16_t op) {
@@ -308,7 +305,7 @@ int thumb_load_from_literal_pool(uint16_t op) {
     return arm_load_store_word_or_byte_immediate(arm_op);
 }
 
-void thumb_load_store_register_disasm(uint32_t address, uint16_t op, char *s) {
+void thumb_load_store_register_disasm(uint32_t address, uint16_t op, std::string &s) {
     UNUSED(address);
 
     uint32_t opc = BITS(op, 9, 11);
@@ -317,23 +314,23 @@ void thumb_load_store_register_disasm(uint32_t address, uint16_t op, char *s) {
     uint32_t Rd = BITS(op, 0, 2);
 
     switch (opc) {
-        case 0: std::strcpy(s, "str"); break;
-        case 1: std::strcpy(s, "strh"); break;
-        case 2: std::strcpy(s, "strb"); break;
-        case 3: std::strcpy(s, "ldrsb"); break;
-        case 4: std::strcpy(s, "ldr"); break;
-        case 5: std::strcpy(s, "ldrh"); break;
-        case 6: std::strcpy(s, "ldrb"); break;
-        case 7: std::strcpy(s, "ldrsh"); break;
+        case 0: s += "str"; break;
+        case 1: s += "strh"; break;
+        case 2: s += "strb"; break;
+        case 3: s += "ldrsb"; break;
+        case 4: s += "ldr"; break;
+        case 5: s += "ldrh"; break;
+        case 6: s += "ldrb"; break;
+        case 7: s += "ldrsh"; break;
         default: std::abort();
     }
-    std::strcat(s, " ");
+    s += " ";
     print_register(s, Rd);
-    std::strcat(s, ", [");
+    s += ", [";
     print_register(s, Rn);
-    std::strcat(s, ", ");
+    s += ", ";
     print_register(s, Rm);
-    std::strcat(s, "]");
+    s += "]";
 }
 
 int thumb_load_store_register(uint16_t op) {
@@ -363,7 +360,7 @@ int thumb_load_store_register(uint16_t op) {
     }
 }
 
-void thumb_load_store_word_or_byte_immediate_disasm(uint32_t address, uint16_t op, char *s) {
+void thumb_load_store_word_or_byte_immediate_disasm(uint32_t address, uint16_t op, std::string &s) {
     UNUSED(address);
 
     bool B = BIT(op, 12);
@@ -372,15 +369,15 @@ void thumb_load_store_word_or_byte_immediate_disasm(uint32_t address, uint16_t o
     uint32_t Rn = BITS(op, 3, 5);
     uint32_t Rd = BITS(op, 0, 2);
 
-    std::strcpy(s, L ? "ldr" : "str");
-    if (B) std::strcat(s, "b");
-    std::strcat(s, " ");
+    s += (L ? "ldr" : "str");
+    if (B) s += "b";
+    s += " ";
     print_register(s, Rd);
-    std::strcat(s, ", [");
+    s += ", [";
     print_register(s, Rn);
-    std::strcat(s, ", ");
+    s += ", ";
     print_immediate(s, B ? imm : imm << 2);
-    std::strcat(s, "]");
+    s += "]";
 }
 
 int thumb_load_store_word_or_byte_immediate(uint16_t op) {
@@ -402,7 +399,7 @@ int thumb_load_store_word_or_byte_immediate(uint16_t op) {
     return arm_load_store_word_or_byte_immediate(arm_op);
 }
 
-void thumb_load_store_halfword_immediate_disasm(uint32_t address, uint16_t op, char *s) {
+void thumb_load_store_halfword_immediate_disasm(uint32_t address, uint16_t op, std::string &s) {
     UNUSED(address);
 
     bool L = BIT(op, 11);
@@ -410,14 +407,14 @@ void thumb_load_store_halfword_immediate_disasm(uint32_t address, uint16_t op, c
     uint32_t Rn = BITS(op, 3, 5);
     uint32_t Rd = BITS(op, 0, 2);
 
-    std::strcpy(s, L ? "ldrh" : "strh");
-    std::strcat(s, " ");
+    s += (L ? "ldrh" : "strh");
+    s += " ";
     print_register(s, Rd);
-    std::strcat(s, ", [");
+    s += ", [";
     print_register(s, Rn);
-    std::strcat(s, ", ");
+    s += ", ";
     print_immediate(s, imm << 1);
-    std::strcat(s, "]");
+    s += "]";
 }
 
 int thumb_load_store_halfword_immediate(uint16_t op) {
@@ -435,21 +432,21 @@ int thumb_load_store_halfword_immediate(uint16_t op) {
     return arm_load_store_halfword_immediate(arm_op);
 }
 
-void thumb_load_store_to_or_from_stack_disasm(uint32_t address, uint16_t op, char *s) {
+void thumb_load_store_to_or_from_stack_disasm(uint32_t address, uint16_t op, std::string &s) {
     UNUSED(address);
 
     bool L = BIT(op, 11);
     uint32_t Rd = BITS(op, 8, 10);
     uint32_t imm = BITS(op, 0, 7);
 
-    std::strcpy(s, L ? "ldr" : "str");
-    std::strcat(s, " ");
+    s += (L ? "ldr" : "str");
+    s += " ";
     print_register(s, Rd);
-    std::strcat(s, ", [");
+    s += ", [";
     print_register(s, REG_SP);
-    std::strcat(s, ", ");
+    s += ", ";
     print_immediate(s, imm << 2);
-    std::strcat(s, "]");
+    s += "]";
 }
 
 int thumb_load_store_to_or_from_stack(uint16_t op) {
@@ -466,19 +463,19 @@ int thumb_load_store_to_or_from_stack(uint16_t op) {
     return arm_load_store_word_or_byte_immediate(arm_op);
 }
 
-void thumb_add_to_sp_or_pc_disasm(uint32_t address, uint16_t op, char *s) {
+void thumb_add_to_sp_or_pc_disasm(uint32_t address, uint16_t op, std::string &s) {
     UNUSED(address);
 
     bool SP = BIT(op, 11);
     uint32_t Rd = BITS(op, 8, 10);
     uint32_t imm = BITS(op, 0, 7);
 
-    std::strcpy(s, "add");
-    std::strcat(s, " ");
+    s += "add";
+    s += " ";
     print_register(s, Rd);
-    std::strcat(s, ", ");
+    s += ", ";
     print_register(s, SP ? REG_SP : REG_PC);
-    std::strcat(s, ", ");
+    s += ", ";
     print_immediate(s, ROR(imm, 30));
 }
 
@@ -496,20 +493,20 @@ int thumb_add_to_sp_or_pc(uint16_t op) {
     return arm_data_processing_immediate(arm_op);
 }
 
-void thumb_adjust_stack_pointer_disasm(uint32_t address, uint16_t op, char *s) {
+void thumb_adjust_stack_pointer_disasm(uint32_t address, uint16_t op, std::string &s) {
     UNUSED(address);
 
     uint32_t opc = BIT(op, 7);
     uint32_t imm = BITS(op, 0, 6);
 
     switch (opc) {
-        case 0: std::strcpy(s, "add"); break;
-        case 1: std::strcpy(s, "sub"); break;
+        case 0: s += "add"; break;
+        case 1: s += "sub"; break;
         default: std::abort();
     }
-    std::strcat(s, " ");
+    s += " ";
     print_register(s, REG_SP);
-    std::strcat(s, ", ");
+    s += ", ";
     print_immediate(s, ROR(imm, 30));
 }
 
@@ -529,22 +526,21 @@ int thumb_adjust_stack_pointer(uint16_t op) {
     return arm_data_processing_immediate(arm_op);
 }
 
-void thumb_push_or_pop_register_list_disasm(uint32_t address, uint16_t op, char *s) {
+void thumb_push_or_pop_register_list_disasm(uint32_t address, uint16_t op, std::string &s) {
     UNUSED(address);
 
     bool L = BIT(op, 11);
     bool R = BIT(op, 8);
     uint32_t rlist = BITS(op, 0, 7);
 
-    std::strcpy(s, L ? "pop" : "push");
-    std::strcat(s, " ");
-    std::strcat(s, "{");
+    s += (L ? "pop" : "push");
+    s += " {";
     bool first = print_thumb_rlist(s, rlist);
     if (R) {
-        if (!first) std::strcat(s, ", ");
+        if (!first) s += ", ";
         print_register(s, L ? REG_PC : REG_LR);
     }
-    std::strcat(s, "}");
+    s += "}";
 }
 
 int thumb_push_or_pop_register_list(uint16_t op) {
@@ -566,19 +562,19 @@ int thumb_push_or_pop_register_list(uint16_t op) {
     return arm_load_store_multiple(arm_op);
 }
 
-void thumb_load_store_multiple_disasm(uint32_t address, uint16_t op, char *s) {
+void thumb_load_store_multiple_disasm(uint32_t address, uint16_t op, std::string &s) {
     UNUSED(address);
 
     bool L = BIT(op, 11);
     uint32_t Rn = BITS(op, 8, 10);
     uint32_t rlist = BITS(op, 0, 7);
 
-    std::strcpy(s, L ? "ldmia" : "stmia");
-    std::strcat(s, " ");
+    s += (L ? "ldmia" : "stmia");
+    s += " ";
     print_register(s, Rn);
-    std::strcat(s, "!, {");
+    s += "!, {";
     print_thumb_rlist(s, rlist);
-    std::strcat(s, "}");
+    s += "}";
 }
 
 int thumb_load_store_multiple(uint16_t op) {
@@ -595,29 +591,29 @@ int thumb_load_store_multiple(uint16_t op) {
     return arm_load_store_multiple(arm_op);
 }
 
-void thumb_conditional_branch_disasm(uint32_t address, uint16_t op, char *s) {
+void thumb_conditional_branch_disasm(uint32_t address, uint16_t op, std::string &s) {
     uint32_t cond = BITS(op, 8, 11);
     uint32_t imm = BITS(op, 0, 7);
     SIGN_EXTEND(imm, 7);
 
     switch (cond) {
-        case COND_EQ: std::strcpy(s, "beq"); break;
-        case COND_NE: std::strcpy(s, "bne"); break;
-        case COND_CS: std::strcpy(s, "bcs"); break;
-        case COND_CC: std::strcpy(s, "bcc"); break;
-        case COND_MI: std::strcpy(s, "bmi"); break;
-        case COND_PL: std::strcpy(s, "bpl"); break;
-        case COND_VS: std::strcpy(s, "bvs"); break;
-        case COND_VC: std::strcpy(s, "bvc"); break;
-        case COND_HI: std::strcpy(s, "bhi"); break;
-        case COND_LS: std::strcpy(s, "bls"); break;
-        case COND_GE: std::strcpy(s, "bge"); break;
-        case COND_LT: std::strcpy(s, "blt"); break;
-        case COND_GT: std::strcpy(s, "bgt"); break;
-        case COND_LE: std::strcpy(s, "ble"); break;
+        case COND_EQ: s += "beq"; break;
+        case COND_NE: s += "bne"; break;
+        case COND_CS: s += "bcs"; break;
+        case COND_CC: s += "bcc"; break;
+        case COND_MI: s += "bmi"; break;
+        case COND_PL: s += "bpl"; break;
+        case COND_VS: s += "bvs"; break;
+        case COND_VC: s += "bvc"; break;
+        case COND_HI: s += "bhi"; break;
+        case COND_LS: s += "bls"; break;
+        case COND_GE: s += "bge"; break;
+        case COND_LT: s += "blt"; break;
+        case COND_GT: s += "bgt"; break;
+        case COND_LE: s += "ble"; break;
         default: std::abort();
     }
-    std::strcat(s, " ");
+    s += " ";
     uint32_t pc_rel_address = address + 4 + (imm << 1);
     print_address(s, pc_rel_address);
 }
@@ -635,13 +631,13 @@ int thumb_conditional_branch(uint16_t op) {
     return 1;
 }
 
-void thumb_software_interrupt_disasm(uint32_t address, uint16_t op, char *s) {
+void thumb_software_interrupt_disasm(uint32_t address, uint16_t op, std::string &s) {
     UNUSED(address);
 
     uint32_t imm = BITS(op, 0, 7);
 
-    std::strcpy(s, "swi");
-    std::strcat(s, " ");
+    s += "swi";
+    s += " ";
     print_bios_function_name(s, imm);
 }
 
@@ -652,12 +648,12 @@ int thumb_software_interrupt(uint16_t op) {
     return arm_software_interrupt(arm_op);
 }
 
-void thumb_unconditional_branch_disasm(uint32_t address, uint16_t op, char *s) {
+void thumb_unconditional_branch_disasm(uint32_t address, uint16_t op, std::string &s) {
     uint32_t imm = BITS(op, 0, 10);
     SIGN_EXTEND(imm, 10);
 
-    std::strcpy(s, "b");
-    std::strcat(s, " ");
+    s += "b";
+    s += " ";
     uint32_t pc_rel_address = address + 4 + (imm << 1);
     print_address(s, pc_rel_address);
 }
@@ -672,11 +668,11 @@ int thumb_unconditional_branch(uint16_t op) {
     return 1;
 }
 
-void thumb_branch_with_link_prefix_disasm(uint32_t address, uint16_t op, char *s) {
+void thumb_branch_with_link_prefix_disasm(uint32_t address, uint16_t op, std::string &s) {
     UNUSED(address);
     UNUSED(op);
 
-    std::strcpy(s, "bl");
+    s += "bl";
 }
 
 int thumb_branch_with_link_prefix(uint16_t op) {
@@ -688,18 +684,18 @@ int thumb_branch_with_link_prefix(uint16_t op) {
     return 1;
 }
 
-void thumb_branch_with_link_suffix_disasm(uint32_t address, uint16_t op, char *s) {
+void thumb_branch_with_link_suffix_disasm(uint32_t address, uint16_t op, std::string &s) {
     uint16_t op_last = memory_read_halfword(address - 2);
     uint32_t imm_last = BITS(op_last, 0, 10);
     SIGN_EXTEND(imm_last, 10);
     uint32_t imm = BITS(op, 0, 10);
 
-    std::strcpy(s, "bl");
-    std::strcat(s, " ");
+    s += "bl";
+    s += " ";
     if ((op_last & 0xf800) == 0xf000) {
         print_address(s, address + 2 + (imm_last << 12) + (imm << 1));
     } else {
-        std::strcat(s, "lr + ");
+        s += "lr + ";
         print_immediate(s, imm << 1);
     }
 }
@@ -715,11 +711,11 @@ int thumb_branch_with_link_suffix(uint16_t op) {
     return 1;
 }
 
-void thumb_undefined_instruction_disasm(uint32_t address, uint16_t op, char *s) {
+void thumb_undefined_instruction_disasm(uint32_t address, uint16_t op, std::string &s) {
     UNUSED(address);
     UNUSED(op);
 
-    std::strcpy(s, "undefined");
+    s += "undefined";
 }
 
 int thumb_undefined_instruction(uint16_t op) {

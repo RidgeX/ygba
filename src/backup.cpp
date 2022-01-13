@@ -5,8 +5,9 @@
 
 #include <stdint.h>
 #include <cassert>
-#include <cstdio>
 #include <cstring>
+
+#include <fmt/core.h>
 
 #include "main.h"
 
@@ -68,7 +69,7 @@ uint8_t backup_read_byte(uint32_t address) {
         return backup_sram[address & 0x7fff];
     }
 #ifdef LOG_BAD_MEMORY_ACCESS
-    std::printf("backup_read_byte(0x%08x);\n", address);
+    fmt::print("backup_read_byte(0x{:08x});\n", address);
 #endif
     return 0xff;
 }
@@ -167,7 +168,7 @@ void backup_write_byte(uint32_t address, uint8_t value) {
         return;
     }
 #ifdef LOG_BAD_MEMORY_ACCESS
-    std::printf("backup_write_byte(0x%08x, 0x%02x);\n", address, value);
+    fmt::print("backup_write_byte(0x{:08x}, 0x{:02x});\n", address, value);
 #endif
 }
 

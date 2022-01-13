@@ -4,7 +4,8 @@
 #include "io.h"
 
 #include <stdint.h>
-#include <cstdio>
+
+#include <fmt/core.h>
 
 #include "main.h"
 
@@ -200,7 +201,7 @@ static uint8_t io_read_byte_discrete(uint32_t address) {
 
         default:
 #ifdef LOG_BAD_MEMORY_ACCESS
-            std::printf("io_read_byte_discrete(0x%08x);\n", address);
+            fmt::print("io_read_byte_discrete(0x{:08x});\n", address);
 #endif
             break;
     }
@@ -607,7 +608,7 @@ static void io_write_byte_discrete(uint32_t address, uint8_t value) {
 
         default:
 #ifdef LOG_BAD_MEMORY_ACCESS
-            std::printf("io_write_byte_discrete(0x%08x, 0x%02x);\n", address, value);
+            fmt::print("io_write_byte_discrete(0x{:08x}, 0x{:02x});\n", address, value);
 #endif
             break;
     }

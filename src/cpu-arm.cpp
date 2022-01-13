@@ -6,7 +6,7 @@
 #include <stdint.h>
 #include <cassert>
 #include <cstdlib>
-#include <cstring>
+#include <string>
 
 #include "algorithms.h"
 #include "memory.h"
@@ -122,7 +122,7 @@ static void arm_shifter_flags(uint32_t shop, uint32_t s, uint32_t m) {
     }
 }
 
-void arm_data_processing_register_disasm(uint32_t address, uint32_t op, char *s) {
+void arm_data_processing_register_disasm(uint32_t address, uint32_t op, std::string &s) {
     UNUSED(address);
 
     uint32_t opc = BITS(op, 21, 24);
@@ -143,33 +143,33 @@ void arm_data_processing_register_disasm(uint32_t address, uint32_t op, char *s)
     bool is_move = (opc == ARM_MOV || opc == ARM_MVN);
 
     switch (opc) {
-        case ARM_AND: std::strcpy(s, S ? "ands" : "and"); break;
-        case ARM_EOR: std::strcpy(s, S ? "eors" : "eor"); break;
-        case ARM_SUB: std::strcpy(s, S ? "subs" : "sub"); break;
-        case ARM_RSB: std::strcpy(s, S ? "rsbs" : "rsb"); break;
-        case ARM_ADD: std::strcpy(s, S ? "adds" : "add"); break;
-        case ARM_ADC: std::strcpy(s, S ? "adcs" : "adc"); break;
-        case ARM_SBC: std::strcpy(s, S ? "sbcs" : "sbc"); break;
-        case ARM_RSC: std::strcpy(s, S ? "rscs" : "rsc"); break;
-        case ARM_TST: std::strcpy(s, Rd == REG_PC ? "tstp" : "tst"); break;
-        case ARM_TEQ: std::strcpy(s, Rd == REG_PC ? "teqp" : "teq"); break;
-        case ARM_CMP: std::strcpy(s, Rd == REG_PC ? "cmpp" : "cmp"); break;
-        case ARM_CMN: std::strcpy(s, Rd == REG_PC ? "cmnp" : "cmn"); break;
-        case ARM_ORR: std::strcpy(s, S ? "orrs" : "orr"); break;
-        case ARM_MOV: std::strcpy(s, S ? "movs" : "mov"); break;
-        case ARM_BIC: std::strcpy(s, S ? "bics" : "bic"); break;
-        case ARM_MVN: std::strcpy(s, S ? "mvns" : "mvn"); break;
+        case ARM_AND: s += (S ? "ands" : "and"); break;
+        case ARM_EOR: s += (S ? "eors" : "eor"); break;
+        case ARM_SUB: s += (S ? "subs" : "sub"); break;
+        case ARM_RSB: s += (S ? "rsbs" : "rsb"); break;
+        case ARM_ADD: s += (S ? "adds" : "add"); break;
+        case ARM_ADC: s += (S ? "adcs" : "adc"); break;
+        case ARM_SBC: s += (S ? "sbcs" : "sbc"); break;
+        case ARM_RSC: s += (S ? "rscs" : "rsc"); break;
+        case ARM_TST: s += (Rd == REG_PC ? "tstp" : "tst"); break;
+        case ARM_TEQ: s += (Rd == REG_PC ? "teqp" : "teq"); break;
+        case ARM_CMP: s += (Rd == REG_PC ? "cmpp" : "cmp"); break;
+        case ARM_CMN: s += (Rd == REG_PC ? "cmnp" : "cmn"); break;
+        case ARM_ORR: s += (S ? "orrs" : "orr"); break;
+        case ARM_MOV: s += (S ? "movs" : "mov"); break;
+        case ARM_BIC: s += (S ? "bics" : "bic"); break;
+        case ARM_MVN: s += (S ? "mvns" : "mvn"); break;
         default: std::abort();
     }
     print_arm_condition(s, op);
-    std::strcat(s, " ");
+    s += " ";
     if (!is_test_or_compare) {
         print_register(s, Rd);
-        std::strcat(s, ", ");
+        s += ", ";
     }
     if (!is_move) {
         print_register(s, Rn);
-        std::strcat(s, ", ");
+        s += ", ";
     }
     print_register(s, Rm);
     print_arm_shift(s, shop, shamt, shreg, Rs);
@@ -227,7 +227,7 @@ int arm_data_processing_register(uint32_t op) {
     return 1;
 }
 
-void arm_data_processing_immediate_disasm(uint32_t address, uint32_t op, char *s) {
+void arm_data_processing_immediate_disasm(uint32_t address, uint32_t op, std::string &s) {
     UNUSED(address);
 
     uint32_t opc = BITS(op, 21, 24);
@@ -241,33 +241,33 @@ void arm_data_processing_immediate_disasm(uint32_t address, uint32_t op, char *s
     bool is_move = (opc == ARM_MOV || opc == ARM_MVN);
 
     switch (opc) {
-        case ARM_AND: std::strcpy(s, S ? "ands" : "and"); break;
-        case ARM_EOR: std::strcpy(s, S ? "eors" : "eor"); break;
-        case ARM_SUB: std::strcpy(s, S ? "subs" : "sub"); break;
-        case ARM_RSB: std::strcpy(s, S ? "rsbs" : "rsb"); break;
-        case ARM_ADD: std::strcpy(s, S ? "adds" : "add"); break;
-        case ARM_ADC: std::strcpy(s, S ? "adcs" : "adc"); break;
-        case ARM_SBC: std::strcpy(s, S ? "sbcs" : "sbc"); break;
-        case ARM_RSC: std::strcpy(s, S ? "rscs" : "rsc"); break;
-        case ARM_TST: std::strcpy(s, "tst"); break;
-        case ARM_TEQ: std::strcpy(s, "teq"); break;
-        case ARM_CMP: std::strcpy(s, "cmp"); break;
-        case ARM_CMN: std::strcpy(s, "cmn"); break;
-        case ARM_ORR: std::strcpy(s, S ? "orrs" : "orr"); break;
-        case ARM_MOV: std::strcpy(s, S ? "movs" : "mov"); break;
-        case ARM_BIC: std::strcpy(s, S ? "bics" : "bic"); break;
-        case ARM_MVN: std::strcpy(s, S ? "mvns" : "mvn"); break;
+        case ARM_AND: s += (S ? "ands" : "and"); break;
+        case ARM_EOR: s += (S ? "eors" : "eor"); break;
+        case ARM_SUB: s += (S ? "subs" : "sub"); break;
+        case ARM_RSB: s += (S ? "rsbs" : "rsb"); break;
+        case ARM_ADD: s += (S ? "adds" : "add"); break;
+        case ARM_ADC: s += (S ? "adcs" : "adc"); break;
+        case ARM_SBC: s += (S ? "sbcs" : "sbc"); break;
+        case ARM_RSC: s += (S ? "rscs" : "rsc"); break;
+        case ARM_TST: s += "tst"; break;
+        case ARM_TEQ: s += "teq"; break;
+        case ARM_CMP: s += "cmp"; break;
+        case ARM_CMN: s += "cmn"; break;
+        case ARM_ORR: s += (S ? "orrs" : "orr"); break;
+        case ARM_MOV: s += (S ? "movs" : "mov"); break;
+        case ARM_BIC: s += (S ? "bics" : "bic"); break;
+        case ARM_MVN: s += (S ? "mvns" : "mvn"); break;
         default: std::abort();
     }
     print_arm_condition(s, op);
-    std::strcat(s, " ");
+    s += " ";
     if (!is_test_or_compare) {
         print_register(s, Rd);
-        std::strcat(s, ", ");
+        s += ", ";
     }
     if (!is_move) {
         print_register(s, Rn);
-        std::strcat(s, ", ");
+        s += ", ";
     }
     print_immediate(s, imm);
 }
@@ -311,7 +311,7 @@ int arm_data_processing_immediate(uint32_t op) {
     return 1;
 }
 
-void arm_load_store_word_or_byte_register_disasm(uint32_t address, uint32_t op, char *s) {
+void arm_load_store_word_or_byte_register_disasm(uint32_t address, uint32_t op, std::string &s) {
     UNUSED(address);
 
     bool P = BIT(op, 24);
@@ -331,21 +331,21 @@ void arm_load_store_word_or_byte_register_disasm(uint32_t address, uint32_t op, 
         shamt = 32;  // LSR #0 -> LSR #32, ASR #0 -> ASR #32
     }
 
-    std::strcpy(s, L ? "ldr" : "str");
-    if (B) std::strcat(s, "b");
-    if (T) std::strcat(s, "t");
+    s += (L ? "ldr" : "str");
+    if (B) s += "b";
+    if (T) s += "t";
     print_arm_condition(s, op);
-    std::strcat(s, " ");
+    s += " ";
     print_register(s, Rd);
-    std::strcat(s, ", [");
+    s += ", [";
     print_register(s, Rn);
-    std::strcat(s, P ? ", " : "], ");
-    if (!U) std::strcat(s, "-");
+    s += (P ? ", " : "], ");
+    if (!U) s += "-";
     print_register(s, Rm);
     print_arm_shift(s, shop, shamt, false, 0);
     if (P) {
-        std::strcat(s, "]");
-        if (W) std::strcat(s, "!");
+        s += "]";
+        if (W) s += "!";
     }
 }
 
@@ -395,7 +395,7 @@ int arm_load_store_word_or_byte_register(uint32_t op) {
     return 1;
 }
 
-void arm_load_store_word_or_byte_immediate_disasm(uint32_t address, uint32_t op, char *s) {
+void arm_load_store_word_or_byte_immediate_disasm(uint32_t address, uint32_t op, std::string &s) {
     UNUSED(address);
 
     bool P = BIT(op, 24);
@@ -409,19 +409,19 @@ void arm_load_store_word_or_byte_immediate_disasm(uint32_t address, uint32_t op,
 
     bool T = !P && W;
 
-    std::strcpy(s, L ? "ldr" : "str");
-    if (B) std::strcat(s, "b");
-    if (T) std::strcat(s, "t");
+    s += (L ? "ldr" : "str");
+    if (B) s += "b";
+    if (T) s += "t";
     print_arm_condition(s, op);
-    std::strcat(s, " ");
+    s += " ";
     print_register(s, Rd);
-    std::strcat(s, ", [");
+    s += ", [";
     print_register(s, Rn);
-    std::strcat(s, P ? ", " : "], ");
+    s += (P ? ", " : "], ");
     print_immediate_signed(s, imm, !U);
     if (P) {
-        std::strcat(s, "]");
-        if (W) std::strcat(s, "!");
+        s += "]";
+        if (W) s += "!";
     }
 }
 
@@ -465,7 +465,7 @@ int arm_load_store_word_or_byte_immediate(uint32_t op) {
     return 1;
 }
 
-void arm_load_store_multiple_disasm(uint32_t address, uint32_t op, char *s) {
+void arm_load_store_multiple_disasm(uint32_t address, uint32_t op, std::string &s) {
     UNUSED(address);
 
     bool P = BIT(op, 24);
@@ -476,24 +476,24 @@ void arm_load_store_multiple_disasm(uint32_t address, uint32_t op, char *s) {
     uint32_t Rn = BITS(op, 16, 19);
     uint32_t rlist = BITS(op, 0, 15);
 
-    std::strcpy(s, L ? "ldm" : "stm");
+    s += (L ? "ldm" : "stm");
     if (!P && !U) {
-        std::strcat(s, "da");
+        s += "da";
     } else if (!P && U) {
-        std::strcat(s, "ia");
+        s += "ia";
     } else if (P && !U) {
-        std::strcat(s, "db");
+        s += "db";
     } else if (P && U) {
-        std::strcat(s, "ib");
+        s += "ib";
     }
     print_arm_condition(s, op);
-    std::strcat(s, " ");
+    s += " ";
     print_register(s, Rn);
-    if (W) std::strcat(s, "!");
-    std::strcat(s, ", {");
+    if (W) s += "!";
+    s += ", {";
     print_arm_rlist(s, rlist);
-    std::strcat(s, "}");
-    if (S) std::strcat(s, "^");
+    s += "}";
+    if (S) s += "^";
 }
 
 int arm_load_store_multiple(uint32_t op) {
@@ -552,14 +552,14 @@ int arm_load_store_multiple(uint32_t op) {
     return 1;
 }
 
-void arm_branch_disasm(uint32_t address, uint32_t op, char *s) {
+void arm_branch_disasm(uint32_t address, uint32_t op, std::string &s) {
     bool L = BIT(op, 24);
     uint32_t imm = BITS(op, 0, 23);
     SIGN_EXTEND(imm, 23);
 
-    std::strcpy(s, L ? "bl" : "b");
+    s += (L ? "bl" : "b");
     print_arm_condition(s, op);
-    std::strcat(s, " ");
+    s += " ";
     print_address(s, address + 8 + (imm << 2));
 }
 
@@ -575,14 +575,14 @@ int arm_branch(uint32_t op) {
     return 1;
 }
 
-void arm_software_interrupt_disasm(uint32_t address, uint32_t op, char *s) {
+void arm_software_interrupt_disasm(uint32_t address, uint32_t op, std::string &s) {
     UNUSED(address);
 
     uint32_t imm = BITS(op, 0, 23);
 
-    std::strcpy(s, "swi");
+    s += "swi";
     print_arm_condition(s, op);
-    std::strcat(s, " ");
+    s += " ";
     print_bios_function_name(s, imm >> 16);
 }
 
@@ -608,7 +608,7 @@ int arm_hardware_interrupt() {
     return 1;
 }
 
-void arm_multiply_disasm(uint32_t address, uint32_t op, char *s) {
+void arm_multiply_disasm(uint32_t address, uint32_t op, std::string &s) {
     UNUSED(address);
 
     bool A = BIT(op, 21);
@@ -618,17 +618,17 @@ void arm_multiply_disasm(uint32_t address, uint32_t op, char *s) {
     uint32_t Rs = BITS(op, 8, 11);
     uint32_t Rm = BITS(op, 0, 3);
 
-    std::strcpy(s, A ? "mla" : "mul");
-    if (S) std::strcat(s, "s");
+    s += (A ? "mla" : "mul");
+    if (S) s += "s";
     print_arm_condition(s, op);
-    std::strcat(s, " ");
+    s += " ";
     print_register(s, Rd);
-    std::strcat(s, ", ");
+    s += ", ";
     print_register(s, Rm);
-    std::strcat(s, ", ");
+    s += ", ";
     print_register(s, Rs);
     if (A) {
-        std::strcat(s, ", ");
+        s += ", ";
         print_register(s, Rn);
     }
 }
@@ -656,7 +656,7 @@ int arm_multiply(uint32_t op) {
     return 1;
 }
 
-void arm_multiply_long_disasm(uint32_t address, uint32_t op, char *s) {
+void arm_multiply_long_disasm(uint32_t address, uint32_t op, std::string &s) {
     UNUSED(address);
 
     bool U = BIT(op, 22);
@@ -668,19 +668,19 @@ void arm_multiply_long_disasm(uint32_t address, uint32_t op, char *s) {
     uint32_t Rm = BITS(op, 0, 3);
 
     if (U) {
-        std::strcpy(s, A ? "smlal" : "smull");
+        s += (A ? "smlal" : "smull");
     } else {
-        std::strcpy(s, A ? "umlal" : "umull");
+        s += (A ? "umlal" : "umull");
     }
-    if (S) std::strcat(s, "s");
+    if (S) s += "s";
     print_arm_condition(s, op);
-    std::strcat(s, " ");
+    s += " ";
     print_register(s, RdLo);
-    std::strcat(s, ", ");
+    s += ", ";
     print_register(s, RdHi);
-    std::strcat(s, ", ");
+    s += ", ";
     print_register(s, Rm);
-    std::strcat(s, ", ");
+    s += ", ";
     print_register(s, Rs);
 }
 
@@ -715,7 +715,7 @@ int arm_multiply_long(uint32_t op) {
     return 1;
 }
 
-void arm_load_store_halfword_register_disasm(uint32_t address, uint32_t op, char *s) {
+void arm_load_store_halfword_register_disasm(uint32_t address, uint32_t op, std::string &s) {
     UNUSED(address);
 
     bool P = BIT(op, 24);
@@ -726,18 +726,18 @@ void arm_load_store_halfword_register_disasm(uint32_t address, uint32_t op, char
     uint32_t Rd = BITS(op, 12, 15);
     uint32_t Rm = BITS(op, 0, 3);
 
-    std::strcpy(s, L ? "ldrh" : "strh");
+    s += (L ? "ldrh" : "strh");
     print_arm_condition(s, op);
-    std::strcat(s, " ");
+    s += " ";
     print_register(s, Rd);
-    std::strcat(s, ", [");
+    s += ", [";
     print_register(s, Rn);
-    std::strcat(s, P ? ", " : "], ");
-    if (!U) std::strcat(s, "-");
+    s += (P ? ", " : "], ");
+    if (!U) s += "-";
     print_register(s, Rm);
     if (P) {
-        std::strcat(s, "]");
-        if (W) std::strcat(s, "!");
+        s += "]";
+        if (W) s += "!";
     }
 }
 
@@ -776,7 +776,7 @@ int arm_load_store_halfword_register(uint32_t op) {
     return 1;
 }
 
-void arm_load_store_halfword_immediate_disasm(uint32_t address, uint32_t op, char *s) {
+void arm_load_store_halfword_immediate_disasm(uint32_t address, uint32_t op, std::string &s) {
     UNUSED(address);
 
     bool P = BIT(op, 24);
@@ -787,17 +787,17 @@ void arm_load_store_halfword_immediate_disasm(uint32_t address, uint32_t op, cha
     uint32_t Rd = BITS(op, 12, 15);
     uint32_t imm = BITS(op, 8, 11) << 4 | BITS(op, 0, 3);
 
-    std::strcpy(s, L ? "ldrh" : "strh");
+    s += (L ? "ldrh" : "strh");
     print_arm_condition(s, op);
-    std::strcat(s, " ");
+    s += " ";
     print_register(s, Rd);
-    std::strcat(s, ", [");
+    s += ", [";
     print_register(s, Rn);
-    std::strcat(s, P ? ", " : "], ");
+    s += (P ? ", " : "], ");
     print_immediate_signed(s, imm, !U);
     if (P) {
-        std::strcat(s, "]");
-        if (W) std::strcat(s, "!");
+        s += "]";
+        if (W) s += "!";
     }
 }
 
@@ -833,7 +833,7 @@ int arm_load_store_halfword_immediate(uint32_t op) {
     return 1;
 }
 
-void arm_load_signed_halfword_or_signed_byte_register_disasm(uint32_t address, uint32_t op, char *s) {
+void arm_load_signed_halfword_or_signed_byte_register_disasm(uint32_t address, uint32_t op, std::string &s) {
     UNUSED(address);
 
     bool P = BIT(op, 24);
@@ -845,21 +845,21 @@ void arm_load_signed_halfword_or_signed_byte_register_disasm(uint32_t address, u
     uint32_t Rm = BITS(op, 0, 3);
 
     switch (opc) {
-        case 0xd: std::strcpy(s, "ldrsb"); break;
-        case 0xf: std::strcpy(s, "ldrsh"); break;
+        case 0xd: s += "ldrsb"; break;
+        case 0xf: s += "ldrsh"; break;
         default: std::abort();
     }
     print_arm_condition(s, op);
-    std::strcat(s, " ");
+    s += " ";
     print_register(s, Rd);
-    std::strcat(s, ", [");
+    s += ", [";
     print_register(s, Rn);
-    std::strcat(s, P ? ", " : "], ");
-    if (!U) std::strcat(s, "-");
+    s += (P ? ", " : "], ");
+    if (!U) s += "-";
     print_register(s, Rm);
     if (P) {
-        std::strcat(s, "]");
-        if (W) std::strcat(s, "!");
+        s += "]";
+        if (W) s += "!";
     }
 }
 
@@ -909,7 +909,7 @@ int arm_load_signed_halfword_or_signed_byte_register(uint32_t op) {
     return 1;
 }
 
-void arm_load_signed_halfword_or_signed_byte_immediate_disasm(uint32_t address, uint32_t op, char *s) {
+void arm_load_signed_halfword_or_signed_byte_immediate_disasm(uint32_t address, uint32_t op, std::string &s) {
     UNUSED(address);
 
     bool P = BIT(op, 24);
@@ -921,20 +921,20 @@ void arm_load_signed_halfword_or_signed_byte_immediate_disasm(uint32_t address, 
     uint32_t imm = BITS(op, 8, 11) << 4 | BITS(op, 0, 3);
 
     switch (opc) {
-        case 0xd: std::strcpy(s, "ldrsb"); break;
-        case 0xf: std::strcpy(s, "ldrsh"); break;
+        case 0xd: s += "ldrsb"; break;
+        case 0xf: s += "ldrsh"; break;
         default: std::abort();
     }
     print_arm_condition(s, op);
-    std::strcat(s, " ");
+    s += " ";
     print_register(s, Rd);
-    std::strcat(s, ", [");
+    s += ", [";
     print_register(s, Rn);
-    std::strcat(s, P ? ", " : "], ");
+    s += (P ? ", " : "], ");
     print_immediate_signed(s, imm, !U);
     if (P) {
-        std::strcat(s, "]");
-        if (W) std::strcat(s, "!");
+        s += "]";
+        if (W) s += "!";
     }
 }
 
@@ -981,7 +981,7 @@ int arm_load_signed_halfword_or_signed_byte_immediate(uint32_t op) {
     return 1;
 }
 
-void arm_special_data_processing_register_disasm(uint32_t address, uint32_t op, char *s) {
+void arm_special_data_processing_register_disasm(uint32_t address, uint32_t op, std::string &s) {
     UNUSED(address);
 
     bool R = BIT(op, 22);
@@ -990,23 +990,23 @@ void arm_special_data_processing_register_disasm(uint32_t address, uint32_t op, 
     uint32_t Rd = BITS(op, 12, 15);
     uint32_t Rm = BITS(op, 0, 3);
 
-    std::strcpy(s, b21 ? "msr" : "mrs");
+    s += (b21 ? "msr" : "mrs");
     print_arm_condition(s, op);
-    std::strcat(s, " ");
+    s += " ";
     if (b21) {
-        std::strcat(s, R ? "spsr" : "cpsr");
-        std::strcat(s, "_");
-        if (mask_type == 0) std::strcat(s, "none");
-        if (mask_type & 8) std::strcat(s, "f");  // Flags
-        if (mask_type & 4) std::strcat(s, "s");  // Status
-        if (mask_type & 2) std::strcat(s, "x");  // Extension
-        if (mask_type & 1) std::strcat(s, "c");  // Control
-        std::strcat(s, ", ");
+        s += (R ? "spsr" : "cpsr");
+        s += "_";
+        if (mask_type == 0) s += "none";
+        if (mask_type & 8) s += "f";  // Flags
+        if (mask_type & 4) s += "s";  // Status
+        if (mask_type & 2) s += "x";  // Extension
+        if (mask_type & 1) s += "c";  // Control
+        s += ", ";
         print_register(s, Rm);
     } else {
         print_register(s, Rd);
-        std::strcat(s, ", ");
-        std::strcat(s, R ? "spsr" : "cpsr");
+        s += ", ";
+        s += (R ? "spsr" : "cpsr");
     }
 }
 
@@ -1047,7 +1047,7 @@ int arm_special_data_processing_register(uint32_t op) {
     return 1;
 }
 
-void arm_special_data_processing_immediate_disasm(uint32_t address, uint32_t op, char *s) {
+void arm_special_data_processing_immediate_disasm(uint32_t address, uint32_t op, std::string &s) {
     UNUSED(address);
 
     bool R = BIT(op, 22);
@@ -1055,17 +1055,17 @@ void arm_special_data_processing_immediate_disasm(uint32_t address, uint32_t op,
     uint32_t rot = BITS(op, 8, 11);
     uint32_t imm = ROR(BITS(op, 0, 7), 2 * rot);
 
-    std::strcpy(s, "msr");
+    s += "msr";
     print_arm_condition(s, op);
-    std::strcat(s, " ");
-    std::strcat(s, R ? "spsr" : "cpsr");
-    std::strcat(s, "_");
-    if (mask_type == 0) std::strcat(s, "none");
-    if (mask_type & 8) std::strcat(s, "f");  // Flags
-    if (mask_type & 4) std::strcat(s, "s");  // Status
-    if (mask_type & 2) std::strcat(s, "x");  // Extension
-    if (mask_type & 1) std::strcat(s, "c");  // Control
-    std::strcat(s, ", ");
+    s += " ";
+    s += (R ? "spsr" : "cpsr");
+    s += "_";
+    if (mask_type == 0) s += "none";
+    if (mask_type & 8) s += "f";  // Flags
+    if (mask_type & 4) s += "s";  // Status
+    if (mask_type & 2) s += "x";  // Extension
+    if (mask_type & 1) s += "c";  // Control
+    s += ", ";
     print_immediate(s, imm);
 }
 
@@ -1090,7 +1090,7 @@ int arm_special_data_processing_immediate(uint32_t op) {
     return 1;
 }
 
-void arm_swap_disasm(uint32_t address, uint32_t op, char *s) {
+void arm_swap_disasm(uint32_t address, uint32_t op, std::string &s) {
     UNUSED(address);
 
     bool B = BIT(op, 22);
@@ -1098,16 +1098,16 @@ void arm_swap_disasm(uint32_t address, uint32_t op, char *s) {
     uint32_t Rd = BITS(op, 12, 15);
     uint32_t Rm = BITS(op, 0, 3);
 
-    std::strcpy(s, "swp");
-    if (B) std::strcat(s, "b");
+    s += "swp";
+    if (B) s += "b";
     print_arm_condition(s, op);
-    std::strcat(s, " ");
+    s += " ";
     print_register(s, Rd);
-    std::strcat(s, ", ");
+    s += ", ";
     print_register(s, Rm);
-    std::strcat(s, ", [");
+    s += ", [";
     print_register(s, Rn);
-    std::strcat(s, "]");
+    s += "]";
 }
 
 int arm_swap(uint32_t op) {
@@ -1133,14 +1133,14 @@ int arm_swap(uint32_t op) {
     return 1;
 }
 
-void arm_branch_and_exchange_disasm(uint32_t address, uint32_t op, char *s) {
+void arm_branch_and_exchange_disasm(uint32_t address, uint32_t op, std::string &s) {
     UNUSED(address);
 
     uint32_t Rm = BITS(op, 0, 3);
 
-    std::strcpy(s, "bx");
+    s += "bx";
     print_arm_condition(s, op);
-    std::strcat(s, " ");
+    s += " ";
     print_register(s, Rm);
 }
 
@@ -1161,14 +1161,14 @@ int arm_branch_and_exchange(uint32_t op) {
     return 1;
 }
 
-void arm_coprocessor_load_store_disasm(uint32_t address, uint32_t op, char *s) {
+void arm_coprocessor_load_store_disasm(uint32_t address, uint32_t op, std::string &s) {
     UNUSED(address);
 
     bool L = BIT(op, 20);
 
-    std::strcpy(s, L ? "ldc" : "stc");
+    s += (L ? "ldc" : "stc");
     print_arm_condition(s, op);
-    std::strcat(s, " ???");
+    s += " ???";
 }
 
 int arm_coprocessor_load_store(uint32_t op) {
@@ -1178,18 +1178,18 @@ int arm_coprocessor_load_store(uint32_t op) {
     return 1;
 }
 
-void arm_coprocessor_data_processing_disasm(uint32_t address, uint32_t op, char *s) {
+void arm_coprocessor_data_processing_disasm(uint32_t address, uint32_t op, std::string &s) {
     UNUSED(address);
 
     bool L = BIT(op, 20);
 
     if (BIT(op, 4)) {
-        std::strcpy(s, L ? "mrc" : "mcr");
+        s += (L ? "mrc" : "mcr");
     } else {
-        std::strcpy(s, "cdp");
+        s += "cdp";
     }
     print_arm_condition(s, op);
-    std::strcat(s, " ???");
+    s += " ???";
 }
 
 int arm_coprocessor_data_processing(uint32_t op) {
@@ -1199,11 +1199,11 @@ int arm_coprocessor_data_processing(uint32_t op) {
     return 1;
 }
 
-void arm_undefined_instruction_disasm(uint32_t address, uint32_t op, char *s) {
+void arm_undefined_instruction_disasm(uint32_t address, uint32_t op, std::string &s) {
     UNUSED(address);
     UNUSED(op);
 
-    std::strcpy(s, "undefined");
+    s += "undefined";
 }
 
 int arm_undefined_instruction(uint32_t op) {
