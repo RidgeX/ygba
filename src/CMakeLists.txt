@@ -1,6 +1,4 @@
 add_executable(ygba WIN32
-    algorithms.cpp
-    algorithms.h
     backup.cpp
     backup.h
     cpu-arm.cpp

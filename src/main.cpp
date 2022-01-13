@@ -5,6 +5,7 @@
 
 #include <stdint.h>
 #include <algorithm>
+#include <bit>
 #include <cassert>
 #include <cstdlib>
 #include <cstring>
@@ -25,7 +26,6 @@
 #include <SDL_opengl.h>
 #endif
 
-#include "algorithms.h"
 #include "backup.h"
 #include "cpu.h"
 #include "gpio.h"
@@ -362,7 +362,7 @@ static void read_rom_file(const std::string &rom_path) {
     SDL_RWseek(rw, 0, RW_SEEK_END);
     game_rom_size = SDL_RWtell(rw);
     assert(game_rom_size != 0);
-    game_rom_mask = next_power_of_2(game_rom_size) - 1;
+    game_rom_mask = std::bit_ceil(game_rom_size) - 1;
     SDL_RWseek(rw, 0, RW_SEEK_SET);
     if (game_rom_size <= sizeof(game_rom)) {
         SDL_RWread(rw, game_rom, game_rom_size, 1);
