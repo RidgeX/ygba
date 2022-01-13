@@ -17,4 +17,4 @@ add_executable(ygba WIN32
     memory.h
 )
 
-target_link_libraries(ygba PRIVATE imgui SDL2::SDL2 SDL2::SDL2main)
+target_link_libraries(ygba PRIVATE fmt::fmt imgui SDL2::SDL2 SDL2::SDL2main)
