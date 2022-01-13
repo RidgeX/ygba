@@ -1,9 +1,11 @@
 // Copyright (c) 2021 Ridge Shrubsall
 // SPDX-License-Identifier: BSD-3-Clause
 
-#include <stdio.h>
-
 #include "io.h"
+
+#include <stdint.h>
+#include <cstdio>
+
 #include "main.h"
 
 //#define LOG_BAD_MEMORY_ACCESS
@@ -29,7 +31,7 @@ static void set_sound_powered(bool flag) {
     }
 }
 
-static uint8_t _io_read_byte(uint32_t address) {
+static uint8_t io_read_byte_discrete(uint32_t address) {
     switch (address) {
         case REG_DISPCNT + 0: return ioreg.dispcnt.b.b0;
         case REG_DISPCNT + 1: return ioreg.dispcnt.b.b1;
@@ -198,15 +200,15 @@ static uint8_t _io_read_byte(uint32_t address) {
 
         default:
 #ifdef LOG_BAD_MEMORY_ACCESS
-            printf("_io_read_byte(0x%08x);\n", address);
+            std::printf("io_read_byte_discrete(0x%08x);\n", address);
 #endif
             break;
     }
 
-    return (uint8_t) (open_bus() >> 8 * (address & 3));
+    return (uint8_t) (gba_open_bus() >> 8 * (address & 3));
 }
 
-static void _io_write_byte(uint32_t address, uint8_t value) {
+static void io_write_byte_discrete(uint32_t address, uint8_t value) {
     uint8_t old_value;
 
     switch (address) {
@@ -605,7 +607,7 @@ static void _io_write_byte(uint32_t address, uint8_t value) {
 
         default:
 #ifdef LOG_BAD_MEMORY_ACCESS
-            printf("_io_write_byte(0x%08x, 0x%02x);\n", address, value);
+            std::printf("io_write_byte_discrete(0x%08x, 0x%02x);\n", address, value);
 #endif
             break;
     }
@@ -619,7 +621,7 @@ uint8_t io_read_byte(uint32_t address) {
         case REG_KEYCNT + 1: return ioreg.keycnt.b.b1;
 
         default:
-            return _io_read_byte(address);
+            return io_read_byte_discrete(address);
     }
 }
 
@@ -644,7 +646,7 @@ void io_write_byte(uint32_t address, uint8_t value) {
             break;
 
         default:
-            _io_write_byte(address, value);
+            io_write_byte_discrete(address, value);
             break;
     }
 }
@@ -655,8 +657,8 @@ uint16_t io_read_halfword(uint32_t address) {
         case REG_KEYCNT: return ioreg.keycnt.w;
 
         default:
-            uint16_t result = _io_read_byte(address);
-            result |= _io_read_byte(address + 1) << 8;
+            uint16_t result = io_read_byte_discrete(address);
+            result |= io_read_byte_discrete(address + 1) << 8;
             return result;
     }
 }
@@ -674,8 +676,8 @@ void io_write_halfword(uint32_t address, uint16_t value) {
             break;
 
         default:
-            _io_write_byte(address, (uint8_t) value);
-            _io_write_byte(address + 1, (uint8_t) (value >> 8));
+            io_write_byte_discrete(address, (uint8_t) value);
+            io_write_byte_discrete(address + 1, (uint8_t) (value >> 8));
             break;
     }
 }
@@ -685,10 +687,10 @@ uint32_t io_read_word(uint32_t address) {
         case REG_KEYINPUT: gba_check_keypad_interrupt(); return ioreg.keyinput.w | ioreg.keycnt.w << 16;
 
         default:
-            uint32_t result = _io_read_byte(address);
-            result |= _io_read_byte(address + 1) << 8;
-            result |= _io_read_byte(address + 2) << 16;
-            result |= _io_read_byte(address + 3) << 24;
+            uint32_t result = io_read_byte_discrete(address);
+            result |= io_read_byte_discrete(address + 1) << 8;
+            result |= io_read_byte_discrete(address + 2) << 16;
+            result |= io_read_byte_discrete(address + 3) << 24;
             return result;
     }
 }
@@ -704,10 +706,10 @@ void io_write_word(uint32_t address, uint32_t value) {
             break;
 
         default:
-            _io_write_byte(address, (uint8_t) value);
-            _io_write_byte(address + 1, (uint8_t) (value >> 8));
-            _io_write_byte(address + 2, (uint8_t) (value >> 16));
-            _io_write_byte(address + 3, (uint8_t) (value >> 24));
+            io_write_byte_discrete(address, (uint8_t) value);
+            io_write_byte_discrete(address + 1, (uint8_t) (value >> 8));
+            io_write_byte_discrete(address + 2, (uint8_t) (value >> 16));
+            io_write_byte_discrete(address + 3, (uint8_t) (value >> 24));
             break;
     }
 }

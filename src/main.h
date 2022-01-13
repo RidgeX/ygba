@@ -1,10 +1,8 @@
 // Copyright (c) 2021 Ridge Shrubsall
 // SPDX-License-Identifier: BSD-3-Clause
 
-#ifndef MAIN_H
-#define MAIN_H
+#pragma once
 
-#include <stdbool.h>
 #include <stdint.h>
 
 #define DCNT_GB        (1 << 3)
@@ -71,11 +69,9 @@ extern int active_dma;
 
 void gba_audio_fifo_a(uint32_t sample);
 void gba_audio_fifo_b(uint32_t sample);
-void gba_check_keypad_interrupt(void);
+void gba_check_keypad_interrupt();
 void gba_timer_reset(int i);
-uint32_t open_bus(void);
-void gba_affine_reset(void);
+uint32_t gba_open_bus();
+void gba_affine_reset();
 void gba_dma_reset(int ch);
 void gba_dma_update(uint32_t current_timing);
-
-#endif  // MAIN_H

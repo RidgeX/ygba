@@ -1,8 +1,7 @@
 // Copyright (c) 2021 Ridge Shrubsall
 // SPDX-License-Identifier: BSD-3-Clause
 
-#ifndef MEMORY_H
-#define MEMORY_H
+#pragma once
 
 #include <stdint.h>
 
@@ -27,5 +26,3 @@ uint16_t memory_read_halfword(uint32_t address);
 void memory_write_halfword(uint32_t address, uint16_t value);
 uint32_t memory_read_word(uint32_t address);
 void memory_write_word(uint32_t address, uint32_t value);
-
-#endif  // MEMORY_H

@@ -1,25 +1,29 @@
 // Copyright (c) 2021 Ridge Shrubsall
 // SPDX-License-Identifier: BSD-3-Clause
 
+#include "memory.h"
+
+#include <stdint.h>
+#include <cstdio>
+
 #include "backup.h"
 #include "cpu.h"
 #include "gpio.h"
 #include "io.h"
 #include "main.h"
-#include "memory.h"
 
 //#define LOG_BAD_MEMORY_ACCESS
 
 uint8_t system_rom[0x4000];
-uint32_t last_bios_access = 0;
+uint32_t last_bios_access;
 uint8_t cpu_ewram[0x40000];
 uint8_t cpu_iwram[0x8000];
 uint8_t palette_ram[0x400];
 uint8_t video_ram[0x18000];
 uint8_t object_ram[0x400];
 uint8_t game_rom[0x2000000];
-uint32_t game_rom_size = 0;
-uint32_t game_rom_mask = 0;
+uint32_t game_rom_size;
+uint32_t game_rom_mask;
 
 uint8_t rom_read_byte(uint32_t address) {
     if (address > game_rom_mask) return (uint8_t) ((uint16_t) (address >> 1) >> 8 * (address & 1));
@@ -38,7 +42,7 @@ uint32_t rom_read_word(uint32_t address) {
 
 uint8_t memory_read_byte(uint32_t address) {
     if (address < 0x4000) {
-        if (r[15] < 0x4000) last_bios_access = address;
+        if (get_pc() < 0x4000) last_bios_access = address;
         return system_rom[last_bios_access];
     }
     if (address >= 0x02000000 && address < 0x03000000) {
@@ -72,9 +76,9 @@ uint8_t memory_read_byte(uint32_t address) {
         return backup_read_byte(address & 0xffff);
     }
 #ifdef LOG_BAD_MEMORY_ACCESS
-    printf("memory_read_byte(0x%08x);\n", address);
+    std::printf("memory_read_byte(0x%08x);\n", address);
 #endif
-    return (uint8_t) (open_bus() >> 8 * (address & 3));
+    return (uint8_t) (gba_open_bus() >> 8 * (address & 3));
 }
 
 void memory_write_byte(uint32_t address, uint8_t value) {
@@ -118,13 +122,13 @@ void memory_write_byte(uint32_t address, uint8_t value) {
         return;
     }
 #ifdef LOG_BAD_MEMORY_ACCESS
-    printf("memory_write_byte(0x%08x, 0x%02x);\n", address, value);
+    std::printf("memory_write_byte(0x%08x, 0x%02x);\n", address, value);
 #endif
 }
 
 uint16_t memory_read_halfword(uint32_t address) {
     if (address < 0x4000) {
-        if (r[15] < 0x4000) last_bios_access = address & 0x3ffe;
+        if (get_pc() < 0x4000) last_bios_access = address & 0x3ffe;
         return *(uint16_t *) &system_rom[last_bios_access];
     }
     if (address >= 0x02000000 && address < 0x03000000) {
@@ -164,9 +168,9 @@ uint16_t memory_read_halfword(uint32_t address) {
         return backup_read_halfword(address & 0xffff);
     }
 #ifdef LOG_BAD_MEMORY_ACCESS
-    printf("memory_read_halfword(0x%08x);\n", address);
+    std::printf("memory_read_halfword(0x%08x);\n", address);
 #endif
-    return (uint16_t) (open_bus() >> 8 * (address & 2));
+    return (uint16_t) (gba_open_bus() >> 8 * (address & 2));
 }
 
 void memory_write_halfword(uint32_t address, uint16_t value) {
@@ -218,13 +222,13 @@ void memory_write_halfword(uint32_t address, uint16_t value) {
         backup_write_halfword(address & 0xffff, value);
     }
 #ifdef LOG_BAD_MEMORY_ACCESS
-    printf("memory_write_halfword(0x%08x, 0x%04x);\n", address, value);
+    std::printf("memory_write_halfword(0x%08x, 0x%04x);\n", address, value);
 #endif
 }
 
 uint32_t memory_read_word(uint32_t address) {
     if (address < 0x4000) {
-        if (r[15] < 0x4000) last_bios_access = address & 0x3ffc;
+        if (get_pc() < 0x4000) last_bios_access = address & 0x3ffc;
         return *(uint32_t *) &system_rom[last_bios_access];
     }
     if (address >= 0x02000000 && address < 0x03000000) {
@@ -258,9 +262,9 @@ uint32_t memory_read_word(uint32_t address) {
         return backup_read_word(address & 0xffff);
     }
 #ifdef LOG_BAD_MEMORY_ACCESS
-    printf("memory_read_word(0x%08x);\n", address);
+    std::printf("memory_read_word(0x%08x);\n", address);
 #endif
-    return open_bus();
+    return gba_open_bus();
 }
 
 void memory_write_word(uint32_t address, uint32_t value) {
@@ -304,6 +308,6 @@ void memory_write_word(uint32_t address, uint32_t value) {
         backup_write_word(address & 0xffff, value);
     }
 #ifdef LOG_BAD_MEMORY_ACCESS
-    printf("memory_write_word(0x%08x, 0x%08x);\n", address, value);
+    std::printf("memory_write_word(0x%08x, 0x%08x);\n", address, value);
 #endif
 }

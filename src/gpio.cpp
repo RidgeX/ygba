@@ -1,25 +1,27 @@
 // Copyright (c) 2021 Ridge Shrubsall
 // SPDX-License-Identifier: BSD-3-Clause
 
-#include <assert.h>
-#include <time.h>
-
 #include "gpio.h"
+
+#include <stdint.h>
+#include <cassert>
+#include <ctime>
+
 #include "memory.h"
 
-bool has_rtc = false;
+bool has_rtc;
 
-uint16_t gpio_data = 0;
-uint16_t gpio_direction = 0;
-uint16_t gpio_read_enable = 0;
+uint16_t gpio_data;
+uint16_t gpio_direction;
+uint16_t gpio_read_enable;
 
-uint64_t rtc_rbits = 0;
-uint32_t rtc_num_rbits = 0;
-uint64_t rtc_wbits = 0;
-uint32_t rtc_num_wbits = 0;
-uint32_t rtc_state = 0;
+uint64_t rtc_rbits;
+uint32_t rtc_num_rbits;
+uint64_t rtc_wbits;
+uint32_t rtc_num_wbits;
+uint32_t rtc_state;
 
-void gpio_init(void) {
+void gpio_init() {
     gpio_data = 0;
     gpio_direction = 0;
     gpio_read_enable = 0;
@@ -43,7 +45,7 @@ uint8_t decimal_to_bcd(uint8_t x) {
     return (tens << 4) | ones;
 }
 
-void rtc_send(uint8_t value) {
+static void rtc_send(uint8_t value) {
     for (int i = 0; i < 8; i++) {
         rtc_rbits <<= 1;
         rtc_rbits |= (value >> i) & 1;
@@ -51,7 +53,7 @@ void rtc_send(uint8_t value) {
     rtc_num_rbits += 8;
 }
 
-uint16_t rtc_read_bit(void) {
+static uint16_t rtc_read_bit() {
     if (rtc_num_rbits > 0) {
         rtc_num_rbits--;
         return (rtc_rbits >> rtc_num_rbits) & 1;
@@ -59,9 +61,9 @@ uint16_t rtc_read_bit(void) {
     return 0;
 }
 
-void rtc_write_bit(uint16_t value) {
-    time_t rawtime;
-    struct tm *timeinfo;
+static void rtc_write_bit(uint16_t value) {
+    std::time_t rawtime;
+    std::tm *timeinfo;
 
     rtc_wbits <<= 1;
     rtc_wbits |= value & 1;
@@ -93,8 +95,8 @@ void rtc_write_bit(uint16_t value) {
                 break;
 
             case 0x65:  // Read date and time
-                time(&rawtime);
-                timeinfo = localtime(&rawtime);
+                std::time(&rawtime);
+                timeinfo = std::localtime(&rawtime);
                 rtc_send(decimal_to_bcd(timeinfo->tm_year % 100));
                 rtc_send(decimal_to_bcd(timeinfo->tm_mon + 1));
                 rtc_send(decimal_to_bcd(timeinfo->tm_mday));
@@ -109,8 +111,8 @@ void rtc_write_bit(uint16_t value) {
                 break;
 
             case 0x67:  // Read time
-                time(&rawtime);
-                timeinfo = localtime(&rawtime);
+                std::time(&rawtime);
+                timeinfo = std::localtime(&rawtime);
                 rtc_send(decimal_to_bcd(timeinfo->tm_hour));
                 rtc_send(decimal_to_bcd(timeinfo->tm_min));
                 rtc_send(decimal_to_bcd(timeinfo->tm_sec));

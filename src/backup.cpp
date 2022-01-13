@@ -1,44 +1,46 @@
 // Copyright (c) 2021 Ridge Shrubsall
 // SPDX-License-Identifier: BSD-3-Clause
 
-#include <assert.h>
-#include <stdio.h>
-#include <string.h>
-
 #include "backup.h"
+
+#include <stdint.h>
+#include <cassert>
+#include <cstdio>
+#include <cstring>
+
 #include "main.h"
 
 //#define LOG_BAD_MEMORY_ACCESS
 
-bool has_eeprom = false;
-bool has_flash = false;
-bool has_sram = false;
+bool has_eeprom;
+bool has_flash;
+bool has_sram;
 
 uint8_t backup_eeprom[0x2000];
 uint8_t backup_flash[0x20000];
 uint8_t backup_sram[0x8000];
 
-uint32_t eeprom_addr = 0;
-uint64_t eeprom_rbits = 0;
-uint32_t eeprom_num_rbits = 0;
-uint64_t eeprom_wbits = 0;
-uint32_t eeprom_num_wbits = 0;
-uint32_t eeprom_state = 0;
-uint32_t eeprom_width = 0;
+uint32_t eeprom_addr;
+uint64_t eeprom_rbits;
+uint32_t eeprom_num_rbits;
+uint64_t eeprom_wbits;
+uint32_t eeprom_num_wbits;
+uint32_t eeprom_state;
+uint32_t eeprom_width;
 
-uint32_t flash_bank = 0;
-uint32_t flash_state = 0;
-bool flash_id = false;
-uint8_t flash_manufacturer = 0;
-uint8_t flash_device = 0;
+uint32_t flash_bank;
+uint32_t flash_state;
+bool flash_id;
+uint8_t flash_manufacturer;
+uint8_t flash_device;
 
-void backup_erase(void) {
-    memset(backup_eeprom, 0xff, sizeof(backup_eeprom));
-    memset(backup_flash, 0xff, sizeof(backup_flash));
-    memset(backup_sram, 0xff, sizeof(backup_sram));
+void backup_erase() {
+    std::memset(backup_eeprom, 0xff, sizeof(backup_eeprom));
+    std::memset(backup_flash, 0xff, sizeof(backup_flash));
+    std::memset(backup_sram, 0xff, sizeof(backup_sram));
 }
 
-void backup_init(void) {
+void backup_init() {
     eeprom_addr = 0;
     eeprom_rbits = 0;
     eeprom_num_rbits = 0;
@@ -66,7 +68,7 @@ uint8_t backup_read_byte(uint32_t address) {
         return backup_sram[address & 0x7fff];
     }
 #ifdef LOG_BAD_MEMORY_ACCESS
-    printf("backup_read_byte(0x%08x);\n", address);
+    std::printf("backup_read_byte(0x%08x);\n", address);
 #endif
     return 0xff;
 }
@@ -121,12 +123,12 @@ void backup_write_byte(uint32_t address, uint8_t value) {
                 }
                 if (flash_state & 4) {  // Erase mode
                     if (address == 0x5555 && value == 0x10) {
-                        memset(backup_flash, 0xff, sizeof(backup_flash));  // Chip erase
+                        std::memset(backup_flash, 0xff, sizeof(backup_flash));  // Chip erase
                         break;
                     }
                     if (value == 0x30) {
                         uint32_t sector = address >> 12;
-                        memset(&backup_flash[flash_bank * 0x10000 + sector * 0x1000], 0xff, 0x1000);  // Sector erase
+                        std::memset(&backup_flash[flash_bank * 0x10000 + sector * 0x1000], 0xff, 0x1000);  // Sector erase
                         break;
                     }
                     assert(false);
@@ -165,7 +167,7 @@ void backup_write_byte(uint32_t address, uint8_t value) {
         return;
     }
 #ifdef LOG_BAD_MEMORY_ACCESS
-    printf("backup_write_byte(0x%08x, 0x%02x);\n", address, value);
+    std::printf("backup_write_byte(0x%08x, 0x%02x);\n", address, value);
 #endif
 }
 
@@ -187,7 +189,7 @@ void backup_write_word(uint32_t address, uint32_t value) {
     backup_write_byte(address, (uint8_t) (value >> 8 * (address & 3)));
 }
 
-uint16_t eeprom_read_bit(void) {
+uint16_t eeprom_read_bit() {
     if (eeprom_num_rbits > 64) {
         eeprom_num_rbits--;
         return 1;

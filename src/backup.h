@@ -1,10 +1,8 @@
 // Copyright (c) 2021 Ridge Shrubsall
 // SPDX-License-Identifier: BSD-3-Clause
 
-#ifndef BACKUP_H
-#define BACKUP_H
+#pragma once
 
-#include <stdbool.h>
 #include <stdint.h>
 
 #define MANUFACTURER_ATMEL     0x1f
@@ -36,8 +34,8 @@ extern uint32_t eeprom_width;
 extern uint8_t flash_manufacturer;
 extern uint8_t flash_device;
 
-void backup_erase(void);
-void backup_init(void);
+void backup_erase();
+void backup_init();
 uint8_t backup_read_byte(uint32_t address);
 void backup_write_byte(uint32_t address, uint8_t value);
 uint16_t backup_read_halfword(uint32_t address);
@@ -45,7 +43,5 @@ void backup_write_halfword(uint32_t address, uint16_t value);
 uint32_t backup_read_word(uint32_t address);
 void backup_write_word(uint32_t address, uint32_t value);
 
-uint16_t eeprom_read_bit(void);
+uint16_t eeprom_read_bit();
 void eeprom_write_bit(uint16_t value);
-
-#endif  // BACKUP_H

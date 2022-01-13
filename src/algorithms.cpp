@@ -1,14 +1,11 @@
 // Copyright (c) 2021 Ridge Shrubsall
 // SPDX-License-Identifier: BSD-3-Clause
 
-#include <assert.h>
-#include <stdlib.h>
-
 #include "algorithms.h"
 
-bool is_power_of_2(uint32_t x) {
-    return (x & (x - 1)) == 0;
-}
+#include <stdint.h>
+#include <cassert>
+#include <cstdlib>
 
 uint32_t next_power_of_2(uint32_t x) {
     return (x == 1 ? 1 : 1 << (32 - bits_clz(x - 1)));
@@ -72,8 +69,8 @@ static int max(int a, int b) {
 }
 
 static unsigned char *reverse(unsigned char *pattern, int m) {
-    unsigned char *rev_pattern = (unsigned char *) calloc(m, sizeof(unsigned char));
-    assert(rev_pattern != NULL);
+    unsigned char *rev_pattern = (unsigned char *) std::calloc(m, sizeof(unsigned char));
+    assert(rev_pattern != nullptr);
 
     for (int i = 0; i < m; i++) {
         rev_pattern[m - 1 - i] = pattern[i];
@@ -83,8 +80,8 @@ static unsigned char *reverse(unsigned char *pattern, int m) {
 }
 
 static int *compute_prefix(unsigned char *pattern, int m) {
-    int *prefix = (int *) calloc(m, sizeof(int));
-    assert(prefix != NULL);
+    int *prefix = (int *) std::calloc(m, sizeof(int));
+    assert(prefix != nullptr);
 
     prefix[0] = 0;
     int pos = 0;
@@ -103,7 +100,7 @@ static int *compute_prefix(unsigned char *pattern, int m) {
 
 unsigned char *knuth_morris_pratt_matcher(unsigned char *text, int n, unsigned char *pattern, int m) {
     int *prefix = compute_prefix(pattern, m);
-    unsigned char *match = NULL;
+    unsigned char *match = nullptr;
 
     int pos = 0;
     for (int i = 0; i < n; i++) {
@@ -120,13 +117,13 @@ unsigned char *knuth_morris_pratt_matcher(unsigned char *text, int n, unsigned c
         }
     }
 
-    free(prefix);
+    std::free(prefix);
     return match;
 }
 
 static int *compute_last_occurrence(unsigned char *pattern, int m) {
-    int *last_occurrence = (int *) calloc(256, sizeof(int));
-    assert(last_occurrence != NULL);
+    int *last_occurrence = (int *) std::calloc(256, sizeof(int));
+    assert(last_occurrence != nullptr);
 
     for (int i = 0; i < 256; i++) {
         last_occurrence[i] = 0;
@@ -142,8 +139,8 @@ static int *compute_good_suffix(unsigned char *pattern, int m) {
     int *prefix = compute_prefix(pattern, m);
     unsigned char *rev_pattern = reverse(pattern, m);
     int *rev_prefix = compute_prefix(rev_pattern, m);
-    int *good_suffix = (int *) calloc(m + 1, sizeof(int));
-    assert(good_suffix != NULL);
+    int *good_suffix = (int *) std::calloc(m + 1, sizeof(int));
+    assert(good_suffix != nullptr);
 
     for (int i = 0; i <= m; i++) {
         good_suffix[i] = m - prefix[m - 1];
@@ -155,16 +152,16 @@ static int *compute_good_suffix(unsigned char *pattern, int m) {
         }
     }
 
-    free(prefix);
-    free(rev_pattern);
-    free(rev_prefix);
+    std::free(prefix);
+    std::free(rev_pattern);
+    std::free(rev_prefix);
     return good_suffix;
 }
 
 unsigned char *boyer_moore_matcher(unsigned char *text, int n, unsigned char *pattern, int m) {
     int *last_occurrence = compute_last_occurrence(pattern, m);
     int *good_suffix = compute_good_suffix(pattern, m);
-    unsigned char *match = NULL;
+    unsigned char *match = nullptr;
 
     int shift = 0;
     while (shift <= n - m) {
@@ -181,7 +178,7 @@ unsigned char *boyer_moore_matcher(unsigned char *text, int n, unsigned char *pa
         }
     }
 
-    free(last_occurrence);
-    free(good_suffix);
+    std::free(last_occurrence);
+    std::free(good_suffix);
     return match;
 }

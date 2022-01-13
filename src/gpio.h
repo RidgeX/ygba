@@ -1,8 +1,7 @@
 // Copyright (c) 2021 Ridge Shrubsall
 // SPDX-License-Identifier: BSD-3-Clause
 
-#ifndef GPIO_H
-#define GPIO_H
+#pragma once
 
 #include <stdint.h>
 
@@ -24,8 +23,6 @@
 
 extern bool has_rtc;
 
-void gpio_init(void);
+void gpio_init();
 uint16_t gpio_read_halfword(uint32_t address);
 void gpio_write_halfword(uint32_t address, uint16_t value);
-
-#endif  // GPIO_H

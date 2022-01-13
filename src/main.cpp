@@ -1,47 +1,49 @@
 // Copyright (c) 2021 Ridge Shrubsall
 // SPDX-License-Identifier: BSD-3-Clause
 
+#include "main.h"
+
+#include <stdint.h>
+#include <cassert>
+#include <cstdlib>
+#include <cstring>
+
 #include "imgui.h"
 #include "imgui_impl_opengl3.h"
 #include "imgui_impl_sdl.h"
 #include "imgui_memory_editor.h"
 
 #include <SDL.h>
-#include <SDL_opengl.h>
 #if defined(IMGUI_IMPL_OPENGL_ES2)
 #include <SDL_opengles2.h>
+#else
+#include <SDL_opengl.h>
 #endif
-
-#include <assert.h>
-#include <stdlib.h>
-#include <string.h>
 
 #include "algorithms.h"
 #include "backup.h"
 #include "cpu.h"
 #include "gpio.h"
 #include "io.h"
-#include "main.h"
 #include "memory.h"
 
-bool single_step = false;
-uint32_t ppu_cycles = 0;
-bool halted = false;
-int active_dma = -1;
-bool skip_bios = false;
-char *save_path = NULL;
+bool single_step;
+uint32_t ppu_cycles;
+bool halted;
+int active_dma;
+bool skip_bios;
+char *save_path;
 char game_title[13];
 char game_code[5];
-uint8_t game_version = 0;
-uint32_t idle_loop_address = 0;
-uint16_t idle_loop_last_irq = 0;
+uint8_t game_version;
+uint32_t idle_loop_address;
+uint16_t idle_loop_last_irq;
 
 #define SCREEN_WIDTH  240
 #define SCREEN_HEIGHT 160
 
 uint32_t screen_texture;
 uint32_t screen_pixels[SCREEN_HEIGHT][SCREEN_WIDTH];
-int screen_scale = 3;
 
 typedef struct {
     int left;
@@ -52,7 +54,7 @@ typedef struct {
 
 lcd_window win0, win1;
 
-bool is_point_in_window(int x, int y, lcd_window win) {
+static bool is_point_in_window(int x, int y, lcd_window win) {
     bool x_ok = false;
     bool y_ok = false;
 
@@ -70,16 +72,16 @@ bool is_point_in_window(int x, int y, lcd_window win) {
     return (x_ok && y_ok);
 }
 
-double fixed8p8_to_double(int16_t x) {
+static double fixed8p8_to_double(int16_t x) {
     return (x >> 8) + ((x & 0xff) / 256.0);
 }
 
-double fixed20p8_to_double(int32_t x) {
+static double fixed20p8_to_double(int32_t x) {
     SIGN_EXTEND(x, 27);
     return (x >> 8) + ((x & 0xff) / 256.0);
 }
 
-double cubic_interpolate(int8_t *history, double mu) {
+static double cubic_interpolate(int8_t *history, double mu) {
     double A = history[3] - history[2] - history[0] + history[1];
     double B = history[0] - history[1] - A;
     double C = history[2] - history[0];
@@ -87,13 +89,13 @@ double cubic_interpolate(int8_t *history, double mu) {
     return A * mu * mu * mu + B * mu * mu + C * mu + D;
 }
 
-int16_t clamp_i16(int32_t x, int16_t min, int16_t max) {
+static int16_t clamp_i16(int32_t x, int16_t min, int16_t max) {
     x = x < min ? min : x;
     x = x > max ? max : x;
     return x;
 }
 
-void gba_audio_callback(void *userdata, uint8_t *stream_u8, int len_u8) {
+static void gba_audio_callback(void *userdata, uint8_t *stream_u8, int len_u8) {
     UNUSED(userdata);
     int16_t *stream = (int16_t *) stream_u8;
     int len = len_u8 / 2;
@@ -162,24 +164,24 @@ void gba_audio_fifo_b(uint32_t sample) {
     ioreg.fifo_b_w = (ioreg.fifo_b_w + 4) % FIFO_SIZE;
 }
 
-SDL_AudioDeviceID gba_audio_init(void) {
+static SDL_AudioDeviceID gba_audio_init() {
     SDL_AudioSpec want;
-    memset(&want, 0, sizeof(want));
+    std::memset(&want, 0, sizeof(want));
     want.freq = 48000;
     want.format = AUDIO_S16;
     want.channels = 2;
     want.samples = FIFO_SIZE;
     want.callback = gba_audio_callback;
-    SDL_AudioDeviceID audio_device = SDL_OpenAudioDevice(NULL, 0, &want, NULL, 0);
+    SDL_AudioDeviceID audio_device = SDL_OpenAudioDevice(nullptr, 0, &want, nullptr, 0);
     if (audio_device == 0) {
         SDL_Log("Failed to open audio device: %s", SDL_GetError());
-        exit(EXIT_FAILURE);
+        std::exit(EXIT_FAILURE);
     }
     SDL_PauseAudioDevice(audio_device, 0);
     return audio_device;
 }
 
-void gba_check_keypad_interrupt(void) {
+void gba_check_keypad_interrupt() {
     if (BIT(ioreg.keycnt.w, 14)) {
         uint16_t held = ~ioreg.keyinput.w & 0x3ff;
         uint16_t mask = ioreg.keycnt.w & 0x3ff;
@@ -200,7 +202,7 @@ void gba_timer_reset(int i) {
     ioreg.timer[i].elapsed = 0;
 }
 
-uint32_t open_bus(void) {
+uint32_t gba_open_bus() {
     if (FLAG_T()) {
         return thumb_pipeline[1] | thumb_pipeline[1] << 16;
     } else {
@@ -208,7 +210,7 @@ uint32_t open_bus(void) {
     }
 }
 
-void gba_detect_cartridge_features(void) {
+static void gba_detect_cartridge_features() {
     void *match;
 
     has_eeprom = false;
@@ -257,49 +259,50 @@ void gba_detect_cartridge_features(void) {
     match = boyer_moore_matcher(game_rom, game_rom_size, siirtc_v, 8);
     if (match) has_rtc = true;
 
-    memcpy(game_title, game_rom + 0xa0, 12);
+    std::memcpy(game_title, game_rom + 0xa0, 12);
     game_title[12] = '\0';
-    memcpy(game_code, game_rom + 0xac, 4);
+    std::memcpy(game_code, game_rom + 0xac, 4);
     game_code[4] = '\0';
     game_version = game_rom[0xbc];
 
     // Advance Wars (USA)
-    if (strcmp(game_title, "ADVANCEWARS") == 0 && strcmp(game_code, "AWRE") == 0 && game_version == 0) idle_loop_address = 0x80387ec;
+    if (std::strcmp(game_title, "ADVANCEWARS") == 0 && std::strcmp(game_code, "AWRE") == 0 && game_version == 0) idle_loop_address = 0x80387ec;
     // Advance Wars (USA) (Rev 1)
-    if (strcmp(game_title, "ADVANCEWARS") == 0 && strcmp(game_code, "AWRE") == 0 && game_version == 1) idle_loop_address = 0x8038818;
+    if (std::strcmp(game_title, "ADVANCEWARS") == 0 && std::strcmp(game_code, "AWRE") == 0 && game_version == 1) idle_loop_address = 0x8038818;
     // Advance Wars 2 - Black Hole Rising (USA, Australia)
-    if (strcmp(game_title, "ADVANCEWARS2") == 0 && strcmp(game_code, "AW2E") == 0 && game_version == 0) idle_loop_address = 0x8036e0c;
+    if (std::strcmp(game_title, "ADVANCEWARS2") == 0 && std::strcmp(game_code, "AW2E") == 0 && game_version == 0) idle_loop_address = 0x8036e0c;
     // Pokemon - Emerald Version (USA, Europe)
-    if (strcmp(game_title, "POKEMON EMER") == 0 && strcmp(game_code, "BPEE") == 0 && game_version == 0) idle_loop_address = 0x80008c6;
+    if (std::strcmp(game_title, "POKEMON EMER") == 0 && std::strcmp(game_code, "BPEE") == 0 && game_version == 0) idle_loop_address = 0x80008c6;
     // Pokemon - FireRed Version (USA)
-    if (strcmp(game_title, "POKEMON FIRE") == 0 && strcmp(game_code, "BPRE") == 0 && game_version == 0) idle_loop_address = 0x80008aa;
+    if (std::strcmp(game_title, "POKEMON FIRE") == 0 && std::strcmp(game_code, "BPRE") == 0 && game_version == 0) idle_loop_address = 0x80008aa;
     // Pokemon - FireRed Version (USA, Europe) (Rev 1)
-    if (strcmp(game_title, "POKEMON FIRE") == 0 && strcmp(game_code, "BPRE") == 0 && game_version == 1) idle_loop_address = 0x80008be;
+    if (std::strcmp(game_title, "POKEMON FIRE") == 0 && std::strcmp(game_code, "BPRE") == 0 && game_version == 1) idle_loop_address = 0x80008be;
     // Pokemon - LeafGreen Version (USA)
-    if (strcmp(game_title, "POKEMON LEAF") == 0 && strcmp(game_code, "BPGE") == 0 && game_version == 0) idle_loop_address = 0x80008aa;
+    if (std::strcmp(game_title, "POKEMON LEAF") == 0 && std::strcmp(game_code, "BPGE") == 0 && game_version == 0) idle_loop_address = 0x80008aa;
     // Pokemon - LeafGreen Version (USA, Europe) (Rev 1)
-    if (strcmp(game_title, "POKEMON LEAF") == 0 && strcmp(game_code, "BPGE") == 0 && game_version == 1) idle_loop_address = 0x80008be;
+    if (std::strcmp(game_title, "POKEMON LEAF") == 0 && std::strcmp(game_code, "BPGE") == 0 && game_version == 1) idle_loop_address = 0x80008be;
     // Super Monkey Ball Jr. (USA)
-    if (strcmp(game_title, "MONKEYBALLJR") == 0 && strcmp(game_code, "ALUE") == 0 && game_version == 0) has_flash = has_sram = false;
+    if (std::strcmp(game_title, "MONKEYBALLJR") == 0 && std::strcmp(game_code, "ALUE") == 0 && game_version == 0) has_flash = has_sram = false;
 }
 
-void gba_reset(bool keep_backup) {
-    memset(cpu_ewram, 0, sizeof(cpu_ewram));
-    memset(cpu_iwram, 0, sizeof(cpu_iwram));
-    memset(&ioreg, 0, sizeof(ioreg));
-    memset(palette_ram, 0, sizeof(palette_ram));
-    memset(video_ram, 0, sizeof(video_ram));
-    memset(object_ram, 0, sizeof(object_ram));
+static void gba_reset(bool keep_backup) {
+    std::memset(cpu_ewram, 0, sizeof(cpu_ewram));
+    std::memset(cpu_iwram, 0, sizeof(cpu_iwram));
+    std::memset(&ioreg, 0, sizeof(ioreg));
+    std::memset(palette_ram, 0, sizeof(palette_ram));
+    std::memset(video_ram, 0, sizeof(video_ram));
+    std::memset(object_ram, 0, sizeof(object_ram));
     if (!keep_backup) backup_erase();
     backup_init();
     gpio_init();
 
-    memset(r, 0, sizeof(uint32_t) * 16);
+    std::memset(r, 0, sizeof(uint32_t) * 16);
     arm_init_registers(skip_bios);
     branch_taken = true;
 
     ppu_cycles = 0;
     halted = false;
+    active_dma = -1;
 
     ioreg.dispcnt.w = 0x80;
     ioreg.bg_affine[0].pa.w = 0x100;
@@ -315,9 +318,9 @@ void gba_reset(bool keep_backup) {
     }
 }
 
-void read_save_file(void) {
+static void read_save_file() {
     SDL_RWops *rw = SDL_RWFromFile(save_path, "rb");
-    if (rw == NULL) return;
+    if (rw == nullptr) return;
 
     if (has_eeprom) {
         SDL_RWread(rw, backup_eeprom, sizeof(backup_eeprom), 1);
@@ -330,11 +333,11 @@ void read_save_file(void) {
     SDL_RWclose(rw);
 }
 
-void write_save_file(void) {
+static void write_save_file() {
     if (!has_eeprom && !has_flash && !has_sram) return;
 
     SDL_RWops *rw = SDL_RWFromFile(save_path, "wb");
-    if (rw == NULL) return;
+    if (rw == nullptr) return;
 
     if (has_eeprom) {
         SDL_RWwrite(rw, backup_eeprom, sizeof(backup_eeprom), 1);
@@ -347,11 +350,11 @@ void write_save_file(void) {
     SDL_RWclose(rw);
 }
 
-void load_bios_file(void) {
+static void read_bios_file() {
     SDL_RWops *rw = SDL_RWFromFile("gba_bios.bin", "rb");
-    if (rw == NULL) {
-        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Missing BIOS file", "Failed to open BIOS file 'gba_bios.bin'.", NULL);
-        exit(EXIT_FAILURE);
+    if (rw == nullptr) {
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Missing BIOS file", "Failed to open BIOS file 'gba_bios.bin'.", nullptr);
+        std::exit(EXIT_FAILURE);
     }
 
     SDL_RWread(rw, system_rom, sizeof(system_rom), 1);
@@ -359,11 +362,11 @@ void load_bios_file(void) {
     SDL_RWclose(rw);
 }
 
-void load_rom_file(const char *rom_path) {
-    memset(game_rom, 0, sizeof(game_rom));
+static void read_rom_file(const char *rom_path) {
+    std::memset(game_rom, 0, sizeof(game_rom));
 
     SDL_RWops *rw = SDL_RWFromFile(rom_path, "rb");
-    if (rw == NULL) return;
+    if (rw == nullptr) return;
 
     SDL_RWseek(rw, 0, RW_SEEK_END);
     game_rom_size = SDL_RWtell(rw);
@@ -377,37 +380,44 @@ void load_rom_file(const char *rom_path) {
     SDL_RWclose(rw);
 }
 
-void gba_load(const char *rom_path) {
-    if (strstr(rom_path, ".gba") == NULL) return;
+static char *my_strdup(const char *src) {
+    std::size_t len = std::strlen(src) + 1;
+    char *dst = (char *) std::malloc(len);
+    if (dst == nullptr) return nullptr;
+    std::memcpy(dst, src, len);
+    return dst;
+}
 
-    if (save_path != NULL) {
+static void gba_load(const char *rom_path) {
+    if (std::strstr(rom_path, ".gba") == nullptr) return;
+
+    if (save_path != nullptr) {
         write_save_file();
-        free(save_path);
+        std::free(save_path);
     }
-    save_path = strdup(rom_path);
-    assert(save_path != NULL);
-    char *p_ext = strstr(save_path, ".gba");
+    save_path = my_strdup(rom_path);
+    assert(save_path != nullptr);
+    char *p_ext = std::strstr(save_path, ".gba");
     *p_ext = '\0';
-    strcat(save_path, ".sav");
+    std::strcat(save_path, ".sav");
 
     gba_reset(false);
-    load_rom_file(rom_path);
+    read_rom_file(rom_path);
     gba_detect_cartridge_features();
     read_save_file();
 }
 
-uint32_t rgb555(uint32_t pixel) {
-    uint32_t red, green, blue;
-    red = pixel & 0x1f;
-    green = (pixel >> 5) & 0x1f;
-    blue = (pixel >> 10) & 0x1f;
+static uint32_t rgb555(uint32_t pixel) {
+    uint32_t red = pixel & 0x1f;
+    uint32_t green = (pixel >> 5) & 0x1f;
+    uint32_t blue = (pixel >> 10) & 0x1f;
     red = (red << 3) | (red >> 2);
     green = (green << 3) | (green >> 2);
     blue = (blue << 3) | (blue >> 2);
     return 0xff << 24 | blue << 16 | green << 8 | red;
 }
 
-void gba_draw_blank(int y, bool forced_blank) {
+static void gba_draw_blank(int y, bool forced_blank) {
     uint16_t pixel = *(uint16_t *) &palette_ram[0];
     uint32_t clear_color = rgb555(forced_blank ? 0x7fff : pixel);
 
@@ -416,7 +426,7 @@ void gba_draw_blank(int y, bool forced_blank) {
     }
 }
 
-void gba_draw_pixel_culled(int bg, int x, int y, uint32_t pixel) {
+static void gba_draw_pixel_culled(int bg, int x, int y, uint32_t pixel) {
     if (x < 0 || x >= SCREEN_WIDTH) return;
     assert(y >= 0 && y < SCREEN_HEIGHT);
 
@@ -442,7 +452,7 @@ void gba_draw_pixel_culled(int bg, int x, int y, uint32_t pixel) {
     screen_pixels[y][x] = rgb555(pixel);
 }
 
-bool tile_access(uint32_t tile_address, int x, int y, bool hflip, bool vflip, bool colors_256, uint32_t palette_offset, int palette_no, uint16_t *pixel) {
+static bool tile_access(uint32_t tile_address, int x, int y, bool hflip, bool vflip, bool colors_256, uint32_t palette_offset, int palette_no, uint16_t *pixel) {
     assert(x >= 0 && x < 8 && y >= 0 && y < 8);
 
     if (hflip) x = 7 - x;
@@ -470,7 +480,7 @@ bool tile_access(uint32_t tile_address, int x, int y, bool hflip, bool vflip, bo
     return false;
 }
 
-bool bg_regular_access(int x, int y, int w, int h, uint32_t tile_base, uint32_t map_base, uint32_t screen_size, bool colors_256, uint16_t *pixel) {
+static bool bg_regular_access(int x, int y, int w, int h, uint32_t tile_base, uint32_t map_base, uint32_t screen_size, bool colors_256, uint16_t *pixel) {
     assert(x >= 0 && x < w && y >= 0 && y < h);
 
     int map_x = (x / 8) % (w / 8);
@@ -489,7 +499,7 @@ bool bg_regular_access(int x, int y, int w, int h, uint32_t tile_base, uint32_t 
     return tile_access(tile_address, x % 8, y % 8, hflip, vflip, colors_256, 0, palette_no, pixel);
 }
 
-bool bg_affine_access(int x, int y, int w, int h, uint32_t tile_base, uint32_t map_base, uint16_t *pixel) {
+static bool bg_affine_access(int x, int y, int w, int h, uint32_t tile_base, uint32_t map_base, uint16_t *pixel) {
     if (x < 0 || x >= w || y < 0 || y >= h) return false;
 
     int map_x = (x / 8) % (w / 8);
@@ -503,7 +513,7 @@ bool bg_affine_access(int x, int y, int w, int h, uint32_t tile_base, uint32_t m
     return tile_access(tile_address, x % 8, y % 8, false, false, true, 0, 0, pixel);
 }
 
-bool sprite_access(int tile_no, int x, int y, int w, int h, bool hflip, bool vflip, bool colors_256, int palette_no, int mode, uint16_t *pixel) {
+static bool sprite_access(int tile_no, int x, int y, int w, int h, bool hflip, bool vflip, bool colors_256, int palette_no, int mode, uint16_t *pixel) {
     if (x < 0 || x >= w || y < 0 || y >= h) return false;
 
     if (hflip) x = w - 1 - x;
@@ -522,10 +532,10 @@ bool sprite_access(int tile_no, int x, int y, int w, int h, bool hflip, bool vfl
     return tile_access(tile_address, x % 8, y % 8, false, false, colors_256, 0x200, palette_no, pixel);
 }
 
-int sprite_width_lookup[4][4] = {{8, 16, 32, 64}, {16, 32, 32, 64}, {8, 8, 16, 32}, {8, 8, 8, 8}};
-int sprite_height_lookup[4][4] = {{8, 16, 32, 64}, {8, 8, 16, 32}, {16, 32, 32, 64}, {8, 8, 8, 8}};
+static const int sprite_width_lookup[4][4] = {{8, 16, 32, 64}, {16, 32, 32, 64}, {8, 8, 16, 32}, {8, 8, 8, 8}};
+static const int sprite_height_lookup[4][4] = {{8, 16, 32, 64}, {8, 8, 16, 32}, {16, 32, 32, 64}, {8, 8, 8, 8}};
 
-void gba_draw_sprites(int mode, int pri, int y) {
+static void gba_draw_sprites(int mode, int pri, int y) {
     for (int n = 127; n >= 0; n--) {
         uint16_t attr0 = *(uint16_t *) &object_ram[n * 8];
         uint16_t attr1 = *(uint16_t *) &object_ram[n * 8 + 2];
@@ -592,7 +602,7 @@ void gba_draw_sprites(int mode, int pri, int y) {
     }
 }
 
-void gba_draw_bitmap(int mode, int y) {
+static void gba_draw_bitmap(int mode, int y) {
     int width = (mode == 5 ? 160 : SCREEN_WIDTH);
 
     for (int x = 0; x < SCREEN_WIDTH; x++) {
@@ -616,10 +626,10 @@ void gba_draw_bitmap(int mode, int y) {
     }
 }
 
-int bg_width_lookup[2][4] = {{256, 512, 256, 512}, {128, 256, 512, 1024}};
-int bg_height_lookup[2][4] = {{256, 256, 512, 512}, {128, 256, 512, 1024}};
+static const int bg_width_lookup[2][4] = {{256, 512, 256, 512}, {128, 256, 512, 1024}};
+static const int bg_height_lookup[2][4] = {{256, 256, 512, 512}, {128, 256, 512, 1024}};
 
-void gba_draw_tiled_bg(int mode, int bg, int y) {
+static void gba_draw_tiled_bg(int mode, int bg, int y) {
     if (mode == 1 && bg == 3) return;
     if (mode == 2 && (bg == 0 || bg == 1)) return;
 
@@ -671,7 +681,7 @@ void gba_draw_tiled_bg(int mode, int bg, int y) {
     }
 }
 
-void gba_draw_tiled(int mode, int y) {
+static void gba_draw_tiled(int mode, int y) {
     for (int pri = 3; pri >= 0; pri--) {
         for (int bg = 3; bg >= 0; bg--) {
             bool bg_visible = BIT(ioreg.dispcnt.w, 8 + bg);
@@ -686,7 +696,7 @@ void gba_draw_tiled(int mode, int y) {
     }
 }
 
-void gba_draw_scanline(void) {
+static void gba_draw_scanline() {
     win0.right = ioreg.winh[0].b.b0;
     win0.left = ioreg.winh[0].b.b1;
     win0.bottom = ioreg.winv[0].b.b0;
@@ -722,21 +732,21 @@ void gba_draw_scanline(void) {
     }
 }
 
-void gba_affine_reset(void) {
+void gba_affine_reset() {
     for (int i = 0; i < 2; i++) {
         ioreg.bg_affine[i].x = fixed20p8_to_double(ioreg.bg_affine[i].x0.dw);
         ioreg.bg_affine[i].y = fixed20p8_to_double(ioreg.bg_affine[i].y0.dw);
     }
 }
 
-void gba_affine_update(void) {
+static void gba_affine_update() {
     for (int i = 0; i < 2; i++) {
         ioreg.bg_affine[i].x += fixed8p8_to_double(ioreg.bg_affine[i].pb.w);
         ioreg.bg_affine[i].y += fixed8p8_to_double(ioreg.bg_affine[i].pd.w);
     }
 }
 
-void gba_ppu_update(void) {
+static void gba_ppu_update() {
     if (ppu_cycles % 1232 == 0) {
         ioreg.dispstat.w &= ~DSTAT_IN_HBL;
         if (ioreg.vcount.w < SCREEN_HEIGHT) {
@@ -783,7 +793,7 @@ void gba_ppu_update(void) {
     }
 }
 
-void gba_timer_update(uint32_t cycles) {
+static void gba_timer_update(uint32_t cycles) {
     bool overflow = false;
 
     for (int i = 0; i < 4; i++) {
@@ -808,7 +818,7 @@ void gba_timer_update(uint32_t cycles) {
                 case TM_FREQ_64: freq = 64; break;
                 case TM_FREQ_256: freq = 256; break;
                 case TM_FREQ_1024: freq = 1024; break;
-                default: abort();
+                default: std::abort();
             }
             if (*elapsed >= freq) {
                 increment = *elapsed / freq;
@@ -843,7 +853,7 @@ void gba_timer_update(uint32_t cycles) {
     }
 }
 
-void gba_dma_transfer(int ch, uint32_t dst_ctrl, uint32_t src_ctrl, uint32_t *dst_addr, uint32_t *src_addr, uint32_t size, uint32_t count) {
+static void gba_dma_transfer(int ch, uint32_t dst_ctrl, uint32_t src_ctrl, uint32_t *dst_addr, uint32_t *src_addr, uint32_t size, uint32_t count) {
     for (uint32_t i = 0; i < count; i++) {
         bool bad_src_addr = !(*src_addr >= 0x02000000 && *src_addr < 0x10000000);
         bad_src_addr |= (ch == 0 && *src_addr >= 0x08000000 && *src_addr < 0x0e000000);
@@ -953,7 +963,7 @@ void gba_dma_update(uint32_t current_timing) {
     }
 }
 
-void gba_emulate(void) {
+static void gba_emulate() {
     while (true) {
         int cpu_cycles = 0;
 
@@ -989,11 +999,11 @@ void gba_emulate(void) {
 }
 
 // Main code
-int main(int argc, char **argv) {
+int main(int argc, char *argv[]) {
     arm_init_lookup();
     thumb_init_lookup();
 
-    load_bios_file();
+    read_bios_file();
     gba_reset(false);
 
     if (argc == 2) {
@@ -1006,7 +1016,7 @@ int main(int argc, char **argv) {
     // depending on whether SDL_INIT_GAMECONTROLLER is enabled or disabled... updating to latest version of SDL is recommended!)
     if (SDL_Init(SDL_INIT_EVERYTHING) != 0) {
         SDL_Log("Failed to initialize SDL: %s", SDL_GetError());
-        exit(EXIT_FAILURE);
+        std::exit(EXIT_FAILURE);
     }
 
     // Decide GL+GLSL versions
@@ -1039,9 +1049,9 @@ int main(int argc, char **argv) {
     SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
     SDL_WindowFlags window_flags = (SDL_WindowFlags) (SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
     SDL_Window *window = SDL_CreateWindow("ygba", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 800, window_flags);
-    if (window == NULL) {
+    if (window == nullptr) {
         SDL_Log("Failed to create window: %s", SDL_GetError());
-        exit(EXIT_FAILURE);
+        std::exit(EXIT_FAILURE);
     }
     SDL_GLContext gl_context = SDL_GL_CreateContext(window);
     SDL_GL_MakeCurrent(window, gl_context);
@@ -1055,11 +1065,11 @@ int main(int argc, char **argv) {
 
     // Initialize gamepad
     SDL_GameControllerAddMappingsFromFile("gamecontrollerdb.txt");
-    SDL_GameController *game_controller = NULL;
+    SDL_GameController *game_controller = nullptr;
     for (int i = 0; i < SDL_NumJoysticks(); i++) {
         if (SDL_IsGameController(i)) {
             game_controller = SDL_GameControllerOpen(i);
-            if (game_controller != NULL) break;
+            if (game_controller != nullptr) break;
             SDL_Log("Failed to open game controller %d: %s", i, SDL_GetError());
         }
     }
@@ -1087,7 +1097,7 @@ int main(int argc, char **argv) {
     // Load Fonts
     // - If no fonts are loaded, dear imgui will use the default font. You can also load multiple fonts and use ImGui::PushFont()/PopFont() to select them.
     // - AddFontFromFileTTF() will return the ImFont* so you can store it if you need to select the font among multiple.
-    // - If the file cannot be loaded, the function will return NULL. Please handle those errors in your application (e.g. use an assertion, or display an error and quit).
+    // - If the file cannot be loaded, the function will return nullptr. Please handle those errors in your application (e.g. use an assertion, or display an error and quit).
     // - The fonts will be rasterized at a given size (w/ oversampling) and stored into a texture when calling ImFontAtlas::Build()/GetTexDataAsXXXX(), which ImGui_ImplXXXX_NewFrame below will call.
     // - Read 'docs/FONTS.md' for more instructions and details.
     // - Remember that in C/C++ if you want to include a backslash \ in a string literal you need to write a double backslash \\ !
@@ -1096,8 +1106,8 @@ int main(int argc, char **argv) {
     //io.Fonts->AddFontFromFileTTF("lib/imgui/misc/fonts/Cousine-Regular.ttf", 15.0f);
     //io.Fonts->AddFontFromFileTTF("lib/imgui/misc/fonts/DroidSans.ttf", 16.0f);
     //io.Fonts->AddFontFromFileTTF("lib/imgui/misc/fonts/ProggyTiny.ttf", 10.0f);
-    //ImFont *font = io.Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\ArialUni.ttf", 18.0f, NULL, io.Fonts->GetGlyphRangesJapanese());
-    //IM_ASSERT(font != NULL);
+    //ImFont *font = io.Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\ArialUni.ttf", 18.0f, nullptr, io.Fonts->GetGlyphRangesJapanese());
+    //IM_ASSERT(font != nullptr);
 
     // Our state
     bool show_demo_window = false;
@@ -1164,10 +1174,10 @@ int main(int argc, char **argv) {
         }
 
         // Input
-        const Uint8 *key_state = SDL_GetKeyboardState(NULL);
+        const Uint8 *key_state = SDL_GetKeyboardState(nullptr);
         done |= (bool) key_state[SDL_SCANCODE_ESCAPE];
         static bool keys[10];
-        memset(keys, 0, sizeof(keys));
+        std::memset(keys, 0, sizeof(keys));
         keys[0] |= (bool) key_state[SDL_SCANCODE_X];          // Button A
         keys[1] |= (bool) key_state[SDL_SCANCODE_Z];          // Button B
         keys[2] |= (bool) key_state[SDL_SCANCODE_BACKSPACE];  // Select
@@ -1178,7 +1188,7 @@ int main(int argc, char **argv) {
         keys[7] |= (bool) key_state[SDL_SCANCODE_DOWN];       // Down
         keys[8] |= (bool) key_state[SDL_SCANCODE_S];          // Button R
         keys[9] |= (bool) key_state[SDL_SCANCODE_A];          // Button L
-        if (game_controller != NULL) {
+        if (game_controller != nullptr) {
             keys[0] |= (bool) SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_A);              // Button A
             keys[1] |= (bool) SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_B);              // Button B
             keys[2] |= (bool) SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_BACK);           // Select
@@ -1212,6 +1222,7 @@ int main(int argc, char **argv) {
         glBindTexture(GL_TEXTURE_2D, 0);
 
         // Screen
+        static int screen_scale = 3;
         ImGui::Begin("Screen");
         ImGui::SliderInt("Scale", &screen_scale, 1, 5);
         ImVec2 screen_size = ImVec2((float) SCREEN_WIDTH * screen_scale, (float) SCREEN_HEIGHT * screen_scale);
@@ -1237,14 +1248,14 @@ int main(int argc, char **argv) {
             cpsr_flag_text[6] = (cpsr & PSR_T ? 'T' : '-');
             cpsr_flag_text[7] = '\0';
             switch (cpsr & PSR_MODE) {
-                case PSR_MODE_USR: strcpy(cpsr_mode_text, "User"); break;
-                case PSR_MODE_FIQ: strcpy(cpsr_mode_text, "FIQ"); break;
-                case PSR_MODE_IRQ: strcpy(cpsr_mode_text, "IRQ"); break;
-                case PSR_MODE_SVC: strcpy(cpsr_mode_text, "Supervisor"); break;
-                case PSR_MODE_ABT: strcpy(cpsr_mode_text, "Abort"); break;
-                case PSR_MODE_UND: strcpy(cpsr_mode_text, "Undefined"); break;
-                case PSR_MODE_SYS: strcpy(cpsr_mode_text, "System"); break;
-                default: strcpy(cpsr_mode_text, "Illegal"); break;
+                case PSR_MODE_USR: std::strcpy(cpsr_mode_text, "User"); break;
+                case PSR_MODE_FIQ: std::strcpy(cpsr_mode_text, "FIQ"); break;
+                case PSR_MODE_IRQ: std::strcpy(cpsr_mode_text, "IRQ"); break;
+                case PSR_MODE_SVC: std::strcpy(cpsr_mode_text, "Supervisor"); break;
+                case PSR_MODE_ABT: std::strcpy(cpsr_mode_text, "Abort"); break;
+                case PSR_MODE_UND: std::strcpy(cpsr_mode_text, "Undefined"); break;
+                case PSR_MODE_SYS: std::strcpy(cpsr_mode_text, "System"); break;
+                default: std::strcpy(cpsr_mode_text, "Illegal"); break;
             }
             ImGui::Text("cpsr: %08X [%s] %s", cpsr, cpsr_flag_text, cpsr_mode_text);
             if (ImGui::Button("Run")) {
@@ -1289,7 +1300,7 @@ int main(int argc, char **argv) {
         mem_edit.WriteFn = [](uint8_t *data, size_t off, uint8_t d) { UNUSED(data); memory_write_byte(off, d); };
         if (show_memory_window) {
             ImGui::Begin("Memory", &show_memory_window);
-            mem_edit.DrawContents(NULL, 0x10000000);
+            mem_edit.DrawContents(nullptr, 0x10000000);
             ImGui::End();
         }
 
@@ -1333,7 +1344,7 @@ int main(int argc, char **argv) {
         SDL_GL_SwapWindow(window);
     }
 
-    if (save_path != NULL) {
+    if (save_path != nullptr) {
         write_save_file();
     }
 
@@ -1344,7 +1355,7 @@ int main(int argc, char **argv) {
 
     glDeleteTextures(1, &screen_texture);
 
-    if (game_controller != NULL) {
+    if (game_controller != nullptr) {
         SDL_GameControllerClose(game_controller);
     }
     if (audio_device != 0) {

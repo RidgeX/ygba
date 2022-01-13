@@ -1,10 +1,8 @@
 // Copyright (c) 2021 Ridge Shrubsall
 // SPDX-License-Identifier: BSD-3-Clause
 
-#ifndef CPU_H
-#define CPU_H
+#pragma once
 
-#include <stdbool.h>
 #include <stdint.h>
 
 #define UNUSED(x)     (void) (x)
@@ -132,13 +130,6 @@ extern uint32_t arm_pipeline[2];
 extern uint16_t thumb_op;
 extern uint16_t thumb_pipeline[2];
 
-uint8_t memory_read_byte(uint32_t address);
-void memory_write_byte(uint32_t address, uint8_t value);
-uint16_t memory_read_halfword(uint32_t address);
-void memory_write_halfword(uint32_t address, uint16_t value);
-uint32_t memory_read_word(uint32_t address);
-void memory_write_word(uint32_t address, uint32_t value);
-
 void arm_init_registers(bool skip_bios);
 uint32_t align_word(uint32_t address, uint32_t value);
 uint32_t align_halfword(uint32_t address, uint16_t value);
@@ -147,15 +138,15 @@ bool condition_passed(uint32_t cond);
 void write_cpsr(uint32_t psr);
 uint32_t read_spsr();
 void write_spsr(uint32_t psr);
-uint32_t get_pc(void);
+uint32_t get_pc();
 void arm_disasm(uint32_t address, uint32_t op, char *s);
-void arm_fill_pipeline(void);
-int arm_step(void);
+void arm_fill_pipeline();
+int arm_step();
 void thumb_disasm(uint32_t address, uint16_t op, char *s);
-void thumb_fill_pipeline(void);
-int thumb_step(void);
-void arm_init_lookup(void);
-void thumb_init_lookup(void);
+void thumb_fill_pipeline();
+int thumb_step();
+void arm_init_lookup();
+void thumb_init_lookup();
 void print_arm_condition(char *s, uint32_t op);
 void print_register(char *s, uint32_t i);
 void print_immediate(char *s, uint32_t i);
@@ -181,8 +172,7 @@ void arm_branch_disasm(uint32_t address, uint32_t op, char *s);
 int arm_branch(uint32_t op);
 void arm_software_interrupt_disasm(uint32_t address, uint32_t op, char *s);
 int arm_software_interrupt(uint32_t op);
-void arm_hardware_interrupt_disasm(uint32_t address, uint32_t op, char *s);
-int arm_hardware_interrupt(void);
+int arm_hardware_interrupt();
 void arm_multiply_disasm(uint32_t address, uint32_t op, char *s);
 int arm_multiply(uint32_t op);
 void arm_multiply_long_disasm(uint32_t address, uint32_t op, char *s);
@@ -255,5 +245,3 @@ void thumb_branch_with_link_suffix_disasm(uint32_t address, uint16_t op, char *s
 int thumb_branch_with_link_suffix(uint16_t op);
 void thumb_undefined_instruction_disasm(uint32_t address, uint16_t op, char *s);
 int thumb_undefined_instruction(uint16_t op);
-
-#endif  // CPU_H

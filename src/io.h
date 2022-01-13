@@ -1,10 +1,8 @@
 // Copyright (c) 2021 Ridge Shrubsall
 // SPDX-License-Identifier: BSD-3-Clause
 
-#ifndef IO_H
-#define IO_H
+#pragma once
 
-#include <stdbool.h>
 #include <stdint.h>
 
 #define FIFO_SIZE 8192
@@ -269,5 +267,3 @@ uint16_t io_read_halfword(uint32_t address);
 void io_write_halfword(uint32_t address, uint16_t value);
 uint32_t io_read_word(uint32_t address);
 void io_write_word(uint32_t address, uint32_t value);
-
-#endif  // IO_H

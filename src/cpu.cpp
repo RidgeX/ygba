@@ -1,12 +1,15 @@
 // Copyright (c) 2021 Ridge Shrubsall
 // SPDX-License-Identifier: BSD-3-Clause
 
-#include <assert.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
 #include "cpu.h"
+
+#include <stdint.h>
+#include <cassert>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+
+#include "memory.h"
 
 uint32_t r[16];
 uint32_t r8_usr, r9_usr, r10_usr, r11_usr, r12_usr, r13_usr, r14_usr;
@@ -31,13 +34,13 @@ void (*thumb_lookup_disasm[256])(uint32_t, uint16_t, char *);
 
 void arm_init_registers(bool skip_bios) {
     if (skip_bios) {
-        r[13] = 0x03007f00;
+        r[REG_SP] = 0x03007f00;
         r13_irq = 0x03007fa0;
         r13_svc = 0x03007fe0;
-        r[15] = 0x08000000;
+        r[REG_PC] = 0x08000000;
         cpsr = PSR_MODE_SYS;
     } else {
-        r[15] = VEC_RESET;
+        r[REG_PC] = VEC_RESET;
         cpsr = PSR_I | PSR_F | PSR_MODE_SVC;
     }
 }
@@ -141,7 +144,7 @@ void mode_change(uint32_t old_mode, uint32_t new_mode) {
     }
 }
 
-uint16_t cond_lookup[16] = {
+static const uint16_t cond_lookup[16] = {
     0x56aa,  // ----
     0x6a6a,  // ---V
     0x55a6,  // --C-
@@ -207,40 +210,40 @@ void write_spsr(uint32_t psr) {
     }
 }
 
-uint32_t get_pc(void) {
-    return r[15] - (branch_taken ? 0 : 2 * SIZEOF_INSTR);
+uint32_t get_pc() {
+    return r[REG_PC] - (branch_taken ? 0 : 2 * SIZEOF_INSTR);
 }
 
 void arm_disasm(uint32_t address, uint32_t op, char *s) {
     uint32_t index = BITS(op, 20, 27) << 4 | BITS(op, 4, 7);
     void (*handler)(uint32_t, uint32_t, char *) = arm_lookup_disasm[index];
-    assert(handler != NULL);
+    assert(handler != nullptr);
     (*handler)(address, op, s);
 }
 
-void arm_fill_pipeline(void) {
-    arm_op = memory_read_word(r[15]);
-    arm_pipeline[0] = memory_read_word(r[15] + 4);
-    arm_pipeline[1] = memory_read_word(r[15] + 8);
+void arm_fill_pipeline() {
+    arm_op = memory_read_word(r[REG_PC]);
+    arm_pipeline[0] = memory_read_word(r[REG_PC] + 4);
+    arm_pipeline[1] = memory_read_word(r[REG_PC] + 8);
     branch_taken = false;
-    r[15] += 8;
+    r[REG_PC] += 8;
 }
 
-int arm_step(void) {
+int arm_step() {
     uint32_t cond = BITS(arm_op, 28, 31);
     int cycles = 1;
     if (condition_passed(cond)) {
         uint32_t index = BITS(arm_op, 20, 27) << 4 | BITS(arm_op, 4, 7);
         int (*handler)(uint32_t) = arm_lookup[index];
-        assert(handler != NULL);
+        assert(handler != nullptr);
         cycles = (*handler)(arm_op);
     }
 
     if (!branch_taken) {
-        r[15] += 4;
+        r[REG_PC] += 4;
         arm_op = arm_pipeline[0];
         arm_pipeline[0] = arm_pipeline[1];
-        arm_pipeline[1] = memory_read_word(r[15]);
+        arm_pipeline[1] = memory_read_word(r[REG_PC]);
     }
 
     return cycles;
@@ -249,35 +252,35 @@ int arm_step(void) {
 void thumb_disasm(uint32_t address, uint16_t op, char *s) {
     uint16_t index = BITS(op, 8, 15);
     void (*handler)(uint32_t, uint16_t, char *) = thumb_lookup_disasm[index];
-    assert(handler != NULL);
+    assert(handler != nullptr);
     (*handler)(address, op, s);
 }
 
-void thumb_fill_pipeline(void) {
-    thumb_op = memory_read_halfword(r[15]);
-    thumb_pipeline[0] = memory_read_halfword(r[15] + 2);
-    thumb_pipeline[1] = memory_read_halfword(r[15] + 4);
+void thumb_fill_pipeline() {
+    thumb_op = memory_read_halfword(r[REG_PC]);
+    thumb_pipeline[0] = memory_read_halfword(r[REG_PC] + 2);
+    thumb_pipeline[1] = memory_read_halfword(r[REG_PC] + 4);
     branch_taken = false;
-    r[15] += 4;
+    r[REG_PC] += 4;
 }
 
-int thumb_step(void) {
+int thumb_step() {
     uint16_t index = BITS(thumb_op, 8, 15);
     int (*handler)(uint16_t) = thumb_lookup[index];
-    assert(handler != NULL);
+    assert(handler != nullptr);
     int cycles = (*handler)(thumb_op);
 
     if (!branch_taken) {
-        r[15] += 2;
+        r[REG_PC] += 2;
         thumb_op = thumb_pipeline[0];
         thumb_pipeline[0] = thumb_pipeline[1];
-        thumb_pipeline[1] = memory_read_halfword(r[15]);
+        thumb_pipeline[1] = memory_read_halfword(r[REG_PC]);
     }
 
     return cycles;
 }
 
-void lookup_bind(void (**lookup)(void), const char *mask, void (*f)(void)) {
+static void lookup_bind(void (**lookup)(void), const char *mask, void (*f)(void)) {
     uint32_t n = 0;
     uint32_t m = 0;
     for (const char *p = mask; *p != '\0'; p++) {
@@ -287,7 +290,7 @@ void lookup_bind(void (**lookup)(void), const char *mask, void (*f)(void)) {
             case '0': break;
             case '1': n |= 1; break;
             case 'x': m |= 1; break;
-            default: abort();
+            default: std::abort();
         }
     }
 
@@ -299,18 +302,18 @@ void lookup_bind(void (**lookup)(void), const char *mask, void (*f)(void)) {
     }
 }
 
-void arm_bind(const char *mask, int (*execute)(uint32_t), void (*disasm)(uint32_t, uint32_t, char *)) {
+static void arm_bind(const char *mask, int (*execute)(uint32_t), void (*disasm)(uint32_t, uint32_t, char *)) {
     lookup_bind((void (**)()) arm_lookup, mask, (void (*)()) execute);
     lookup_bind((void (**)()) arm_lookup_disasm, mask, (void (*)()) disasm);
 }
 
-void thumb_bind(const char *mask, int (*execute)(uint16_t), void (*disasm)(uint32_t, uint16_t, char *)) {
+static void thumb_bind(const char *mask, int (*execute)(uint16_t), void (*disasm)(uint32_t, uint16_t, char *)) {
     lookup_bind((void (**)()) thumb_lookup, mask, (void (*)()) execute);
     lookup_bind((void (**)()) thumb_lookup_disasm, mask, (void (*)()) disasm);
 }
 
-void arm_init_lookup(void) {
-    memset(arm_lookup, 0, sizeof(void *) * 4096);
+void arm_init_lookup() {
+    std::memset(arm_lookup, 0, sizeof(void *) * 4096);
 
 #define BIND(mask, f) arm_bind(mask, f, f##_disasm)
 
@@ -341,8 +344,8 @@ void arm_init_lookup(void) {
 #undef BIND
 }
 
-void thumb_init_lookup(void) {
-    memset(thumb_lookup, 0, sizeof(void *) * 256);
+void thumb_init_lookup() {
+    std::memset(thumb_lookup, 0, sizeof(void *) * 256);
 
 #define BIND(mask, f) thumb_bind(mask, f, f##_disasm)
 
@@ -375,23 +378,23 @@ void thumb_init_lookup(void) {
 
 void print_arm_condition(char *s, uint32_t op) {
     switch (BITS(op, 28, 31)) {
-        case COND_EQ: strcat(s, "eq"); break;
-        case COND_NE: strcat(s, "ne"); break;
-        case COND_CS: strcat(s, "cs"); break;
-        case COND_CC: strcat(s, "cc"); break;
-        case COND_MI: strcat(s, "mi"); break;
-        case COND_PL: strcat(s, "pl"); break;
-        case COND_VS: strcat(s, "vs"); break;
-        case COND_VC: strcat(s, "vc"); break;
-        case COND_HI: strcat(s, "hi"); break;
-        case COND_LS: strcat(s, "ls"); break;
-        case COND_GE: strcat(s, "ge"); break;
-        case COND_LT: strcat(s, "lt"); break;
-        case COND_GT: strcat(s, "gt"); break;
-        case COND_LE: strcat(s, "le"); break;
+        case COND_EQ: std::strcat(s, "eq"); break;
+        case COND_NE: std::strcat(s, "ne"); break;
+        case COND_CS: std::strcat(s, "cs"); break;
+        case COND_CC: std::strcat(s, "cc"); break;
+        case COND_MI: std::strcat(s, "mi"); break;
+        case COND_PL: std::strcat(s, "pl"); break;
+        case COND_VS: std::strcat(s, "vs"); break;
+        case COND_VC: std::strcat(s, "vc"); break;
+        case COND_HI: std::strcat(s, "hi"); break;
+        case COND_LS: std::strcat(s, "ls"); break;
+        case COND_GE: std::strcat(s, "ge"); break;
+        case COND_LT: std::strcat(s, "lt"); break;
+        case COND_GT: std::strcat(s, "gt"); break;
+        case COND_LE: std::strcat(s, "le"); break;
         case COND_AL: break;
-        case COND_NV: strcat(s, "nv"); break;
-        default: abort();
+        case COND_NV: std::strcat(s, "nv"); break;
+        default: std::abort();
     }
 }
 
@@ -400,23 +403,23 @@ void print_register(char *s, uint32_t i) {
 
     assert(i < 16);
     switch (i) {
-        case 13: strcpy(temp, "sp"); break;
-        case 14: strcpy(temp, "lr"); break;
-        case 15: strcpy(temp, "pc"); break;
-        default: sprintf(temp, "r%u", i); break;
+        case 13: std::strcpy(temp, "sp"); break;
+        case 14: std::strcpy(temp, "lr"); break;
+        case 15: std::strcpy(temp, "pc"); break;
+        default: std::sprintf(temp, "r%u", i); break;
     }
-    strcat(s, temp);
+    std::strcat(s, temp);
 }
 
 void print_immediate(char *s, uint32_t i) {
     char temp[12];
 
     if (i > 9) {
-        sprintf(temp, "#0x%X", i);
+        std::sprintf(temp, "#0x%X", i);
     } else {
-        sprintf(temp, "#%u", i);
+        std::sprintf(temp, "#%u", i);
     }
-    strcat(s, temp);
+    std::strcat(s, temp);
 }
 
 void print_immediate_signed(char *s, uint32_t i, bool sign) {
@@ -424,48 +427,48 @@ void print_immediate_signed(char *s, uint32_t i, bool sign) {
 
     if (sign) {
         if (i > 9) {
-            sprintf(temp, "#-0x%X", i);
+            std::sprintf(temp, "#-0x%X", i);
         } else {
-            sprintf(temp, "#-%u", i);
+            std::sprintf(temp, "#-%u", i);
         }
     } else {
         if (i > 9) {
-            sprintf(temp, "#0x%X", i);
+            std::sprintf(temp, "#0x%X", i);
         } else {
-            sprintf(temp, "#%u", i);
+            std::sprintf(temp, "#%u", i);
         }
     }
-    strcat(s, temp);
+    std::strcat(s, temp);
 }
 
 void print_address(char *s, uint32_t i) {
     char temp[11];
 
-    sprintf(temp, "0x%08X", i);
-    strcat(s, temp);
+    std::sprintf(temp, "0x%08X", i);
+    std::strcat(s, temp);
 }
 
 static void print_shift_amount(char *s, uint32_t i) {
     char temp[12];
 
-    sprintf(temp, "#%u", i);
-    strcat(s, temp);
+    std::sprintf(temp, "#%u", i);
+    std::strcat(s, temp);
 }
 
 void print_arm_shift(char *s, uint32_t shop, uint32_t shamt, uint32_t shreg, uint32_t Rs) {
     switch (shop) {
         case SHIFT_LSL:
             if (shreg) {
-                strcat(s, ", lsl ");
+                std::strcat(s, ", lsl ");
                 print_register(s, Rs);
             } else if (shamt != 0) {
-                strcat(s, ", lsl ");
+                std::strcat(s, ", lsl ");
                 print_shift_amount(s, shamt);
             }
             break;
 
         case SHIFT_LSR:
-            strcat(s, ", lsr ");
+            std::strcat(s, ", lsr ");
             if (shreg) {
                 print_register(s, Rs);
             } else {
@@ -474,7 +477,7 @@ void print_arm_shift(char *s, uint32_t shop, uint32_t shamt, uint32_t shreg, uin
             break;
 
         case SHIFT_ASR:
-            strcat(s, ", asr ");
+            std::strcat(s, ", asr ");
             if (shreg) {
                 print_register(s, Rs);
             } else {
@@ -484,18 +487,18 @@ void print_arm_shift(char *s, uint32_t shop, uint32_t shamt, uint32_t shreg, uin
 
         case SHIFT_ROR:
             if (shreg) {
-                strcat(s, ", ror ");
+                std::strcat(s, ", ror ");
                 print_register(s, Rs);
             } else if (shamt != 0) {
-                strcat(s, ", ror ");
+                std::strcat(s, ", ror ");
                 print_shift_amount(s, shamt);
             } else {
-                strcat(s, ", rrx");
+                std::strcat(s, ", rrx");
             }
             break;
 
         default:
-            abort();
+            std::abort();
     }
 }
 
@@ -507,17 +510,17 @@ static bool print_rlist(char *s, uint32_t rlist, uint32_t max) {
             uint32_t j = i + 1;
             while (BIT(rlist, j)) j++;
             if (j == i + 1) {
-                if (!first) strcat(s, ", ");
+                if (!first) std::strcat(s, ", ");
                 print_register(s, i);
             } else if (j == i + 2) {
-                if (!first) strcat(s, ", ");
+                if (!first) std::strcat(s, ", ");
                 print_register(s, i);
-                strcat(s, ", ");
+                std::strcat(s, ", ");
                 print_register(s, j - 1);
             } else {
-                if (!first) strcat(s, ", ");
+                if (!first) std::strcat(s, ", ");
                 print_register(s, i);
-                strcat(s, "-");
+                std::strcat(s, "-");
                 print_register(s, j - 1);
             }
             i = j;
@@ -588,9 +591,9 @@ void print_bios_function_name(char *s, uint8_t i) {
     char temp[5];
 
     if (i < num_bios_functions) {
-        strcat(s, bios_function_names[i]);
+        std::strcat(s, bios_function_names[i]);
     } else {
-        sprintf(temp, "0x%02X", i);
-        strcat(s, temp);
+        std::sprintf(temp, "0x%02X", i);
+        std::strcat(s, temp);
     }
 }
