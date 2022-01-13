@@ -16,6 +16,8 @@ add_library(imgui OBJECT
     backends/imgui_impl_opengl3_loader.h
     backends/imgui_impl_sdl.cpp
     backends/imgui_impl_sdl.h
+    misc/cpp/imgui_stdlib.cpp
+    misc/cpp/imgui_stdlib.h
     misc/freetype/imgui_freetype.cpp
     misc/freetype/imgui_freetype.h
 )
