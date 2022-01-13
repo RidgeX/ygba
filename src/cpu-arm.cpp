@@ -9,7 +9,6 @@
 #include <cstdlib>
 #include <string>
 
-#include "algorithms.h"
 #include "memory.h"
 
 static uint64_t arm_alu_op(uint32_t opc, uint64_t n, uint64_t m) {
@@ -534,7 +533,7 @@ int arm_load_store_multiple(uint32_t op) {
                 if (i == REG_PC) {
                     memory_write_word(address, r[i] + SIZEOF_INSTR);
                 } else if (i == Rn) {
-                    if (bits_ctz(rlist) == Rn) {
+                    if (std::countr_zero(rlist) == (int) Rn) {
                         memory_write_word(address, old_base);
                     } else {
                         memory_write_word(address, new_base);

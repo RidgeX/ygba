@@ -8,4 +8,3 @@
 uint32_t next_power_of_2(uint32_t x);
 
 uint32_t bits_clz(uint32_t x);
-uint32_t bits_ctz(uint32_t x);
