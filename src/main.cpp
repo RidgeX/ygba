@@ -8,6 +8,7 @@
 #include <cassert>
 #include <cstdlib>
 #include <cstring>
+#include <functional>
 #include <string>
 
 #include <fmt/core.h>
@@ -211,61 +212,46 @@ uint32_t gba_open_bus() {
     }
 }
 
-static void gba_detect_cartridge_features() {
-    void *match;
+static bool game_rom_contains(const std::string &s) {
+    uint8_t *begin = game_rom;
+    uint8_t *end = begin + game_rom_size;
+    const auto it = std::search(begin, end, std::boyer_moore_searcher(s.begin(), s.end()));
+    return it != end;
+}
 
+static void gba_detect_cartridge_features() {
     has_eeprom = false;
     has_flash = false;
     has_sram = false;
     has_rtc = false;
     idle_loop_address = 0;
 
-    uint8_t *eeprom_v = (uint8_t *) "EEPROM_V";
-    match = boyer_moore_matcher(game_rom, game_rom_size, eeprom_v, 8);
-    if (match) has_eeprom = true;
-
-    uint8_t *flash_v = (uint8_t *) "FLASH_V";
-    match = boyer_moore_matcher(game_rom, game_rom_size, flash_v, 7);
-    if (match) {
+    if (game_rom_contains("EEPROM_V")) {
+        has_eeprom = true;
+    }
+    if (game_rom_contains("FLASH_V") || game_rom_contains("FLASH512_V")) {
         has_flash = true;
         flash_manufacturer = MANUFACTURER_PANASONIC;
         flash_device = DEVICE_MN63F805MNP;
     }
-
-    uint8_t *flash512_v = (uint8_t *) "FLASH512_V";
-    match = boyer_moore_matcher(game_rom, game_rom_size, flash512_v, 10);
-    if (match) {
-        has_flash = true;
-        flash_manufacturer = MANUFACTURER_PANASONIC;
-        flash_device = DEVICE_MN63F805MNP;
-    }
-
-    uint8_t *flash1m_v = (uint8_t *) "FLASH1M_V";
-    match = boyer_moore_matcher(game_rom, game_rom_size, flash1m_v, 9);
-    if (match) {
+    if (game_rom_contains("FLASH1M_V")) {
         has_flash = true;
         flash_manufacturer = MANUFACTURER_SANYO;
         flash_device = DEVICE_LE26FV10N1TS;
     }
-
-    uint8_t *sram_v = (uint8_t *) "SRAM_V";
-    match = boyer_moore_matcher(game_rom, game_rom_size, sram_v, 6);
-    if (match) has_sram = true;
-
-    uint8_t *sram_f_v = (uint8_t *) "SRAM_F_V";
-    match = boyer_moore_matcher(game_rom, game_rom_size, sram_f_v, 8);
-    if (match) has_sram = true;
-
-    uint8_t *siirtc_v = (uint8_t *) "SIIRTC_V";
-    match = boyer_moore_matcher(game_rom, game_rom_size, siirtc_v, 8);
-    if (match) has_rtc = true;
+    if (game_rom_contains("SRAM_V") || game_rom_contains("SRAM_F_V")) {
+        has_sram = true;
+    }
+    if (game_rom_contains("SIIRTC_V")) {
+        has_rtc = true;
+    }
 
     std::string game_title((char *) &game_rom[0xa0], 12);
-    if (auto it = std::find(game_title.begin(), game_title.end(), '\0'); it != game_title.end()) {
+    if (const auto it = std::find(game_title.begin(), game_title.end(), '\0'); it != game_title.end()) {
         game_title.erase(it, game_title.end());
     }
     std::string game_code((char *) &game_rom[0xac], 4);
-    if (auto it = std::find(game_code.begin(), game_code.end(), '\0'); it != game_code.end()) {
+    if (const auto it = std::find(game_code.begin(), game_code.end(), '\0'); it != game_code.end()) {
         game_code.erase(it, game_code.end());
     }
     uint8_t game_version = game_rom[0xbc];
