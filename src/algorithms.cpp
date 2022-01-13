@@ -49,15 +49,3 @@ uint32_t bits_ctz(uint32_t x) {
     return r + ((2 - (x >> 1)) & -((x & 1) == 0));
 #endif
 }
-
-uint32_t bits_popcount(uint32_t x) {
-#ifdef __GNUC__
-    return __builtin_popcount(x);
-#else
-    x = x - ((x >> 1) & 0x55555555);
-    x = ((x >> 2) & 0x33333333) + (x & 0x33333333);
-    x = (x + (x >> 4)) & 0x0f0f0f0f;
-    x = (x + (x >> 16));
-    return (x + (x >> 8)) & 0x0000003f;
-#endif
-}

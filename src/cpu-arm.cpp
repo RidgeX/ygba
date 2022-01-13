@@ -4,6 +4,7 @@
 #include "cpu.h"
 
 #include <stdint.h>
+#include <bit>
 #include <cassert>
 #include <cstdlib>
 #include <string>
@@ -505,7 +506,7 @@ int arm_load_store_multiple(uint32_t op) {
     uint32_t Rn = BITS(op, 16, 19);
     uint32_t rlist = BITS(op, 0, 15);
 
-    uint32_t count = bits_popcount(rlist);
+    uint32_t count = std::popcount(rlist);
     if (rlist == 0) {  // Empty rlist
         rlist |= 1 << REG_PC;
         count = 16;
