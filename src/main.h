@@ -5,20 +5,6 @@
 
 #include <stdint.h>
 
-#define DCNT_GB        (1 << 3)
-#define DCNT_PAGE      (1 << 4)
-#define DCNT_OAM_HBL   (1 << 5)
-#define DCNT_OBJ_1D    (1 << 6)
-#define DCNT_BLANK     (1 << 7)
-#define DCNT_BG0       (1 << 8)
-#define DCNT_BG1       (1 << 9)
-#define DCNT_BG2       (1 << 10)
-#define DCNT_BG3       (1 << 11)
-#define DCNT_OBJ       (1 << 12)
-#define DCNT_WIN0      (1 << 13)
-#define DCNT_WIN1      (1 << 14)
-#define DCNT_WINOBJ    (1 << 15)
-
 #define DSTAT_IN_VBL   (1 << 0)
 #define DSTAT_IN_HBL   (1 << 1)
 #define DSTAT_IN_VCT   (1 << 2)
@@ -72,6 +58,5 @@ void gba_audio_fifo_b(uint32_t sample);
 void gba_check_keypad_interrupt();
 void gba_timer_reset(int i);
 uint32_t gba_open_bus();
-void gba_affine_reset();
 void gba_dma_reset(int ch);
 void gba_dma_update(uint32_t current_timing);

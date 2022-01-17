@@ -13,6 +13,8 @@ add_executable(ygba WIN32
     main.h
     memory.cpp
     memory.h
+    video.cpp
+    video.h
 )
 
 target_link_libraries(ygba PRIVATE fmt::fmt imgui SDL2::SDL2 SDL2::SDL2main)
