@@ -7,6 +7,7 @@
 
 #include <fmt/core.h>
 
+#include "audio.h"
 #include "main.h"
 #include "video.h"
 
@@ -629,14 +630,14 @@ uint8_t io_read_byte(uint32_t address) {
 
 void io_write_byte(uint32_t address, uint8_t value) {
     switch (address) {
-        case REG_FIFO_A_L + 0: gba_audio_fifo_a(value); break;
-        case REG_FIFO_A_L + 1: gba_audio_fifo_a(value << 8); break;
-        case REG_FIFO_A_H + 0: gba_audio_fifo_a(value << 16); break;
-        case REG_FIFO_A_H + 1: gba_audio_fifo_a(value << 24); break;
-        case REG_FIFO_B_L + 0: gba_audio_fifo_b(value); break;
-        case REG_FIFO_B_L + 1: gba_audio_fifo_b(value << 8); break;
-        case REG_FIFO_B_H + 0: gba_audio_fifo_b(value << 16); break;
-        case REG_FIFO_B_H + 1: gba_audio_fifo_b(value << 24); break;
+        case REG_FIFO_A_L + 0: audio_fifo_a(value); break;
+        case REG_FIFO_A_L + 1: audio_fifo_a(value << 8); break;
+        case REG_FIFO_A_H + 0: audio_fifo_a(value << 16); break;
+        case REG_FIFO_A_H + 1: audio_fifo_a(value << 24); break;
+        case REG_FIFO_B_L + 0: audio_fifo_b(value); break;
+        case REG_FIFO_B_L + 1: audio_fifo_b(value << 8); break;
+        case REG_FIFO_B_H + 0: audio_fifo_b(value << 16); break;
+        case REG_FIFO_B_H + 1: audio_fifo_b(value << 24); break;
 
         case REG_KEYCNT + 0:
             ioreg.keycnt.b.b0 = value;
@@ -667,10 +668,10 @@ uint16_t io_read_halfword(uint32_t address) {
 
 void io_write_halfword(uint32_t address, uint16_t value) {
     switch (address) {
-        case REG_FIFO_A_L: gba_audio_fifo_a(value); break;
-        case REG_FIFO_A_H: gba_audio_fifo_a(value << 16); break;
-        case REG_FIFO_B_L: gba_audio_fifo_b(value); break;
-        case REG_FIFO_B_H: gba_audio_fifo_b(value << 16); break;
+        case REG_FIFO_A_L: audio_fifo_a(value); break;
+        case REG_FIFO_A_H: audio_fifo_a(value << 16); break;
+        case REG_FIFO_B_L: audio_fifo_b(value); break;
+        case REG_FIFO_B_H: audio_fifo_b(value << 16); break;
 
         case REG_KEYCNT:
             ioreg.keycnt.w = value & 0xc3ff;
@@ -699,8 +700,8 @@ uint32_t io_read_word(uint32_t address) {
 
 void io_write_word(uint32_t address, uint32_t value) {
     switch (address) {
-        case REG_FIFO_A_L: gba_audio_fifo_a(value); break;
-        case REG_FIFO_B_L: gba_audio_fifo_b(value); break;
+        case REG_FIFO_A_L: audio_fifo_a(value); break;
+        case REG_FIFO_B_L: audio_fifo_b(value); break;
 
         case REG_KEYINPUT:
             ioreg.keycnt.w = (value >> 16) & 0xc3ff;

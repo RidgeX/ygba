@@ -53,8 +53,6 @@
 extern bool halted;
 extern int active_dma;
 
-void gba_audio_fifo_a(uint32_t sample);
-void gba_audio_fifo_b(uint32_t sample);
 void gba_check_keypad_interrupt();
 void gba_timer_reset(int i);
 uint32_t gba_open_bus();

@@ -1,4 +1,6 @@
 add_executable(ygba WIN32
+    audio.cpp
+    audio.h
     backup.cpp
     backup.h
     cpu-arm.cpp
