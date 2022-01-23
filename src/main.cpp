@@ -38,6 +38,7 @@ bool single_step;
 uint32_t ppu_cycles;
 bool halted;
 int active_dma;
+uint32_t dma_pc;
 bool skip_bios;
 std::string save_path;
 uint32_t idle_loop_address;
@@ -65,10 +66,12 @@ void gba_timer_reset(int i) {
 }
 
 uint32_t gba_open_bus() {
-    if (FLAG_T()) {
-        return thumb_pipeline[1] | thumb_pipeline[1] << 16;
-    } else {
+    if (active_dma >= 0 || get_pc() - dma_pc == SIZEOF_INSTR) {
+        return ioreg.dma_value.dw;
+    } else if (!FLAG_T()) {
         return arm_pipeline[1];
+    } else {
+        return thumb_pipeline[1] | thumb_pipeline[1] << 16;
     }
 }
 
@@ -154,6 +157,7 @@ static void gba_reset(bool keep_backup) {
     ppu_cycles = 0;
     halted = false;
     active_dma = -1;
+    dma_pc = 0;
 
     ioreg.dispcnt.w = 0x80;
     ioreg.bg_affine[0].pa.w = 0x100;
@@ -462,6 +466,7 @@ void gba_dma_update(uint32_t current_timing) {
             }
         }
 
+        dma_pc = get_pc();
         active_dma = ch;
         gba_dma_transfer(ch, dst_ctrl, src_ctrl, dst_addr, src_addr, word_size ? 4 : 2, count);
         active_dma = -1;
