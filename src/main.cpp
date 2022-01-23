@@ -299,40 +299,40 @@ static void gba_timer_update(uint32_t cycles) {
     bool overflow = false;
 
     for (int i = 0; i < 4; i++) {
-        uint16_t *counter = &ioreg.timer[i].counter.w;
-        uint16_t *reload = &ioreg.timer[i].reload.w;
-        uint16_t *control = &ioreg.timer[i].control.w;
-        uint32_t *elapsed = &ioreg.timer[i].elapsed;
+        uint16_t &counter = ioreg.timer[i].counter.w;
+        uint16_t reload = ioreg.timer[i].reload.w;
+        uint16_t control = ioreg.timer[i].control.w;
+        uint32_t &elapsed = ioreg.timer[i].elapsed;
 
-        if (!(*control & TM_ENABLE)) {
+        if (!(control & TM_ENABLE)) {
             overflow = false;
             continue;
         }
 
         uint32_t increment = 0;
-        if (*control & TM_CASCADE) {
+        if (control & TM_CASCADE) {
             increment = (overflow ? 1 : 0);
         } else {
-            *elapsed += cycles;
+            elapsed += cycles;
             uint32_t freq;
-            switch (*control & TM_FREQ_MASK) {
+            switch (control & TM_FREQ_MASK) {
                 case TM_FREQ_1: freq = 1; break;
                 case TM_FREQ_64: freq = 64; break;
                 case TM_FREQ_256: freq = 256; break;
                 case TM_FREQ_1024: freq = 1024; break;
                 default: std::abort();
             }
-            if (*elapsed >= freq) {
-                increment = *elapsed / freq;
-                *elapsed = *elapsed % freq;
+            if (elapsed >= freq) {
+                increment = elapsed / freq;
+                elapsed = elapsed % freq;
             }
         }
 
-        uint16_t last_counter = *counter;
-        *counter += increment;
-        overflow = *counter < last_counter;
+        uint16_t last_counter = counter;
+        counter += increment;
+        overflow = counter < last_counter;
         if (overflow) {
-            *counter += *reload;
+            counter += reload;
             bool fifo_a_tick = BIT(ioreg.soundcnt_h.w, 10) == i;
             bool fifo_b_tick = BIT(ioreg.soundcnt_h.w, 14) == i;
             if (fifo_a_tick) {
@@ -348,42 +348,42 @@ static void gba_timer_update(uint32_t cycles) {
                 ioreg.fifo_a_refill = false;
                 ioreg.fifo_b_refill = false;
             }
-            if (*control & TM_IRQ) {
+            if (control & TM_IRQ) {
                 ioreg.irq.w |= 1 << (3 + i);
             }
         }
     }
 }
 
-static void gba_dma_transfer(int ch, uint32_t dst_ctrl, uint32_t src_ctrl, uint32_t *dst_addr, uint32_t *src_addr, uint32_t size, uint32_t count) {
+static void gba_dma_transfer(int ch, uint32_t dst_ctrl, uint32_t src_ctrl, uint32_t &dst_addr, uint32_t &src_addr, uint32_t size, uint32_t count) {
     for (uint32_t i = 0; i < count; i++) {
-        bool bad_src_addr = !(*src_addr >= 0x02000000 && *src_addr < 0x10000000);
-        bad_src_addr |= (ch == 0 && *src_addr >= 0x08000000 && *src_addr < 0x0e000000);
+        bool bad_src_addr = !(src_addr >= 0x02000000 && src_addr < 0x10000000);
+        bad_src_addr |= (ch == 0 && src_addr >= 0x08000000 && src_addr < 0x0e000000);
 
-        bool bad_dst_addr = !(*dst_addr >= 0x02000000 && *dst_addr < 0x10000000);
-        bad_dst_addr |= (ch != 3 && *dst_addr >= 0x08000000);
+        bool bad_dst_addr = !(dst_addr >= 0x02000000 && dst_addr < 0x10000000);
+        bad_dst_addr |= (ch != 3 && dst_addr >= 0x08000000);
 
         if (size == 4) {
             uint32_t value = ioreg.dma_value.dw;
-            if (!bad_src_addr) value = memory_read_word(*src_addr & ~3);
+            if (!bad_src_addr) value = memory_read_word(src_addr & ~3);
             ioreg.dma_value.dw = value;
-            if (!bad_dst_addr) memory_write_word(*dst_addr & ~3, value);
+            if (!bad_dst_addr) memory_write_word(dst_addr & ~3, value);
         } else {
             uint16_t value = ioreg.dma_value.w.w0;
-            if (!bad_src_addr) value = memory_read_halfword(*src_addr & ~1);
+            if (!bad_src_addr) value = memory_read_halfword(src_addr & ~1);
             ioreg.dma_value.w.w0 = value;
-            if (!bad_dst_addr) memory_write_halfword(*dst_addr & ~1, value);
+            if (!bad_dst_addr) memory_write_halfword(dst_addr & ~1, value);
         }
 
         if (dst_ctrl == DMA_INC || dst_ctrl == DMA_RELOAD) {
-            *dst_addr += size;
+            dst_addr += size;
         } else if (dst_ctrl == DMA_DEC) {
-            *dst_addr -= size;
+            dst_addr -= size;
         }
         if (src_ctrl == DMA_INC) {
-            *src_addr += size;
+            src_addr += size;
         } else if (src_ctrl == DMA_DEC) {
-            *src_addr -= size;
+            src_addr -= size;
         }
     }
 }
@@ -408,13 +408,13 @@ void gba_dma_update(uint32_t current_timing) {
         if (!(cnt & DMA_ENABLE)) continue;
         if (start_timing != current_timing) continue;
 
-        uint32_t *dst_addr = &ioreg.dma[ch].dst_addr;
-        uint32_t *src_addr = &ioreg.dma[ch].src_addr;
+        uint32_t &dst_addr = ioreg.dma[ch].dst_addr;
+        uint32_t &src_addr = ioreg.dma[ch].src_addr;
         uint16_t count = ioreg.dma[ch].count;
 
         uint32_t dst_ctrl = BITS(cnt, 21, 22);
         uint32_t src_ctrl = BITS(cnt, 23, 24);
-        if (*src_addr >= 0x08000000 && *src_addr < 0x0e000000) src_ctrl = DMA_INC;
+        if (src_addr >= 0x08000000 && src_addr < 0x0e000000) src_ctrl = DMA_INC;
         bool word_size = (cnt & DMA_32);
 
         if (start_timing == DMA_AT_VBLANK) assert(ioreg.vcount.w == 160);
@@ -423,10 +423,10 @@ void gba_dma_update(uint32_t current_timing) {
             if (ch == 0) {
                 continue;
             } else if (ch == 1 || ch == 2) {
-                if (!(*dst_addr == 0x40000a0 || *dst_addr == 0x40000a4)) continue;
+                if (!(dst_addr == 0x40000a0 || dst_addr == 0x40000a4)) continue;
                 assert(cnt & DMA_REPEAT);
-                if (*dst_addr == 0x40000a0 && !ioreg.fifo_a_refill) continue;
-                if (*dst_addr == 0x40000a4 && !ioreg.fifo_b_refill) continue;
+                if (dst_addr == 0x40000a0 && !ioreg.fifo_a_refill) continue;
+                if (dst_addr == 0x40000a4 && !ioreg.fifo_b_refill) continue;
                 dst_ctrl = DMA_FIXED;
                 word_size = true;
                 count = 4;
@@ -439,7 +439,7 @@ void gba_dma_update(uint32_t current_timing) {
         assert(!(cnt & DMA_DRQ));
 
         // EEPROM size autodetect
-        if (has_eeprom && game_rom_size <= 0x1000000 && (*dst_addr >= 0x0d000000 && *dst_addr < 0x0e000000)) {
+        if (has_eeprom && game_rom_size <= 0x1000000 && (dst_addr >= 0x0d000000 && dst_addr < 0x0e000000)) {
             if (count == 9 || count == 73) {
                 eeprom_width = 6;
             } else if (count == 17 || count == 81) {
