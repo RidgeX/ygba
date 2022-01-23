@@ -364,15 +364,30 @@ static void gba_dma_transfer(int ch, uint32_t dst_ctrl, uint32_t src_ctrl, uint3
         bad_dst_addr |= (ch != 3 && dst_addr >= 0x08000000);
 
         if (size == 4) {
-            uint32_t value = ioreg.dma_value.dw;
-            if (!bad_src_addr) value = memory_read_word(src_addr & ~3);
-            ioreg.dma_value.dw = value;
-            if (!bad_dst_addr) memory_write_word(dst_addr & ~3, value);
+            uint32_t value;
+            if (!bad_src_addr) {
+                value = memory_read_word(src_addr & ~3);
+                ioreg.dma_value.dw = value;
+            }
+            value = ioreg.dma_value.dw;
+            if (!bad_dst_addr) {
+                memory_write_word(dst_addr & ~3, value);
+            }
         } else {
-            uint16_t value = ioreg.dma_value.w.w0;
-            if (!bad_src_addr) value = memory_read_halfword(src_addr & ~1);
-            ioreg.dma_value.w.w0 = value;
-            if (!bad_dst_addr) memory_write_halfword(dst_addr & ~1, value);
+            uint16_t value;
+            if (!bad_src_addr) {
+                value = memory_read_halfword(src_addr & ~1);
+                ioreg.dma_value.w.w0 = value;
+                ioreg.dma_value.w.w1 = value;
+            }
+            if (dst_addr & 2) {
+                value = ioreg.dma_value.w.w1;
+            } else {
+                value = ioreg.dma_value.w.w0;
+            }
+            if (!bad_dst_addr) {
+                memory_write_halfword(dst_addr & ~1, value);
+            }
         }
 
         if (dst_ctrl == DMA_INC || dst_ctrl == DMA_RELOAD) {
