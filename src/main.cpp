@@ -10,7 +10,9 @@
 #include <cstdlib>
 #include <cstring>
 #include <functional>
+#include <map>
 #include <string>
+#include <tuple>
 
 #include <fmt/core.h>
 
@@ -82,6 +84,20 @@ static bool game_rom_contains(const std::string &s) {
     return it != end;
 }
 
+const std::map<std::tuple<std::string, std::string, uint8_t>, uint32_t> idle_loop_address_map{
+    {{"ADVANCEWARS", "AWRE", 0}, 0x80387ec},   // Advance Wars (USA)
+    {{"ADVANCEWARS", "AWRE", 1}, 0x8038818},   // Advance Wars (USA) (Rev 1)
+    {{"ADVANCEWARS2", "AW2E", 0}, 0x8036e0c},  // Advance Wars 2 - Black Hole Rising (USA, Australia)
+    {{"DRILL DOZER", "V49E", 0}, 0x80006ba},   // Drill Dozer (USA)
+    {{"FFTA_USVER.", "AFXE", 0}, 0x8000418},   // Final Fantasy Tactics Advance (USA, Australia)
+    {{"KURURIN", "AKRP", 0}, 0x800041a},       // Kurukuru Kururin (Europe)
+    {{"POKEMON EMER", "BPEE", 0}, 0x80008c6},  // Pokemon - Emerald Version (USA, Europe)
+    {{"POKEMON FIRE", "BPRE", 0}, 0x80008aa},  // Pokemon - FireRed Version (USA)
+    {{"POKEMON FIRE", "BPRE", 1}, 0x80008be},  // Pokemon - FireRed Version (USA, Europe) (Rev 1)
+    {{"POKEMON LEAF", "BPGE", 0}, 0x80008aa},  // Pokemon - LeafGreen Version (USA)
+    {{"POKEMON LEAF", "BPGE", 1}, 0x80008be},  // Pokemon - LeafGreen Version (USA, Europe) (Rev 1)
+};
+
 static void gba_detect_cartridge_features() {
     has_eeprom = false;
     has_flash = false;
@@ -119,24 +135,15 @@ static void gba_detect_cartridge_features() {
     }
     uint8_t game_version = game_rom[0xbc];
 
-    // Advance Wars (USA)
-    if (game_title == "ADVANCEWARS" && game_code == "AWRE" && game_version == 0) idle_loop_address = 0x80387ec;
-    // Advance Wars (USA) (Rev 1)
-    if (game_title == "ADVANCEWARS" && game_code == "AWRE" && game_version == 1) idle_loop_address = 0x8038818;
-    // Advance Wars 2 - Black Hole Rising (USA, Australia)
-    if (game_title == "ADVANCEWARS2" && game_code == "AW2E" && game_version == 0) idle_loop_address = 0x8036e0c;
-    // Pokemon - Emerald Version (USA, Europe)
-    if (game_title == "POKEMON EMER" && game_code == "BPEE" && game_version == 0) idle_loop_address = 0x80008c6;
-    // Pokemon - FireRed Version (USA)
-    if (game_title == "POKEMON FIRE" && game_code == "BPRE" && game_version == 0) idle_loop_address = 0x80008aa;
-    // Pokemon - FireRed Version (USA, Europe) (Rev 1)
-    if (game_title == "POKEMON FIRE" && game_code == "BPRE" && game_version == 1) idle_loop_address = 0x80008be;
-    // Pokemon - LeafGreen Version (USA)
-    if (game_title == "POKEMON LEAF" && game_code == "BPGE" && game_version == 0) idle_loop_address = 0x80008aa;
-    // Pokemon - LeafGreen Version (USA, Europe) (Rev 1)
-    if (game_title == "POKEMON LEAF" && game_code == "BPGE" && game_version == 1) idle_loop_address = 0x80008be;
-    // Super Monkey Ball Jr. (USA)
-    if (game_title == "MONKEYBALLJR" && game_code == "ALUE" && game_version == 0) has_flash = has_sram = false;
+    auto key = std::make_tuple(game_title, game_code, game_version);
+
+    if (idle_loop_address_map.contains(key)) {
+        idle_loop_address = idle_loop_address_map.at(key);
+    }
+    if (key == std::make_tuple("MONKEYBALLJR", "ALUE", 0)) {  // Super Monkey Ball Jr. (USA)
+        has_eeprom = true;
+        has_flash = has_sram = false;
+    }
 }
 
 static void gba_reset(bool keep_backup) {
