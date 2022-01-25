@@ -465,7 +465,7 @@ void gba_dma_update(uint32_t current_timing) {
         assert(!(cnt & DMA_DRQ));
 
         // EEPROM size autodetect
-        if (has_eeprom && game_rom_size <= 0x1000000 && (dst_addr >= 0x0d000000 && dst_addr < 0x0e000000)) {
+        if (has_eeprom && dst_addr >= (game_rom_size <= 0x1000000 ? 0x0d000000 : 0x0dffff00) && dst_addr < 0x0e000000) {
             if (count == 9 || count == 73) {
                 eeprom_width = 6;
             } else if (count == 17 || count == 81) {

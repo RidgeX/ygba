@@ -157,7 +157,7 @@ uint16_t memory_read_halfword(uint32_t address) {
         return *(uint16_t *) &object_ram[address & 0x3fe];
     }
     if (address >= 0x08000000 && address < 0x0e000000) {
-        if (has_eeprom && game_rom_size <= 0x1000000 && (address >= 0x0d000000 && address < 0x0e000000)) {
+        if (has_eeprom && address >= (game_rom_size <= 0x1000000 ? 0x0d000000 : 0x0dffff00)) {
             return eeprom_read_bit();
         }
         if (has_rtc && (address >= 0x080000c4 && address < 0x080000ca)) {
@@ -209,7 +209,7 @@ void memory_write_halfword(uint32_t address, uint16_t value) {
         return;
     }
     if (address >= 0x08000000 && address < 0x0e000000) {
-        if (has_eeprom && game_rom_size <= 0x1000000 && (address >= 0x0d000000 && address < 0x0e000000)) {
+        if (has_eeprom && address >= (game_rom_size <= 0x1000000 ? 0x0d000000 : 0x0dffff00)) {
             eeprom_write_bit(value);
             return;
         }
