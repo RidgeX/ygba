@@ -767,7 +767,9 @@ int arm_load_store_halfword_register(uint32_t op) {
         r[Rd] = align_halfword(n, memory_read_halfword(n));
         if (Rd == REG_PC) branch_taken = true;
     } else {
-        memory_write_halfword(n, (uint16_t) r[Rd]);
+        uint32_t d = r[Rd];
+        if (Rd == REG_PC) d += SIZEOF_INSTR;
+        memory_write_halfword(n, (uint16_t) d);
     }
     if (!P) n += (U ? m : -m);
     if ((!P || W) && (!L || Rd != Rn)) r[Rn] = n;
@@ -824,7 +826,9 @@ int arm_load_store_halfword_immediate(uint32_t op) {
         r[Rd] = align_halfword(n, memory_read_halfword(n));
         if (Rd == REG_PC) branch_taken = true;
     } else {
-        memory_write_halfword(n, (uint16_t) r[Rd]);
+        uint32_t d = r[Rd];
+        if (Rd == REG_PC) d += SIZEOF_INSTR;
+        memory_write_halfword(n, (uint16_t) d);
     }
     if (!P) n += (U ? imm : -imm);
     if ((!P || W) && (!L || Rd != Rn)) r[Rn] = n;
