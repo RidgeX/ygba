@@ -382,11 +382,12 @@ int arm_load_store_word_or_byte_register(uint32_t op) {
         }
         if (Rd == REG_PC) branch_taken = true;
     } else {
-        // FIXME Rd == REG_PC?
+        uint32_t d = r[Rd];
+        if (Rd == REG_PC) d += SIZEOF_INSTR;
         if (B) {
-            memory_write_byte(n, (uint8_t) r[Rd]);
+            memory_write_byte(n, (uint8_t) d);
         } else {
-            memory_write_word(n, r[Rd]);
+            memory_write_word(n, d);
         }
     }
     if (!P) n += (U ? m : -m);
@@ -449,14 +450,12 @@ int arm_load_store_word_or_byte_immediate(uint32_t op) {
         }
         if (Rd == REG_PC) branch_taken = true;
     } else {
+        uint32_t d = r[Rd];
+        if (Rd == REG_PC) d += SIZEOF_INSTR;
         if (B) {
-            memory_write_byte(n, (uint8_t) r[Rd]);
+            memory_write_byte(n, (uint8_t) d);
         } else {
-            if (Rd == REG_PC) {
-                memory_write_word(n, r[Rd] + 4);
-            } else {
-                memory_write_word(n, r[Rd]);
-            }
+            memory_write_word(n, d);
         }
     }
     if (!P) n += (U ? imm : -imm);
