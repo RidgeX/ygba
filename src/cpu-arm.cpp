@@ -56,7 +56,7 @@ static void arm_alu_flags(uint32_t opc, uint32_t n, uint32_t m, uint64_t result)
     }
 }
 
-static uint32_t arm_shifter_op(uint32_t m, uint32_t s, uint32_t shop, uint32_t shamt, bool shreg, bool update_carry) {
+static uint32_t arm_shifter_op(uint32_t m, uint32_t s, uint32_t shop, bool shreg, bool update_carry) {
     switch (shop) {
         case SHIFT_LSL:
             if (s >= 32) return 0;
@@ -71,7 +71,7 @@ static uint32_t arm_shifter_op(uint32_t m, uint32_t s, uint32_t shop, uint32_t s
             return ASR(m, s);
 
         case SHIFT_ROR:
-            if (!shreg && shamt == 0) {  // ROR #0 -> RRX
+            if (!shreg && s == 0) {  // ROR #0 -> RRX
                 bool C = FLAG_C();
                 if (update_carry) {
                     ASSIGN_C(BIT(m, 0));
@@ -85,7 +85,7 @@ static uint32_t arm_shifter_op(uint32_t m, uint32_t s, uint32_t shop, uint32_t s
     }
 }
 
-static void arm_shifter_flags(uint32_t shop, uint32_t s, uint32_t m) {
+static void arm_shifter_flags(uint32_t m, uint32_t s, uint32_t shop) {
     switch (shop) {
         case SHIFT_LSL:
             if (s >= 1 && s <= 32) {
@@ -203,12 +203,12 @@ int arm_data_processing_register(uint32_t op) {
     uint32_t s = (shreg ? (uint8_t) r[Rs] : shamt);  // Use least significant byte of Rs
     uint32_t m = r[Rm];
     if (Rm == REG_PC && shreg) m += SIZEOF_INSTR;  // PC ahead if shift by register
-    m = arm_shifter_op(m, s, shop, shamt, shreg, true);
+    m = arm_shifter_op(m, s, shop, shreg, true);
     uint32_t n = r[Rn];
     if (Rn == REG_PC && shreg) n += SIZEOF_INSTR;  // PC ahead if shift by register
     uint64_t result = arm_alu_op(opc, n, m);
     if (S) {
-        arm_shifter_flags(shop, s, r[Rm]);
+        arm_shifter_flags(r[Rm], s, shop);
         arm_alu_flags(opc, n, m, result);
     }
     if (!is_test_or_compare) {
@@ -370,7 +370,7 @@ int arm_load_store_word_or_byte_register(uint32_t op) {
         shamt = 32;  // LSR #0 -> LSR #32, ASR #0 -> ASR #32
     }
 
-    uint32_t m = arm_shifter_op(r[Rm], shamt, shop, shamt, false, false);
+    uint32_t m = arm_shifter_op(r[Rm], shamt, shop, false, false);
     uint32_t n = r[Rn];
     if (Rn == REG_PC) n &= ~3;
     if (P) n += (U ? m : -m);
@@ -517,10 +517,10 @@ int arm_load_store_multiple(uint32_t op) {
     if (U == P) address += 4;
     if (S) {
         assert((cpsr & PSR_MODE) != PSR_MODE_USR && (cpsr & PSR_MODE) != PSR_MODE_SYS);
+        mode_change(cpsr & PSR_MODE, PSR_MODE_USR);
     }
-    if (S) mode_change(cpsr & PSR_MODE, PSR_MODE_USR);
     for (uint32_t i = 0; i < 16; i++) {
-        if (rlist & (1 << i)) {
+        if (BIT(rlist, i)) {
             if (L) {
                 if (i == Rn) W = false;
                 r[i] = memory_read_word(address);
@@ -699,8 +699,8 @@ int arm_multiply_long(uint32_t op) {
     uint64_t m = r[Rm];
     uint64_t s = r[Rs];
     if (U) {
-        if (BIT(m, 31)) m |= ~0xffffffffLL;
-        if (BIT(s, 31)) s |= ~0xffffffffLL;
+        SIGN_EXTEND(m, 31);
+        SIGN_EXTEND(s, 31);
     }
     uint64_t result = m * s;
     if (A) result += (uint64_t) r[RdLo] | (uint64_t) r[RdHi] << 32;

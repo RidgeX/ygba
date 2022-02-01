@@ -14,9 +14,9 @@
 #define ASR(x, i)     (((x) & (1 << 31)) != 0 ? ~(~(x) >> (i)) : (x) >> (i))
 #define ROR(x, i)     (((x) >> (i)) | ((x) << (32 - (i))))
 
-#define SIGN_EXTEND(x, i)               \
-    if ((x) & (1 << (i))) {             \
-        (x) |= ~((1 << ((i) + 1)) - 1); \
+#define SIGN_EXTEND(x, i)                  \
+    if ((x) & (1ULL << (i))) {             \
+        (x) |= ~((1ULL << ((i) + 1)) - 1); \
     }
 
 // clang-format off
