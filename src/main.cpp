@@ -78,10 +78,12 @@ uint32_t gba_open_bus() {
 }
 
 static bool game_rom_contains(const std::string &s) {
-    uint8_t *begin = game_rom;
-    uint8_t *end = begin + game_rom_size;
-    const auto it = std::search(begin, end, std::boyer_moore_searcher(s.begin(), s.end()));
-    return it != end;
+    const uint8_t *text_begin = game_rom;
+    const uint8_t *text_end = text_begin + game_rom_size;
+    const uint8_t *pattern_begin = (const uint8_t *) s.c_str();
+    const uint8_t *pattern_end = pattern_begin + s.length();
+    const auto it = std::search(text_begin, text_end, std::boyer_moore_searcher(pattern_begin, pattern_end));
+    return it != text_end;
 }
 
 const std::map<std::tuple<std::string, std::string, uint8_t>, uint32_t> idle_loop_address_map{
