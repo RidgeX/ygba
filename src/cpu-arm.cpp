@@ -175,7 +175,7 @@ void arm_data_processing_register_disasm(uint32_t address, uint32_t op, std::str
     print_arm_shift(s, shop, shamt, shreg, Rs);
 }
 
-int arm_data_processing_register(uint32_t op) {
+void arm_data_processing_register(uint32_t op) {
     uint32_t opc = BITS(op, 21, 24);
     bool S = BIT(op, 20);
     uint32_t Rn = BITS(op, 16, 19);
@@ -223,8 +223,6 @@ int arm_data_processing_register(uint32_t op) {
             write_cpsr(read_spsr());  // Restores SPSR on ARMv4
         }
     }
-
-    return 1;
 }
 
 void arm_data_processing_immediate_disasm(uint32_t address, uint32_t op, std::string &s) {
@@ -272,7 +270,7 @@ void arm_data_processing_immediate_disasm(uint32_t address, uint32_t op, std::st
     print_immediate(s, imm);
 }
 
-int arm_data_processing_immediate(uint32_t op) {
+void arm_data_processing_immediate(uint32_t op) {
     uint32_t opc = BITS(op, 21, 24);
     bool S = BIT(op, 20);
     uint32_t Rn = BITS(op, 16, 19);
@@ -307,8 +305,6 @@ int arm_data_processing_immediate(uint32_t op) {
             if (S) write_cpsr(read_spsr());
         }
     }
-
-    return 1;
 }
 
 void arm_load_store_word_or_byte_register_disasm(uint32_t address, uint32_t op, std::string &s) {
@@ -349,7 +345,7 @@ void arm_load_store_word_or_byte_register_disasm(uint32_t address, uint32_t op, 
     }
 }
 
-int arm_load_store_word_or_byte_register(uint32_t op) {
+void arm_load_store_word_or_byte_register(uint32_t op) {
     bool P = BIT(op, 24);
     bool U = BIT(op, 23);
     bool B = BIT(op, 22);
@@ -392,8 +388,6 @@ int arm_load_store_word_or_byte_register(uint32_t op) {
     }
     if (!P) n += (U ? m : -m);
     if ((!P || W) && (!L || Rd != Rn)) r[Rn] = n;
-
-    return 1;
 }
 
 void arm_load_store_word_or_byte_immediate_disasm(uint32_t address, uint32_t op, std::string &s) {
@@ -426,7 +420,7 @@ void arm_load_store_word_or_byte_immediate_disasm(uint32_t address, uint32_t op,
     }
 }
 
-int arm_load_store_word_or_byte_immediate(uint32_t op) {
+void arm_load_store_word_or_byte_immediate(uint32_t op) {
     bool P = BIT(op, 24);
     bool U = BIT(op, 23);
     bool B = BIT(op, 22);
@@ -460,8 +454,6 @@ int arm_load_store_word_or_byte_immediate(uint32_t op) {
     }
     if (!P) n += (U ? imm : -imm);
     if ((!P || W) && (!L || Rd != Rn)) r[Rn] = n;
-
-    return 1;
 }
 
 void arm_load_store_multiple_disasm(uint32_t address, uint32_t op, std::string &s) {
@@ -495,7 +487,7 @@ void arm_load_store_multiple_disasm(uint32_t address, uint32_t op, std::string &
     if (S) s += "^";
 }
 
-int arm_load_store_multiple(uint32_t op) {
+void arm_load_store_multiple(uint32_t op) {
     bool P = BIT(op, 24);
     bool U = BIT(op, 23);
     bool S = BIT(op, 22);
@@ -547,8 +539,6 @@ int arm_load_store_multiple(uint32_t op) {
     //assert(!W || !S);
     if (S) mode_change(PSR_MODE_USR, cpsr & PSR_MODE);
     if (W) r[Rn] = new_base;  // FIXME before or after mode change?
-
-    return 1;
 }
 
 void arm_branch_disasm(uint32_t address, uint32_t op, std::string &s) {
@@ -562,7 +552,7 @@ void arm_branch_disasm(uint32_t address, uint32_t op, std::string &s) {
     print_address(s, address + 8 + (imm << 2));
 }
 
-int arm_branch(uint32_t op) {
+void arm_branch(uint32_t op) {
     bool L = BIT(op, 24);
     uint32_t imm = BITS(op, 0, 23);
     SIGN_EXTEND(imm, 23);
@@ -570,8 +560,6 @@ int arm_branch(uint32_t op) {
     if (L) r[REG_LR] = r[REG_PC] - 4;
     r[REG_PC] += imm << 2;
     branch_taken = true;
-
-    return 1;
 }
 
 void arm_software_interrupt_disasm(uint32_t address, uint32_t op, std::string &s) {
@@ -585,7 +573,7 @@ void arm_software_interrupt_disasm(uint32_t address, uint32_t op, std::string &s
     print_bios_function_name(s, imm >> 16);
 }
 
-int arm_software_interrupt(uint32_t op) {
+void arm_software_interrupt(uint32_t op) {
     UNUSED(op);
 
     r14_svc = r[REG_PC] - SIZEOF_INSTR;  // ARM: PC + 4, Thumb: PC + 2
@@ -593,18 +581,14 @@ int arm_software_interrupt(uint32_t op) {
     branch_taken = true;
     write_cpsr((cpsr & ~(PSR_T | PSR_MODE)) | PSR_I | PSR_MODE_SVC);
     r[REG_PC] = VEC_SWI;
-
-    return 1;
 }
 
-int arm_hardware_interrupt() {
+void arm_hardware_interrupt() {
     r14_irq = r[REG_PC] - (FLAG_T() ? 0 : 4);  // ARM: PC + 4, Thumb: PC + 4
     spsr_irq = cpsr;
     branch_taken = true;
     write_cpsr((cpsr & ~(PSR_T | PSR_MODE)) | PSR_I | PSR_MODE_IRQ);
     r[REG_PC] = VEC_IRQ;
-
-    return 1;
 }
 
 void arm_multiply_disasm(uint32_t address, uint32_t op, std::string &s) {
@@ -632,7 +616,7 @@ void arm_multiply_disasm(uint32_t address, uint32_t op, std::string &s) {
     }
 }
 
-int arm_multiply(uint32_t op) {
+void arm_multiply(uint32_t op) {
     bool A = BIT(op, 21);
     bool S = BIT(op, 20);
     uint32_t Rd = BITS(op, 16, 19);
@@ -651,8 +635,6 @@ int arm_multiply(uint32_t op) {
         ASSIGN_N(BIT(result, 31));
         ASSIGN_Z(result == 0);
     }
-
-    return 1;
 }
 
 void arm_multiply_long_disasm(uint32_t address, uint32_t op, std::string &s) {
@@ -683,7 +665,7 @@ void arm_multiply_long_disasm(uint32_t address, uint32_t op, std::string &s) {
     print_register(s, Rs);
 }
 
-int arm_multiply_long(uint32_t op) {
+void arm_multiply_long(uint32_t op) {
     bool U = BIT(op, 22);
     bool A = BIT(op, 21);
     bool S = BIT(op, 20);
@@ -710,8 +692,6 @@ int arm_multiply_long(uint32_t op) {
         ASSIGN_N(BIT(r[RdHi], 31));
         ASSIGN_Z(r[RdHi] == 0 && r[RdLo] == 0);
     }
-
-    return 1;
 }
 
 void arm_load_store_halfword_register_disasm(uint32_t address, uint32_t op, std::string &s) {
@@ -740,7 +720,7 @@ void arm_load_store_halfword_register_disasm(uint32_t address, uint32_t op, std:
     }
 }
 
-int arm_load_store_halfword_register(uint32_t op) {
+void arm_load_store_halfword_register(uint32_t op) {
     bool P = BIT(op, 24);
     bool U = BIT(op, 23);
     bool I = BIT(op, 22);
@@ -773,8 +753,6 @@ int arm_load_store_halfword_register(uint32_t op) {
     }
     if (!P) n += (U ? m : -m);
     if ((!P || W) && (!L || Rd != Rn)) r[Rn] = n;
-
-    return 1;
 }
 
 void arm_load_store_halfword_immediate_disasm(uint32_t address, uint32_t op, std::string &s) {
@@ -802,7 +780,7 @@ void arm_load_store_halfword_immediate_disasm(uint32_t address, uint32_t op, std
     }
 }
 
-int arm_load_store_halfword_immediate(uint32_t op) {
+void arm_load_store_halfword_immediate(uint32_t op) {
     bool P = BIT(op, 24);
     bool U = BIT(op, 23);
     bool I = BIT(op, 22);
@@ -832,8 +810,6 @@ int arm_load_store_halfword_immediate(uint32_t op) {
     }
     if (!P) n += (U ? imm : -imm);
     if ((!P || W) && (!L || Rd != Rn)) r[Rn] = n;
-
-    return 1;
 }
 
 void arm_load_signed_halfword_or_signed_byte_register_disasm(uint32_t address, uint32_t op, std::string &s) {
@@ -866,7 +842,7 @@ void arm_load_signed_halfword_or_signed_byte_register_disasm(uint32_t address, u
     }
 }
 
-int arm_load_signed_halfword_or_signed_byte_register(uint32_t op) {
+void arm_load_signed_halfword_or_signed_byte_register(uint32_t op) {
     bool P = BIT(op, 24);
     bool U = BIT(op, 23);
     bool I = BIT(op, 22);
@@ -908,8 +884,6 @@ int arm_load_signed_halfword_or_signed_byte_register(uint32_t op) {
     if (Rd == REG_PC) branch_taken = true;
     if (!P) n += (U ? m : -m);
     if ((!P || W) && (!L || Rd != Rn)) r[Rn] = n;
-
-    return 1;
 }
 
 void arm_load_signed_halfword_or_signed_byte_immediate_disasm(uint32_t address, uint32_t op, std::string &s) {
@@ -941,7 +915,7 @@ void arm_load_signed_halfword_or_signed_byte_immediate_disasm(uint32_t address, 
     }
 }
 
-int arm_load_signed_halfword_or_signed_byte_immediate(uint32_t op) {
+void arm_load_signed_halfword_or_signed_byte_immediate(uint32_t op) {
     bool P = BIT(op, 24);
     bool U = BIT(op, 23);
     bool I = BIT(op, 22);
@@ -980,8 +954,6 @@ int arm_load_signed_halfword_or_signed_byte_immediate(uint32_t op) {
     if (Rd == REG_PC) branch_taken = true;
     if (!P) n += (U ? imm : -imm);
     if ((!P || W) && (!L || Rd != Rn)) r[Rn] = n;
-
-    return 1;
 }
 
 void arm_special_data_processing_register_disasm(uint32_t address, uint32_t op, std::string &s) {
@@ -1013,7 +985,7 @@ void arm_special_data_processing_register_disasm(uint32_t address, uint32_t op, 
     }
 }
 
-int arm_special_data_processing_register(uint32_t op) {
+void arm_special_data_processing_register(uint32_t op) {
     bool R = BIT(op, 22);
     bool b21 = BIT(op, 21);
     uint32_t mask_type = BITS(op, 16, 19);
@@ -1046,8 +1018,6 @@ int arm_special_data_processing_register(uint32_t op) {
         }
         assert(Rd != REG_PC);
     }
-
-    return 1;
 }
 
 void arm_special_data_processing_immediate_disasm(uint32_t address, uint32_t op, std::string &s) {
@@ -1072,7 +1042,7 @@ void arm_special_data_processing_immediate_disasm(uint32_t address, uint32_t op,
     print_immediate(s, imm);
 }
 
-int arm_special_data_processing_immediate(uint32_t op) {
+void arm_special_data_processing_immediate(uint32_t op) {
     bool R = BIT(op, 22);
     uint32_t mask_type = BITS(op, 16, 19);
     uint32_t sbo = BITS(op, 12, 15);
@@ -1089,8 +1059,6 @@ int arm_special_data_processing_immediate(uint32_t op) {
     } else {
         write_cpsr((cpsr & ~mask) | (imm & mask));
     }
-
-    return 1;
 }
 
 void arm_swap_disasm(uint32_t address, uint32_t op, std::string &s) {
@@ -1113,7 +1081,7 @@ void arm_swap_disasm(uint32_t address, uint32_t op, std::string &s) {
     s += "]";
 }
 
-int arm_swap(uint32_t op) {
+void arm_swap(uint32_t op) {
     bool B = BIT(op, 22);
     uint32_t Rn = BITS(op, 16, 19);
     uint32_t Rd = BITS(op, 12, 15);
@@ -1132,8 +1100,6 @@ int arm_swap(uint32_t op) {
         r[Rd] = temp;
     }
     assert(Rd != REG_PC);
-
-    return 1;
 }
 
 void arm_branch_and_exchange_disasm(uint32_t address, uint32_t op, std::string &s) {
@@ -1147,7 +1113,7 @@ void arm_branch_and_exchange_disasm(uint32_t address, uint32_t op, std::string &
     print_register(s, Rm);
 }
 
-int arm_branch_and_exchange(uint32_t op) {
+void arm_branch_and_exchange(uint32_t op) {
     uint32_t sbo = BITS(op, 8, 19);
     uint32_t Rm = BITS(op, 0, 3);
 
@@ -1160,8 +1126,6 @@ int arm_branch_and_exchange(uint32_t op) {
         r[REG_PC] = r[Rm] & ~3;
     }
     branch_taken = true;
-
-    return 1;
 }
 
 void arm_coprocessor_load_store_disasm(uint32_t address, uint32_t op, std::string &s) {
@@ -1174,11 +1138,10 @@ void arm_coprocessor_load_store_disasm(uint32_t address, uint32_t op, std::strin
     s += " ???";
 }
 
-int arm_coprocessor_load_store(uint32_t op) {
+void arm_coprocessor_load_store(uint32_t op) {
     UNUSED(op);
 
     assert(false);
-    return 1;
 }
 
 void arm_coprocessor_data_processing_disasm(uint32_t address, uint32_t op, std::string &s) {
@@ -1195,11 +1158,10 @@ void arm_coprocessor_data_processing_disasm(uint32_t address, uint32_t op, std::
     s += " ???";
 }
 
-int arm_coprocessor_data_processing(uint32_t op) {
+void arm_coprocessor_data_processing(uint32_t op) {
     UNUSED(op);
 
     assert(false);
-    return 1;
 }
 
 void arm_undefined_instruction_disasm(uint32_t address, uint32_t op, std::string &s) {
@@ -1209,7 +1171,7 @@ void arm_undefined_instruction_disasm(uint32_t address, uint32_t op, std::string
     s += "undefined";
 }
 
-int arm_undefined_instruction(uint32_t op) {
+void arm_undefined_instruction(uint32_t op) {
     UNUSED(op);
 
     assert(false);
@@ -1219,6 +1181,4 @@ int arm_undefined_instruction(uint32_t op) {
     write_cpsr((cpsr & ~(PSR_T | PSR_MODE)) | PSR_I | PSR_MODE_UND);
     r[REG_PC] = VEC_UNDEF;
     branch_taken = true;
-
-    return 1;
 }

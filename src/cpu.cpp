@@ -232,14 +232,13 @@ void arm_fill_pipeline() {
     r[REG_PC] += 8;
 }
 
-int arm_step() {
+void arm_step() {
     uint32_t cond = BITS(arm_op, 28, 31);
-    int cycles = 1;
     if (condition_passed(cond)) {
         uint32_t index = BITS(arm_op, 20, 27) << 4 | BITS(arm_op, 4, 7);
         int (*handler)(uint32_t) = arm_lookup[index];
         assert(handler != nullptr);
-        cycles = (*handler)(arm_op);
+        (*handler)(arm_op);
     }
 
     if (!branch_taken) {
@@ -248,8 +247,6 @@ int arm_step() {
         arm_pipeline[0] = arm_pipeline[1];
         arm_pipeline[1] = memory_read_word(r[REG_PC]);
     }
-
-    return cycles;
 }
 
 void thumb_disasm(uint32_t address, uint16_t op, std::string &s) {
@@ -267,11 +264,11 @@ void thumb_fill_pipeline() {
     r[REG_PC] += 4;
 }
 
-int thumb_step() {
+void thumb_step() {
     uint16_t index = BITS(thumb_op, 8, 15);
     int (*handler)(uint16_t) = thumb_lookup[index];
     assert(handler != nullptr);
-    int cycles = (*handler)(thumb_op);
+    (*handler)(thumb_op);
 
     if (!branch_taken) {
         r[REG_PC] += 2;
@@ -279,8 +276,6 @@ int thumb_step() {
         thumb_pipeline[0] = thumb_pipeline[1];
         thumb_pipeline[1] = memory_read_halfword(r[REG_PC]);
     }
-
-    return cycles;
 }
 
 static void lookup_bind(void (**lookup)(void), const std::string &mask, void (*f)(void)) {
@@ -305,12 +300,12 @@ static void lookup_bind(void (**lookup)(void), const std::string &mask, void (*f
     }
 }
 
-static void arm_bind(const std::string &mask, int (*execute)(uint32_t), void (*disasm)(uint32_t, uint32_t, std::string &)) {
+static void arm_bind(const std::string &mask, void (*execute)(uint32_t), void (*disasm)(uint32_t, uint32_t, std::string &)) {
     lookup_bind((void (**)()) arm_lookup, mask, (void (*)()) execute);
     lookup_bind((void (**)()) arm_lookup_disasm, mask, (void (*)()) disasm);
 }
 
-static void thumb_bind(const std::string &mask, int (*execute)(uint16_t), void (*disasm)(uint32_t, uint16_t, std::string &)) {
+static void thumb_bind(const std::string &mask, void (*execute)(uint16_t), void (*disasm)(uint32_t, uint16_t, std::string &)) {
     lookup_bind((void (**)()) thumb_lookup, mask, (void (*)()) execute);
     lookup_bind((void (**)()) thumb_lookup_disasm, mask, (void (*)()) disasm);
 }

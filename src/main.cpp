@@ -496,14 +496,12 @@ void gba_dma_update(uint32_t current_timing) {
 
 static void gba_emulate() {
     while (true) {
-        int cpu_cycles = 0;
-
         if (FLAG_T()) {
             if (branch_taken) thumb_fill_pipeline();
-            if (!halted) cpu_cycles = thumb_step();
+            if (!halted) thumb_step();
         } else {
             if (branch_taken) arm_fill_pipeline();
-            if (!halted) cpu_cycles = arm_step();
+            if (!halted) arm_step();
         }
 
         // Idle loop optimization
@@ -525,7 +523,7 @@ static void gba_emulate() {
 
         gba_timer_update(1);  // FIXME
         gba_ppu_update();
-        if (ppu_cycles == 0 || (single_step && cpu_cycles > 0)) break;
+        if (ppu_cycles == 0 || (single_step && !halted)) break;
     }
 }
 
