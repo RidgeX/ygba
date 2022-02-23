@@ -1,0 +1,140 @@
+- [x] Graphics
+  - [x] Backdrop and forced blank
+  - [x] Tile modes
+    - [x] Scrolling
+    - [x] Priorities
+    - [x] Transparency color
+    - [x] Tile flipping
+    - [x] 32 and 256 color palettes
+  - [x] Bitmap modes
+    - [x] Page flipping
+    - [ ] Affine transformation
+  - [x] Tiled and affine backgrounds
+    - [ ] Layer toggle delay
+  - [x] Regular and affine sprites
+    - [x] Tile index wraps around to 0 after 1023 allowing tile 0 to be placed at sprite origin (e.g. Advance Wars 2 versus rules screen)
+    - [x] Affine matrix of all zeros produces rectangle of uniform color using origin pixel (e.g. Kurukuru Kururin intro and pause menu)
+    - [ ] Transparent sprites can update sprite priorities (e.g. Golden Sun carpet)
+    - [ ] OAM update delay
+  - [x] Graphic effects
+    - [ ] Blending
+    - [ ] Mosaic
+    - [x] Windowing
+      - [x] Basic windows
+      - [ ] Object window
+      - [ ] Bad values for window coordinates
+  - [ ] Shaders
+    - [ ] LCD color correction
+- [x] Sound
+  - [x] Digital sound channels
+  - [ ] Programmable sound generators
+    - [ ] Square 1
+    - [ ] Square 2
+    - [ ] Wave
+    - [ ] Noise
+  - [x] Resampling
+    - [x] Sample rates less than 48,000 Hz
+    - [ ] Sample rates greater than 48,000 Hz (e.g. Golden Sun 2, Konami Krazy Racers)
+    - [ ] Mixing dissimilar sample rates (e.g. Medabots AX, Mobile Suit Gundam Seed)
+    - [x] Interpolation
+      - [ ] Cosine interpolation
+      - [x] Cubic interpolation
+      - [ ] Sinc interpolation
+      - [ ] Lanczos interpolation
+  - [ ] Sound bias register
+- [ ] Timings
+  - [ ] Scheduler optimisation
+  - [ ] Memory region timings
+  - [ ] Wait count register
+  - [ ] Instruction timings
+  - [ ] Tick all components during DMA transfer
+  - [ ] DMAs delayed by 2 cycles
+  - [ ] IRQs delayed by 7 cycles (e.g. Hamtaro - Ham-Ham Heartbreak, Mega Man & Bass)
+  - [ ] Cartridge prefetch
+- [x] Memory
+  - [x] BIOS read lockout
+  - [x] I/O registers
+  - [x] Mirroring
+  - [x] Open bus
+    - [x] ARM
+    - [x] Thumb (e.g. The Legend of Zelda: The Minish Cap, Mario & Luigi: Superstar Saga)
+      - [x] Work RAM 256K, Palette RAM, VRAM and GamePak ROM
+      - [ ] BIOS ROM and OAM
+      - [ ] Work RAM 32K
+      - [ ] I/O and GamePak SRAM
+    - [x] DMA (e.g. Hello Kitty Collection, Sonic Pinball Party)
+- [x] Save memory
+  - [x] SRAM, Flash and EEPROM support
+  - [x] Persist save game to disk
+    - [x] On exit or ROM load
+    - [ ] Automatically with mmap
+  - [x] Save type detection via string search
+  - [x] Save type overrides
+    - [x] Hardcoded
+    - [ ] Loaded from text file
+    - [ ] Loaded from save type database
+  - [ ] Save states
+- [x] Timers
+- [x] DMA
+- [x] Key input
+- [x] Interrupt requests
+  - [x] VBlank, VCount and HBlank
+  - [x] Timers
+  - [x] DMA transfers
+  - [x] Key input
+- [x] CPU
+  - [x] Instruction decode via lookup table
+  - [x] ALU and shifter
+  - [x] Pipeline
+  - [x] Conditional execution
+  - [x] Software and hardware interrupts
+  - [ ] ldrt/strt to User mode registers
+  - [x] ARM edge cases
+    - [x] ldr/str with unaligned address
+    - [ ] ldm/stm with unaligned address
+    - [x] CPSR bit 4 (M[4]) always reads as 1
+    - [ ] Invalid CPSR mode
+    - [x] Read SPSR in User/System mode (no SPSR)
+    - [ ] Change Thumb bit via msr
+    - [ ] ldm/stm {}^ in User/System mode
+    - [x] tstp/teqp/cmpp/cmnp (ARMv2 mode change)
+    - [x] ldm/stm empty register list
+    - [x] ldm/stm writeback and Rn in register list
+    - [x] bx to ARM unaligned address
+    - [x] Undefined instructions
+  - [x] Thumb edge cases
+    - [ ] add/cmp/mov high registers (with both registers low)
+    - [ ] blx (not on ARMv4T)
+    - [ ] bx (non-zero should be zero bits)
+    - [ ] add/sub sp (non-zero should be zero bits)
+    - [ ] push/pop (non-zero should be zero bits)
+- [x] GPIO peripherals
+  - [x] Real time clock (e.g. Pokémon Emerald)
+  - [ ] Gyroscope (e.g. WarioWare Twisted!)
+  - [ ] Accelerometer (e.g. Yoshi Topsy-Turvy)
+  - [ ] Solar sensor (e.g. Boktai)
+  - [ ] Rumble (e.g. Drill Dozer)
+  - [ ] e-Reader
+- [ ] Communication
+  - [ ] Link cable
+  - [ ] Wireless adapter
+- [x] Debugging
+  - [x] Registers
+  - [x] Disassembly
+    - [ ] Scrollable window
+  - [x] Stepping
+    - [x] Reset
+    - [x] Single step
+    - [ ] Step n cycles
+    - [ ] Step 1 frame
+  - [ ] Breakpoints
+  - [x] Memory viewer
+    - [ ] Jump to region
+  - [ ] Palette viewer
+  - [ ] Background viewer
+  - [ ] Sprite viewer
+  - [ ] GDB remote debug protocol
+- [x] User interface
+  - [x] Drag and drop ROM file
+  - [x] Screen scale
+  - [ ] Rotate screen 90° (e.g. Dr. Mario + Puzzle League)
