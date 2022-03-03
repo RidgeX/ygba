@@ -92,7 +92,7 @@
   - [x] ARM edge cases
     - [x] ldr/str with unaligned address
     - [ ] ldm/stm with unaligned address
-    - [x] CPSR bit 4 (M[4]) always reads as 1
+    - [x] CPSR bit 4 (M[4]) always reads as 1 (e.g. Banjo-Kazooie: Grunty's Revenge)
     - [ ] Invalid CPSR mode
     - [x] Read SPSR in User/System mode (no SPSR)
     - [ ] Change Thumb bit via msr
@@ -103,6 +103,7 @@
     - [x] bx to ARM unaligned address
     - [x] Undefined instructions
   - [x] Thumb edge cases
+    - [x] Using the second half of a bl instruction pair on its own (e.g. Golden Sun)
     - [ ] add/cmp/mov high registers (with both registers low)
     - [ ] blx (not on ARMv4T)
     - [ ] bx (non-zero should be zero bits)
@@ -110,7 +111,7 @@
     - [ ] push/pop (non-zero should be zero bits)
 - [x] GPIO peripherals
   - [x] Real time clock (e.g. Pokémon Emerald)
-  - [ ] Gyroscope (e.g. WarioWare Twisted!)
+  - [ ] Gyroscope (e.g. WarioWare: Twisted!)
   - [ ] Accelerometer (e.g. Yoshi Topsy-Turvy)
   - [ ] Solar sensor (e.g. Boktai)
   - [ ] Rumble (e.g. Drill Dozer)
@@ -137,4 +138,5 @@
 - [x] User interface
   - [x] Drag and drop ROM file
   - [x] Screen scale
+  - [ ] Remap controls
   - [ ] Rotate screen 90° (e.g. Dr. Mario + Puzzle League)
