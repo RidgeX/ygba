@@ -165,7 +165,15 @@ static bool sprite_access(int tile_no, int x, int y, int w, int h, bool hflip, b
     bool obj_1d = (ioreg.dispcnt.w & DCNT_OBJ_1D);
     int stride = (obj_1d ? (w / 8) : (colors_256 ? 16 : 32));
     int increment = (colors_256 ? 2 : 1);
-    tile_no += (y / 8) * stride * increment + (x / 8) * increment;
+    int count_y = (y / 8) * stride * increment;
+    int count_x = (x / 8) * increment;
+
+    tile_no += count_y;
+    if (obj_1d) {
+        tile_no += count_x;
+    } else {
+        tile_no = (tile_no & ~0x1f) | ((tile_no + count_x) & 0x1f);
+    }
     tile_no &= 0x3ff;
 
     bool bitmap_mode = (mode >= 3 && mode <= 5);

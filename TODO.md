@@ -12,7 +12,8 @@
   - [x] Tiled and affine backgrounds
     - [ ] Layer toggle delay
   - [x] Regular and affine sprites
-    - [x] Tile index wraps around to 0 after 1023 allowing tile 0 to be placed at sprite origin (e.g. Advance Wars 2 versus rules screen)
+    - [x] Tile indexes past 1023 wrap around to 0 allowing tile 0 to be placed at sprite origin (e.g. Advance Wars 2 versus rules screen)
+    - [x] Tile indexes for 2D mapped tiles incremented past end of row wrap around to the same row
     - [x] Affine matrix of all zeros produces rectangle of uniform color using origin pixel (e.g. Kurukuru Kururin intro and pause menu)
     - [ ] Transparent sprites can update sprite priorities (e.g. Golden Sun carpet)
     - [ ] OAM update delay
