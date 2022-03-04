@@ -26,5 +26,5 @@ extern uint32_t screen_pixels[SCREEN_HEIGHT][SCREEN_WIDTH];
 #define DCNT_WINOBJ  (1 << 15)
 
 void video_draw_scanline();
-void video_affine_reset();
+void video_affine_reset(int i);
 void video_affine_update();

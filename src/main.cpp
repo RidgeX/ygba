@@ -281,7 +281,8 @@ static void gba_ppu_update() {
                 gba_dma_update(DMA_AT_VBLANK);
             }
         } else if (ioreg.vcount.w == 0) {
-            video_affine_reset();
+            video_affine_reset(0);
+            video_affine_reset(1);
         }
         if (ioreg.vcount.w == ioreg.dispstat.b.b1) {
             if (!(ioreg.dispstat.w & DSTAT_IN_VCT)) {

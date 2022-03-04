@@ -80,7 +80,7 @@ static void draw_pixel_culled(int bg, int x, int y, uint32_t pixel) {
 
     bool inside_win0 = (enable_win0 && is_point_in_window(x, y, win0));
     bool inside_win1 = (enable_win1 && is_point_in_window(x, y, win1));
-    bool inside_winobj = false;  // FIXME
+    bool inside_winobj = false;  // FIXME Implement object window
 
     if (inside_win0) {
         if (!BIT(ioreg.winin.w, bg)) return;
@@ -383,11 +383,9 @@ void video_draw_scanline() {
     }
 }
 
-void video_affine_reset() {
-    for (int i = 0; i < 2; i++) {
-        ioreg.bg_affine[i].x = fixed20p8_to_double(ioreg.bg_affine[i].x0.dw);
-        ioreg.bg_affine[i].y = fixed20p8_to_double(ioreg.bg_affine[i].y0.dw);
-    }
+void video_affine_reset(int i) {
+    ioreg.bg_affine[i].x = fixed20p8_to_double(ioreg.bg_affine[i].x0.dw);
+    ioreg.bg_affine[i].y = fixed20p8_to_double(ioreg.bg_affine[i].y0.dw);
 }
 
 void video_affine_update() {
