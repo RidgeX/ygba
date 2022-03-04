@@ -262,6 +262,7 @@ static void gba_load(const std::string &rom_path) {
 }
 
 static void gba_ppu_update() {
+    ppu_cycles = (ppu_cycles + 1) % 280896;
     if (ppu_cycles % 1232 == 0) {
         ioreg.dispstat.w &= ~DSTAT_IN_HBL;
         if (ioreg.vcount.w < SCREEN_HEIGHT) {
@@ -271,7 +272,7 @@ static void gba_ppu_update() {
         ioreg.vcount.w = (ioreg.vcount.w + 1) % 228;
         if (ioreg.vcount.w == 227) {
             ioreg.dispstat.w &= ~DSTAT_IN_VBL;
-        } else if (ioreg.vcount.w == 161) {  // FIXME
+        } else if (ioreg.vcount.w == 161) {  // FIXME Implement proper IRQ delay
             if (ioreg.dispstat.w & DSTAT_VBL_IRQ) {
                 ioreg.irq.w |= INT_VBLANK;
             }
@@ -294,9 +295,7 @@ static void gba_ppu_update() {
         } else {
             ioreg.dispstat.w &= ~DSTAT_IN_VCT;
         }
-    }
-    ppu_cycles = (ppu_cycles + 1) % 280896;
-    if (ppu_cycles % 1232 == 1006) {
+    } else if (ppu_cycles % 1232 == 1006) {
         if (!(ioreg.dispstat.w & DSTAT_IN_HBL)) {
             ioreg.dispstat.w |= DSTAT_IN_HBL;
             if (ioreg.dispstat.w & DSTAT_HBL_IRQ) {
@@ -460,7 +459,7 @@ void gba_dma_update(uint32_t current_timing) {
                 word_size = true;
                 count = 4;
             } else if (ch == 3) {
-                continue;  // FIXME
+                continue;  // FIXME Implement video capture DMA
             }
         }
 
@@ -522,7 +521,7 @@ static void gba_emulate() {
             }
         }
 
-        gba_timer_update(1);  // FIXME
+        gba_timer_update(1);  // FIXME Implement timings
         gba_ppu_update();
         if (ppu_cycles == 0 || (single_step && !halted)) break;
     }
