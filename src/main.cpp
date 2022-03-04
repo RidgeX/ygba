@@ -265,10 +265,6 @@ static void gba_ppu_update() {
     ppu_cycles = (ppu_cycles + 1) % 280896;
     if (ppu_cycles % 1232 == 0) {
         ioreg.dispstat.w &= ~DSTAT_IN_HBL;
-        if (ioreg.vcount.w < SCREEN_HEIGHT) {
-            video_draw_scanline();
-            video_affine_update();
-        }
         ioreg.vcount.w = (ioreg.vcount.w + 1) % 228;
         if (ioreg.vcount.w == 227) {
             ioreg.dispstat.w &= ~DSTAT_IN_VBL;
@@ -296,6 +292,10 @@ static void gba_ppu_update() {
             ioreg.dispstat.w &= ~DSTAT_IN_VCT;
         }
     } else if (ppu_cycles % 1232 == 1006) {
+        if (ioreg.vcount.w < SCREEN_HEIGHT) {
+            video_draw_scanline();
+            video_affine_update();
+        }
         if (!(ioreg.dispstat.w & DSTAT_IN_HBL)) {
             ioreg.dispstat.w |= DSTAT_IN_HBL;
             if (ioreg.dispstat.w & DSTAT_HBL_IRQ) {
