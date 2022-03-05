@@ -60,7 +60,7 @@ static uint32_t rgb555(uint32_t pixel) {
     return 0xff << 24 | blue << 16 | green << 8 | red;
 }
 
-static void draw_blank(int y, bool forced_blank) {
+static void draw_backdrop(int y, bool forced_blank) {
     uint16_t pixel = *(uint16_t *) &palette_ram[0];
     uint32_t clear_color = rgb555(forced_blank ? 0x7fff : pixel);
 
@@ -253,30 +253,6 @@ static void draw_sprites(int mode, int pri, int y) {
     }
 }
 
-static void draw_bitmap(int mode, int y) {
-    int width = (mode == 5 ? 160 : SCREEN_WIDTH);
-
-    for (int x = 0; x < SCREEN_WIDTH; x++) {
-        uint16_t pixel = 0;
-        if (mode == 3 || mode == 5) {
-            if (x < width && (mode == 3 || y < 128)) {
-                pixel = *(uint16_t *) &video_ram[(y * width + x) * 2];
-            } else {
-                pixel = *(uint16_t *) &palette_ram[0];
-            }
-        } else if (mode == 4) {
-            bool pflip = (ioreg.dispcnt.w & DCNT_PAGE);
-            uint8_t pixel_index = video_ram[(pflip ? 0xa000 : 0) + y * SCREEN_WIDTH + x];
-            pixel = *(uint16_t *) &palette_ram[pixel_index * 2];
-        }
-        screen_pixels[y][x] = rgb555(pixel);
-    }
-
-    for (int pri = 3; pri >= 0; pri--) {
-        draw_sprites(mode, pri, y);
-    }
-}
-
 const int bg_width_lookup[2][4] = {{256, 512, 256, 512}, {128, 256, 512, 1024}};
 const int bg_height_lookup[2][4] = {{256, 256, 512, 512}, {128, 256, 512, 1024}};
 
@@ -347,6 +323,50 @@ static void draw_tiled(int mode, int y) {
     }
 }
 
+static bool bitmap_access(int x, int y, int mode, uint16_t *pixel) {
+    int w = (mode == 5 ? 160 : SCREEN_WIDTH);
+    int h = (mode == 5 ? 128 : SCREEN_HEIGHT);
+
+    if (x < 0 || x >= w || y < 0 || y >= h) return false;
+
+    if (mode == 4) {
+        bool page_flip = (ioreg.dispcnt.w & DCNT_PAGE);
+        uint8_t pixel_index = video_ram[(page_flip ? 0xa000 : 0) + y * w + x];
+        if (pixel_index != 0) {
+            *pixel = *(uint16_t *) &palette_ram[pixel_index * 2];
+            return true;
+        }
+    } else {
+        *pixel = *(uint16_t *) &video_ram[(y * w + x) * 2];
+        return true;
+    }
+
+    return false;
+}
+
+static void draw_bitmap(int mode, int y) {
+    const int bg = 2;
+
+    double affine_x = ioreg.bg_affine[bg - 2].x;
+    double affine_y = ioreg.bg_affine[bg - 2].y;
+    double pa = fixed8p8_to_double(ioreg.bg_affine[bg - 2].pa.w);
+    double pc = fixed8p8_to_double(ioreg.bg_affine[bg - 2].pc.w);
+
+    for (int x = 0; x < SCREEN_WIDTH; x++) {
+        int i = std::floor(affine_x);
+        int j = std::floor(affine_y);
+        uint16_t pixel;
+        bool ok = bitmap_access(i, j, mode, &pixel);
+        if (ok) draw_pixel_culled(bg, x, y, pixel);
+        affine_x += pa;
+        affine_y += pc;
+    }
+
+    for (int pri = 3; pri >= 0; pri--) {
+        draw_sprites(mode, pri, y);
+    }
+}
+
 void video_draw_scanline() {
     win0.right = ioreg.winh[0].b.b0;
     win0.left = ioreg.winh[0].b.b1;
@@ -358,7 +378,7 @@ void video_draw_scanline() {
     win1.top = ioreg.winv[1].b.b1;
 
     bool forced_blank = (ioreg.dispcnt.w & DCNT_BLANK);
-    draw_blank(ioreg.vcount.w, forced_blank);
+    draw_backdrop(ioreg.vcount.w, forced_blank);
     if (forced_blank) return;
 
     int mode = BITS(ioreg.dispcnt.w, 0, 2);

@@ -8,7 +8,7 @@
     - [x] 32 and 256 color palettes
   - [x] Bitmap modes
     - [x] Page flipping
-    - [ ] Affine transformation
+    - [x] Affine transformation (e.g. Advance Wars, Ecks vs. Sever)
   - [x] Tiled and affine backgrounds
     - [ ] Layer toggle delay
   - [x] Regular and affine sprites
