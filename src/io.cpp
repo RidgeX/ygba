@@ -8,6 +8,7 @@
 #include <fmt/core.h>
 
 #include "audio.h"
+#include "dma.h"
 #include "main.h"
 #include "video.h"
 
@@ -454,8 +455,8 @@ static void io_write_byte_discrete(uint32_t address, uint8_t value) {
             old_value = ioreg.dma[0].cnt.b.b3;
             ioreg.dma[0].cnt.b.b3 = value & 0xf7;
             if (!(old_value & 0x80) && (value & 0x80)) {
-                gba_dma_reset(0);
-                gba_dma_update(DMA_NOW);
+                dma_reset(0);
+                dma_update(DMA_NOW);
             }
             break;
         case REG_DMA1SAD_L + 0: ioreg.dma[1].sad.b.b0 = value; break;
@@ -473,8 +474,8 @@ static void io_write_byte_discrete(uint32_t address, uint8_t value) {
             old_value = ioreg.dma[1].cnt.b.b3;
             ioreg.dma[1].cnt.b.b3 = value & 0xf7;
             if (!(old_value & 0x80) && (value & 0x80)) {
-                gba_dma_reset(1);
-                gba_dma_update(DMA_NOW);
+                dma_reset(1);
+                dma_update(DMA_NOW);
             }
             break;
         case REG_DMA2SAD_L + 0: ioreg.dma[2].sad.b.b0 = value; break;
@@ -492,8 +493,8 @@ static void io_write_byte_discrete(uint32_t address, uint8_t value) {
             old_value = ioreg.dma[2].cnt.b.b3;
             ioreg.dma[2].cnt.b.b3 = value & 0xf7;
             if (!(old_value & 0x80) && (value & 0x80)) {
-                gba_dma_reset(2);
-                gba_dma_update(DMA_NOW);
+                dma_reset(2);
+                dma_update(DMA_NOW);
             }
             break;
         case REG_DMA3SAD_L + 0: ioreg.dma[3].sad.b.b0 = value; break;
@@ -511,8 +512,8 @@ static void io_write_byte_discrete(uint32_t address, uint8_t value) {
             old_value = ioreg.dma[3].cnt.b.b3;
             ioreg.dma[3].cnt.b.b3 = value;
             if (!(old_value & 0x80) && (value & 0x80)) {
-                gba_dma_reset(3);
-                gba_dma_update(DMA_NOW);
+                dma_reset(3);
+                dma_update(DMA_NOW);
             }
             break;
 

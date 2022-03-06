@@ -8,6 +8,7 @@
 #include <cmath>
 
 #include "cpu.h"
+#include "dma.h"
 #include "io.h"
 #include "main.h"
 #include "memory.h"
@@ -432,7 +433,7 @@ void video_update() {
         } else if (ioreg.vcount.w == SCREEN_HEIGHT) {
             if (!(ioreg.dispstat.w & DSTAT_IN_VBL)) {
                 ioreg.dispstat.w |= DSTAT_IN_VBL;
-                gba_dma_update(DMA_AT_VBLANK);
+                dma_update(DMA_AT_VBLANK);
             }
         } else if (ioreg.vcount.w == 0) {
             video_bg_affine_reset(0);
@@ -459,7 +460,7 @@ void video_update() {
                 ioreg.irq.w |= INT_HBLANK;
             }
             if (ioreg.vcount.w < SCREEN_HEIGHT) {
-                gba_dma_update(DMA_AT_HBLANK);
+                dma_update(DMA_AT_HBLANK);
             }
         }
     }
