@@ -10,8 +10,8 @@
 #include "cpu.h"
 #include "dma.h"
 #include "io.h"
-#include "main.h"
 #include "memory.h"
+#include "system.h"
 
 uint32_t video_cycles;
 

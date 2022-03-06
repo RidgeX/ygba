@@ -3,6 +3,11 @@
 
 #pragma once
 
+#include <stdint.h>
+#include <string>
+
+#include <SDL.h>
+
 #define INT_VBLANK (1 << 0)
 #define INT_HBLANK (1 << 1)
 #define INT_VCOUNT (1 << 2)
@@ -17,3 +22,16 @@
 #define INT_DMA3   (1 << 11)
 #define INT_BUTTON (1 << 12)
 #define INT_CART   (1 << 13)
+
+extern SDL_GameController *game_controller;
+
+extern bool skip_bios;
+extern bool single_step;
+extern std::string save_path;
+
+void system_reset(bool keep_save_data);
+void system_read_bios_file();
+void system_write_save_file();
+void system_load_rom(const std::string &rom_path);
+void system_process_input();
+void system_emulate();

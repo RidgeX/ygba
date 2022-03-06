@@ -10,8 +10,8 @@
 #include "audio.h"
 #include "cpu.h"
 #include "dma.h"
-#include "main.h"
 #include "memory.h"
+#include "system.h"
 #include "timer.h"
 #include "video.h"
 

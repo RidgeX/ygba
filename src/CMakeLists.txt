@@ -14,9 +14,10 @@ add_executable(ygba WIN32
     io.cpp
     io.h
     main.cpp
-    main.h
     memory.cpp
     memory.h
+    system.cpp
+    system.h
     timer.cpp
     timer.h
     video.cpp

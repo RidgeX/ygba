@@ -12,7 +12,7 @@
 #include "dma.h"
 #include "gpio.h"
 #include "io.h"
-#include "main.h"
+#include "system.h"
 #include "video.h"
 
 //#define LOG_BAD_MEMORY_ACCESS
