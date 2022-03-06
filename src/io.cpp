@@ -10,6 +10,7 @@
 #include "audio.h"
 #include "dma.h"
 #include "main.h"
+#include "timer.h"
 #include "video.h"
 
 //#define LOG_BAD_MEMORY_ACCESS
@@ -523,7 +524,7 @@ static void io_write_byte_discrete(uint32_t address, uint8_t value) {
             old_value = ioreg.timer[0].control.b.b0;
             ioreg.timer[0].control.b.b0 = value & 0xc7;
             if (!(old_value & 0x80) && (value & 0x80)) {
-                gba_timer_reset(0);
+                timer_reset(0);
             }
             break;
         case REG_TM0CNT_H + 1:
@@ -534,7 +535,7 @@ static void io_write_byte_discrete(uint32_t address, uint8_t value) {
             old_value = ioreg.timer[1].control.b.b0;
             ioreg.timer[1].control.b.b0 = value & 0xc7;
             if (!(old_value & 0x80) && (value & 0x80)) {
-                gba_timer_reset(1);
+                timer_reset(1);
             }
             break;
         case REG_TM1CNT_H + 1:
@@ -545,7 +546,7 @@ static void io_write_byte_discrete(uint32_t address, uint8_t value) {
             old_value = ioreg.timer[2].control.b.b0;
             ioreg.timer[2].control.b.b0 = value & 0xc7;
             if (!(old_value & 0x80) && (value & 0x80)) {
-                gba_timer_reset(2);
+                timer_reset(2);
             }
             break;
         case REG_TM2CNT_H + 1:
@@ -556,7 +557,7 @@ static void io_write_byte_discrete(uint32_t address, uint8_t value) {
             old_value = ioreg.timer[3].control.b.b0;
             ioreg.timer[3].control.b.b0 = value & 0xc7;
             if (!(old_value & 0x80) && (value & 0x80)) {
-                gba_timer_reset(3);
+                timer_reset(3);
             }
             break;
         case REG_TM3CNT_H + 1:

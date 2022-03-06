@@ -20,17 +20,7 @@
 #define INT_BUTTON   (1 << 12)
 #define INT_CART     (1 << 13)
 
-#define TM_FREQ_1    0
-#define TM_FREQ_64   1
-#define TM_FREQ_256  2
-#define TM_FREQ_1024 3
-#define TM_CASCADE   (1 << 2)
-#define TM_IRQ       (1 << 6)
-#define TM_ENABLE    (1 << 7)
-#define TM_FREQ_MASK 3
-
 extern bool halted;
 
 void gba_check_keypad_interrupt();
-void gba_timer_reset(int i);
 uint32_t gba_open_bus();
