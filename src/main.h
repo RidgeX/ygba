@@ -5,13 +5,6 @@
 
 #include <stdint.h>
 
-#define DSTAT_IN_VBL   (1 << 0)
-#define DSTAT_IN_HBL   (1 << 1)
-#define DSTAT_IN_VCT   (1 << 2)
-#define DSTAT_VBL_IRQ  (1 << 3)
-#define DSTAT_HBL_IRQ  (1 << 4)
-#define DSTAT_VCT_IRQ  (1 << 5)
-
 #define DMA_INC        0
 #define DMA_DEC        1
 #define DMA_FIXED      2
@@ -25,15 +18,6 @@
 #define DMA_AT_REFRESH 3
 #define DMA_IRQ        (1 << 30)
 #define DMA_ENABLE     (1 << 31)
-
-#define TM_FREQ_1      0
-#define TM_FREQ_64     1
-#define TM_FREQ_256    2
-#define TM_FREQ_1024   3
-#define TM_CASCADE     (1 << 2)
-#define TM_IRQ         (1 << 6)
-#define TM_ENABLE      (1 << 7)
-#define TM_FREQ_MASK   3
 
 #define INT_VBLANK     (1 << 0)
 #define INT_HBLANK     (1 << 1)
@@ -49,6 +33,15 @@
 #define INT_DMA3       (1 << 11)
 #define INT_BUTTON     (1 << 12)
 #define INT_CART       (1 << 13)
+
+#define TM_FREQ_1      0
+#define TM_FREQ_64     1
+#define TM_FREQ_256    2
+#define TM_FREQ_1024   3
+#define TM_CASCADE     (1 << 2)
+#define TM_IRQ         (1 << 6)
+#define TM_ENABLE      (1 << 7)
+#define TM_FREQ_MASK   3
 
 extern bool halted;
 extern int active_dma;

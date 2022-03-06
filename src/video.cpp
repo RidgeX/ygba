@@ -9,21 +9,24 @@
 
 #include "cpu.h"
 #include "io.h"
+#include "main.h"
 #include "memory.h"
+
+uint32_t video_cycles;
 
 uint32_t screen_texture;
 uint32_t screen_pixels[SCREEN_HEIGHT][SCREEN_WIDTH];
 
-typedef struct {
+struct Window {
     int left;
     int top;
     int right;
     int bottom;
-} lcd_window;
+};
 
-lcd_window win0, win1;
+Window win0, win1;
 
-static bool is_point_in_window(int x, int y, lcd_window win) {
+static bool is_point_in_window(int x, int y, Window win) {
     bool x_ok = false;
     bool y_ok = false;
 
@@ -367,7 +370,7 @@ static void draw_bitmap(int mode, int y) {
     }
 }
 
-void video_draw_scanline() {
+static void video_draw_scanline() {
     win0.right = ioreg.winh[0].b.b0;
     win0.left = ioreg.winh[0].b.b1;
     win0.bottom = ioreg.winv[0].b.b0;
@@ -403,14 +406,61 @@ void video_draw_scanline() {
     }
 }
 
-void video_affine_reset(int i) {
+void video_bg_affine_reset(int i) {
     ioreg.bg_affine[i].x = fixed20p8_to_double(ioreg.bg_affine[i].x0.dw);
     ioreg.bg_affine[i].y = fixed20p8_to_double(ioreg.bg_affine[i].y0.dw);
 }
 
-void video_affine_update() {
+static void video_bg_affine_update() {
     for (int i = 0; i < 2; i++) {
         ioreg.bg_affine[i].x += fixed8p8_to_double(ioreg.bg_affine[i].pb.w);
         ioreg.bg_affine[i].y += fixed8p8_to_double(ioreg.bg_affine[i].pd.w);
+    }
+}
+
+void video_update() {
+    video_cycles = (video_cycles + 1) % CYCLES_FRAME;
+    if (video_cycles % CYCLES_SCANLINE == 0) {
+        ioreg.dispstat.w &= ~DSTAT_IN_HBL;
+        ioreg.vcount.w = (ioreg.vcount.w + 1) % NUM_SCANLINES;
+        if (ioreg.vcount.w == NUM_SCANLINES - 1) {
+            ioreg.dispstat.w &= ~DSTAT_IN_VBL;
+        } else if (ioreg.vcount.w == SCREEN_HEIGHT + 1) {  // FIXME Implement proper IRQ delay
+            if (ioreg.dispstat.w & DSTAT_VBL_IRQ) {
+                ioreg.irq.w |= INT_VBLANK;
+            }
+        } else if (ioreg.vcount.w == SCREEN_HEIGHT) {
+            if (!(ioreg.dispstat.w & DSTAT_IN_VBL)) {
+                ioreg.dispstat.w |= DSTAT_IN_VBL;
+                gba_dma_update(DMA_AT_VBLANK);
+            }
+        } else if (ioreg.vcount.w == 0) {
+            video_bg_affine_reset(0);
+            video_bg_affine_reset(1);
+        }
+        if (ioreg.vcount.w == ioreg.dispstat.b.b1) {
+            if (!(ioreg.dispstat.w & DSTAT_IN_VCT)) {
+                ioreg.dispstat.w |= DSTAT_IN_VCT;
+                if (ioreg.dispstat.w & DSTAT_VCT_IRQ) {
+                    ioreg.irq.w |= INT_VCOUNT;
+                }
+            }
+        } else {
+            ioreg.dispstat.w &= ~DSTAT_IN_VCT;
+        }
+    } else if (video_cycles % CYCLES_SCANLINE == CYCLES_HDRAW) {
+        if (ioreg.vcount.w < SCREEN_HEIGHT) {
+            video_draw_scanline();
+            video_bg_affine_update();
+        }
+        if (!(ioreg.dispstat.w & DSTAT_IN_HBL)) {
+            ioreg.dispstat.w |= DSTAT_IN_HBL;
+            if (ioreg.dispstat.w & DSTAT_HBL_IRQ) {
+                ioreg.irq.w |= INT_HBLANK;
+            }
+            if (ioreg.vcount.w < SCREEN_HEIGHT) {
+                gba_dma_update(DMA_AT_HBLANK);
+            }
+        }
     }
 }

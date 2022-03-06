@@ -253,35 +253,35 @@ static void io_write_byte_discrete(uint32_t address, uint8_t value) {
         case REG_BG2PD + 1: ioreg.bg_affine[0].pd.b.b1 = value; break;
         case REG_BG2X_L + 0:
             ioreg.bg_affine[0].x0.b.b0 = value;
-            video_affine_reset(0);
+            video_bg_affine_reset(0);
             break;
         case REG_BG2X_L + 1:
             ioreg.bg_affine[0].x0.b.b1 = value;
-            video_affine_reset(0);
+            video_bg_affine_reset(0);
             break;
         case REG_BG2X_H + 0:
             ioreg.bg_affine[0].x0.b.b2 = value;
-            video_affine_reset(0);
+            video_bg_affine_reset(0);
             break;
         case REG_BG2X_H + 1:
             ioreg.bg_affine[0].x0.b.b3 = value & 0x0f;
-            video_affine_reset(0);
+            video_bg_affine_reset(0);
             break;
         case REG_BG2Y_L + 0:
             ioreg.bg_affine[0].y0.b.b0 = value;
-            video_affine_reset(0);
+            video_bg_affine_reset(0);
             break;
         case REG_BG2Y_L + 1:
             ioreg.bg_affine[0].y0.b.b1 = value;
-            video_affine_reset(0);
+            video_bg_affine_reset(0);
             break;
         case REG_BG2Y_H + 0:
             ioreg.bg_affine[0].y0.b.b2 = value;
-            video_affine_reset(0);
+            video_bg_affine_reset(0);
             break;
         case REG_BG2Y_H + 1:
             ioreg.bg_affine[0].y0.b.b3 = value & 0x0f;
-            video_affine_reset(0);
+            video_bg_affine_reset(0);
             break;
         case REG_BG3PA + 0: ioreg.bg_affine[1].pa.b.b0 = value; break;
         case REG_BG3PA + 1: ioreg.bg_affine[1].pa.b.b1 = value; break;
@@ -293,35 +293,35 @@ static void io_write_byte_discrete(uint32_t address, uint8_t value) {
         case REG_BG3PD + 1: ioreg.bg_affine[1].pd.b.b1 = value; break;
         case REG_BG3X_L + 0:
             ioreg.bg_affine[1].x0.b.b0 = value;
-            video_affine_reset(1);
+            video_bg_affine_reset(1);
             break;
         case REG_BG3X_L + 1:
             ioreg.bg_affine[1].x0.b.b1 = value;
-            video_affine_reset(1);
+            video_bg_affine_reset(1);
             break;
         case REG_BG3X_H + 0:
             ioreg.bg_affine[1].x0.b.b2 = value;
-            video_affine_reset(1);
+            video_bg_affine_reset(1);
             break;
         case REG_BG3X_H + 1:
             ioreg.bg_affine[1].x0.b.b3 = value & 0x0f;
-            video_affine_reset(1);
+            video_bg_affine_reset(1);
             break;
         case REG_BG3Y_L + 0:
             ioreg.bg_affine[1].y0.b.b0 = value;
-            video_affine_reset(1);
+            video_bg_affine_reset(1);
             break;
         case REG_BG3Y_L + 1:
             ioreg.bg_affine[1].y0.b.b1 = value;
-            video_affine_reset(1);
+            video_bg_affine_reset(1);
             break;
         case REG_BG3Y_H + 0:
             ioreg.bg_affine[1].y0.b.b2 = value;
-            video_affine_reset(1);
+            video_bg_affine_reset(1);
             break;
         case REG_BG3Y_H + 1:
             ioreg.bg_affine[1].y0.b.b3 = value & 0x0f;
-            video_affine_reset(1);
+            video_bg_affine_reset(1);
             break;
         case REG_WIN0H + 0: ioreg.winh[0].b.b0 = value; break;
         case REG_WIN0H + 1: ioreg.winh[0].b.b1 = value; break;
