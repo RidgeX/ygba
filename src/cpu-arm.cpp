@@ -675,7 +675,6 @@ void arm_multiply_long(uint32_t op) {
     uint32_t Rm = BITS(op, 0, 3);
 
     assert(RdHi != REG_PC && RdLo != REG_PC && Rm != REG_PC && Rs != REG_PC);
-    assert(RdHi != RdLo);
 
     uint64_t m = r[Rm];
     uint64_t s = r[Rs];
@@ -685,12 +684,12 @@ void arm_multiply_long(uint32_t op) {
     }
     uint64_t result = m * s;
     if (A) result += (uint64_t) r[RdLo] | (uint64_t) r[RdHi] << 32;
-    r[RdLo] = (uint32_t) result;
+    r[RdLo] = (uint32_t) result;  // RdLo is written first
     r[RdHi] = (uint32_t) (result >> 32);
 
     if (S) {
-        ASSIGN_N(BIT(r[RdHi], 31));
-        ASSIGN_Z(r[RdHi] == 0 && r[RdLo] == 0);
+        ASSIGN_N(BIT(result, 63));
+        ASSIGN_Z(result == 0);
     }
 }
 
