@@ -9,9 +9,11 @@
 
 #include "backup.h"
 #include "cpu.h"
+#include "dma.h"
 #include "gpio.h"
 #include "io.h"
 #include "main.h"
+#include "video.h"
 
 //#define LOG_BAD_MEMORY_ACCESS
 
@@ -26,9 +28,14 @@ uint8_t game_rom[0x2000000];
 uint32_t game_rom_size;
 uint32_t game_rom_mask;
 
-static bool in_bitmap_mode() {
-    uint16_t mode = ioreg.dispcnt.w & 7;
-    return (mode >= 3 && mode <= 5);
+uint32_t memory_open_bus() {
+    if (dma_active_ch >= 0 || get_pc() - dma_pc == SIZEOF_INSTR) {
+        return ioreg.dma_value.dw;
+    } else if (!FLAG_T()) {
+        return arm_pipeline[1];
+    } else {
+        return thumb_pipeline[1] | thumb_pipeline[1] << 16;
+    }
 }
 
 uint8_t rom_read_byte(uint32_t address) {
@@ -63,7 +70,7 @@ uint8_t memory_read_byte(uint32_t address) {
             return palette_ram[address & 0x3ff];
         case 6:
             address &= 0x1ffff;
-            if (in_bitmap_mode() && address >= 0x18000) return 0;  // No VRAM OBJ mirror in bitmap mode
+            if (video_in_bitmap_mode() && address >= 0x18000) return 0;  // No VRAM OBJ mirror in bitmap mode
             if (address >= 0x18000) address -= 0x8000;
             return video_ram[address];
         case 7:
@@ -84,7 +91,7 @@ uint8_t memory_read_byte(uint32_t address) {
 #ifdef LOG_BAD_MEMORY_ACCESS
     fmt::print("memory_read_byte(0x{:08x});\n", address);
 #endif
-    return (uint8_t) (gba_open_bus() >> 8 * (address & 3));
+    return (uint8_t) (memory_open_bus() >> 8 * (address & 3));
 }
 
 void memory_write_byte(uint32_t address, uint8_t value) {
@@ -107,8 +114,8 @@ void memory_write_byte(uint32_t address, uint8_t value) {
             return;
         case 6:
             address &= 0x1fffe;
-            if (in_bitmap_mode() && address >= 0x18000) return;             // No VRAM OBJ mirror in bitmap mode
-            if (address >= (in_bitmap_mode() ? 0x14000 : 0x10000)) return;  // VRAM OBJ 8-bit write ignored
+            if (video_in_bitmap_mode() && address >= 0x18000) return;             // No VRAM OBJ mirror in bitmap mode
+            if (address >= (video_in_bitmap_mode() ? 0x14000 : 0x10000)) return;  // VRAM OBJ 8-bit write ignored
             *(uint16_t *) &video_ram[address] = value | value << 8;
             return;
         case 7:
@@ -149,7 +156,7 @@ uint16_t memory_read_halfword(uint32_t address) {
             return *(uint16_t *) &palette_ram[address & 0x3fe];
         case 6:
             address &= 0x1fffe;
-            if (in_bitmap_mode() && address >= 0x18000) return 0;  // No VRAM OBJ mirror in bitmap mode
+            if (video_in_bitmap_mode() && address >= 0x18000) return 0;  // No VRAM OBJ mirror in bitmap mode
             if (address >= 0x18000) address -= 0x8000;
             return *(uint16_t *) &video_ram[address];
         case 7:
@@ -176,7 +183,7 @@ uint16_t memory_read_halfword(uint32_t address) {
 #ifdef LOG_BAD_MEMORY_ACCESS
     fmt::print("memory_read_halfword(0x{:08x});\n", address);
 #endif
-    return (uint16_t) (gba_open_bus() >> 8 * (address & 2));
+    return (uint16_t) (memory_open_bus() >> 8 * (address & 2));
 }
 
 void memory_write_halfword(uint32_t address, uint16_t value) {
@@ -199,7 +206,7 @@ void memory_write_halfword(uint32_t address, uint16_t value) {
             return;
         case 6:
             address &= 0x1fffe;
-            if (in_bitmap_mode() && address >= 0x18000) return;  // No VRAM OBJ mirror in bitmap mode
+            if (video_in_bitmap_mode() && address >= 0x18000) return;  // No VRAM OBJ mirror in bitmap mode
             if (address >= 0x18000) address -= 0x8000;
             *(uint16_t *) &video_ram[address] = value;
             return;
@@ -249,7 +256,7 @@ uint32_t memory_read_word(uint32_t address) {
             return *(uint32_t *) &palette_ram[address & 0x3fc];
         case 6:
             address &= 0x1fffc;
-            if (in_bitmap_mode() && address >= 0x18000) return 0;  // No VRAM OBJ mirror in bitmap mode
+            if (video_in_bitmap_mode() && address >= 0x18000) return 0;  // No VRAM OBJ mirror in bitmap mode
             if (address >= 0x18000) address -= 0x8000;
             return *(uint32_t *) &video_ram[address];
         case 7:
@@ -270,7 +277,7 @@ uint32_t memory_read_word(uint32_t address) {
 #ifdef LOG_BAD_MEMORY_ACCESS
     fmt::print("memory_read_word(0x{:08x});\n", address);
 #endif
-    return gba_open_bus();
+    return memory_open_bus();
 }
 
 void memory_write_word(uint32_t address, uint32_t value) {
@@ -293,7 +300,7 @@ void memory_write_word(uint32_t address, uint32_t value) {
             return;
         case 6:
             address &= 0x1fffc;
-            if (in_bitmap_mode() && address >= 0x18000) return;  // No VRAM OBJ mirror in bitmap mode
+            if (video_in_bitmap_mode() && address >= 0x18000) return;  // No VRAM OBJ mirror in bitmap mode
             if (address >= 0x18000) address -= 0x8000;
             *(uint32_t *) &video_ram[address] = value;
             return;

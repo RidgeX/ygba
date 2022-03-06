@@ -43,5 +43,6 @@ extern uint32_t screen_pixels[SCREEN_HEIGHT][SCREEN_WIDTH];
 #define DSTAT_HBL_IRQ (1 << 4)
 #define DSTAT_VCT_IRQ (1 << 5)
 
+bool video_in_bitmap_mode();
 void video_bg_affine_reset(int i);
 void video_update();

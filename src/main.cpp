@@ -38,40 +38,14 @@
 #include "timer.h"
 #include "video.h"
 
+SDL_GameController *game_controller;
 bool single_step;
-bool halted;
 bool skip_bios;
 std::string save_path;
 uint32_t idle_loop_address;
 uint16_t idle_loop_last_irq;
 
-void gba_check_keypad_interrupt() {
-    if (BIT(ioreg.keycnt.w, 14)) {
-        uint16_t held = ~ioreg.keyinput.w & 0x3ff;
-        uint16_t mask = ioreg.keycnt.w & 0x3ff;
-        if (BIT(ioreg.keycnt.w, 15)) {
-            if ((held & mask) == mask) {  // All keys held
-                ioreg.irq.w |= INT_BUTTON;
-            }
-        } else {
-            if (held & mask) {  // Any key held
-                ioreg.irq.w |= INT_BUTTON;
-            }
-        }
-    }
-}
-
-uint32_t gba_open_bus() {
-    if (dma_active_ch >= 0 || get_pc() - dma_pc == SIZEOF_INSTR) {
-        return ioreg.dma_value.dw;
-    } else if (!FLAG_T()) {
-        return arm_pipeline[1];
-    } else {
-        return thumb_pipeline[1] | thumb_pipeline[1] << 16;
-    }
-}
-
-static bool game_rom_contains(const std::string &s) {
+static bool rom_contains_string(const std::string &s) {
     const uint8_t *text_begin = game_rom;
     const uint8_t *text_end = text_begin + game_rom_size;
     const uint8_t *pattern_begin = (const uint8_t *) s.c_str();
@@ -94,30 +68,30 @@ const std::map<std::tuple<std::string, std::string, uint8_t>, uint32_t> idle_loo
     {{"POKEMON LEAF", "BPGE", 1}, 0x80008be},  // Pokemon - LeafGreen Version (USA, Europe) (Rev 1)
 };
 
-static void gba_detect_cartridge_features() {
+static void system_detect_cartridge_features() {
     has_eeprom = false;
     has_flash = false;
     has_sram = false;
     has_rtc = false;
     idle_loop_address = 0;
 
-    if (game_rom_contains("EEPROM_V")) {
+    if (rom_contains_string("EEPROM_V")) {
         has_eeprom = true;
     }
-    if (game_rom_contains("FLASH_V") || game_rom_contains("FLASH512_V")) {
+    if (rom_contains_string("FLASH_V") || rom_contains_string("FLASH512_V")) {
         has_flash = true;
         flash_manufacturer = MANUFACTURER_PANASONIC;
         flash_device = DEVICE_MN63F805MNP;
     }
-    if (game_rom_contains("FLASH1M_V")) {
+    if (rom_contains_string("FLASH1M_V")) {
         has_flash = true;
         flash_manufacturer = MANUFACTURER_SANYO;
         flash_device = DEVICE_LE26FV10N1TS;
     }
-    if (game_rom_contains("SRAM_V") || game_rom_contains("SRAM_F_V")) {
+    if (rom_contains_string("SRAM_V") || rom_contains_string("SRAM_F_V")) {
         has_sram = true;
     }
-    if (game_rom_contains("SIIRTC_V")) {
+    if (rom_contains_string("SIIRTC_V")) {
         has_rtc = true;
     }
 
@@ -142,7 +116,7 @@ static void gba_detect_cartridge_features() {
     }
 }
 
-static void gba_reset(bool keep_backup) {
+static void system_reset(bool keep_backup) {
     std::memset(cpu_ewram, 0, sizeof(cpu_ewram));
     std::memset(cpu_iwram, 0, sizeof(cpu_iwram));
     std::memset(&ioreg, 0, sizeof(ioreg));
@@ -176,7 +150,7 @@ static void gba_reset(bool keep_backup) {
     }
 }
 
-static void read_save_file() {
+static void system_read_save_file() {
     SDL_RWops *rw = SDL_RWFromFile(save_path.c_str(), "rb");
     if (rw == nullptr) return;
 
@@ -191,7 +165,7 @@ static void read_save_file() {
     SDL_RWclose(rw);
 }
 
-static void write_save_file() {
+static void system_write_save_file() {
     if (!has_eeprom && !has_flash && !has_sram) return;
 
     SDL_RWops *rw = SDL_RWFromFile(save_path.c_str(), "wb");
@@ -208,7 +182,7 @@ static void write_save_file() {
     SDL_RWclose(rw);
 }
 
-static void read_bios_file() {
+static void system_read_bios_file() {
     SDL_RWops *rw = SDL_RWFromFile("gba_bios.bin", "rb");
     if (rw == nullptr) {
         SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Missing BIOS file", "Failed to open BIOS file 'gba_bios.bin'.", nullptr);
@@ -220,7 +194,7 @@ static void read_bios_file() {
     SDL_RWclose(rw);
 }
 
-static void read_rom_file(const std::string &rom_path) {
+static void system_read_rom_file(const std::string &rom_path) {
     std::memset(game_rom, 0, sizeof(game_rom));
 
     SDL_RWops *rw = SDL_RWFromFile(rom_path.c_str(), "rb");
@@ -238,24 +212,60 @@ static void read_rom_file(const std::string &rom_path) {
     SDL_RWclose(rw);
 }
 
-static void gba_load(const std::string &rom_path) {
+static void system_load_rom(const std::string &rom_path) {
     const std::string rom_ext{".gba"};
     if (!rom_path.ends_with(rom_ext)) return;
 
     if (!save_path.empty()) {
-        write_save_file();
+        system_write_save_file();
     }
     save_path = rom_path;
     std::string::size_type n = save_path.rfind(rom_ext);
     save_path.replace(n, rom_ext.length(), ".sav");
 
-    gba_reset(false);
-    read_rom_file(rom_path);
-    gba_detect_cartridge_features();
-    read_save_file();
+    system_reset(false);
+    system_read_rom_file(rom_path);
+    system_detect_cartridge_features();
+    system_read_save_file();
 }
 
-static void gba_emulate() {
+static void system_process_input() {
+    const Uint8 *key_state = SDL_GetKeyboardState(nullptr);
+    static bool keys[10];
+    std::memset(keys, 0, sizeof(keys));
+    keys[0] |= (bool) key_state[SDL_SCANCODE_X];          // Button A
+    keys[1] |= (bool) key_state[SDL_SCANCODE_Z];          // Button B
+    keys[2] |= (bool) key_state[SDL_SCANCODE_BACKSPACE];  // Select
+    keys[3] |= (bool) key_state[SDL_SCANCODE_RETURN];     // Start
+    keys[4] |= (bool) key_state[SDL_SCANCODE_RIGHT];      // Right
+    keys[5] |= (bool) key_state[SDL_SCANCODE_LEFT];       // Left
+    keys[6] |= (bool) key_state[SDL_SCANCODE_UP];         // Up
+    keys[7] |= (bool) key_state[SDL_SCANCODE_DOWN];       // Down
+    keys[8] |= (bool) key_state[SDL_SCANCODE_S];          // Button R
+    keys[9] |= (bool) key_state[SDL_SCANCODE_A];          // Button L
+    if (game_controller != nullptr) {
+        keys[0] |= (bool) SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_A);              // Button A
+        keys[1] |= (bool) SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_B);              // Button B
+        keys[2] |= (bool) SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_BACK);           // Select
+        keys[3] |= (bool) SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_START);          // Start
+        keys[4] |= (bool) SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_DPAD_RIGHT);     // Right
+        keys[5] |= (bool) SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_DPAD_LEFT);      // Left
+        keys[6] |= (bool) SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_DPAD_UP);        // Up
+        keys[7] |= (bool) SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_DPAD_DOWN);      // Down
+        keys[8] |= (bool) SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER);  // Button R
+        keys[9] |= (bool) SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_LEFTSHOULDER);   // Button L
+    }
+    if (keys[4] && keys[5]) keys[4] = keys[5] = false;  // Disallow opposing directions
+    if (keys[6] && keys[7]) keys[6] = keys[7] = false;
+    ioreg.keyinput.w = 0x3ff;
+    for (int i = 0; i < 10; i++) {
+        if (keys[i]) {
+            ioreg.keyinput.w &= ~(1 << i);
+        }
+    }
+}
+
+static void system_emulate() {
     while (true) {
         if (FLAG_T()) {
             if (branch_taken) thumb_fill_pipeline();
@@ -293,13 +303,13 @@ int main(int argc, char *argv[]) {
     arm_init_lookup();
     thumb_init_lookup();
 
-    read_bios_file();
-    gba_reset(false);
+    system_read_bios_file();
+    system_reset(false);
 
     if (argc == 2) {
         skip_bios = true;
         const std::string rom_path(argv[1]);
-        gba_load(rom_path);
+        system_load_rom(rom_path);
     }
 
     // Setup SDL
@@ -356,7 +366,7 @@ int main(int argc, char *argv[]) {
 
     // Initialize gamepad
     SDL_GameControllerAddMappingsFromFile("gamecontrollerdb.txt");
-    SDL_GameController *game_controller = nullptr;
+    game_controller = nullptr;
     for (int i = 0; i < SDL_NumJoysticks(); i++) {
         if (SDL_IsGameController(i)) {
             game_controller = SDL_GameControllerOpen(i);
@@ -424,7 +434,7 @@ int main(int argc, char *argv[]) {
             } else if (event.type == SDL_DROPFILE) {
                 char *dropped_file = event.drop.file;
                 const std::string rom_path(dropped_file);
-                gba_load(rom_path);
+                system_load_rom(rom_path);
                 SDL_free(dropped_file);
             }
         }
@@ -465,45 +475,11 @@ int main(int argc, char *argv[]) {
             ImGui::End();
         }
 
-        // Input
-        const Uint8 *key_state = SDL_GetKeyboardState(nullptr);
-        done |= (bool) key_state[SDL_SCANCODE_ESCAPE];
-        static bool keys[10];
-        std::memset(keys, 0, sizeof(keys));
-        keys[0] |= (bool) key_state[SDL_SCANCODE_X];          // Button A
-        keys[1] |= (bool) key_state[SDL_SCANCODE_Z];          // Button B
-        keys[2] |= (bool) key_state[SDL_SCANCODE_BACKSPACE];  // Select
-        keys[3] |= (bool) key_state[SDL_SCANCODE_RETURN];     // Start
-        keys[4] |= (bool) key_state[SDL_SCANCODE_RIGHT];      // Right
-        keys[5] |= (bool) key_state[SDL_SCANCODE_LEFT];       // Left
-        keys[6] |= (bool) key_state[SDL_SCANCODE_UP];         // Up
-        keys[7] |= (bool) key_state[SDL_SCANCODE_DOWN];       // Down
-        keys[8] |= (bool) key_state[SDL_SCANCODE_S];          // Button R
-        keys[9] |= (bool) key_state[SDL_SCANCODE_A];          // Button L
-        if (game_controller != nullptr) {
-            keys[0] |= (bool) SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_A);              // Button A
-            keys[1] |= (bool) SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_B);              // Button B
-            keys[2] |= (bool) SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_BACK);           // Select
-            keys[3] |= (bool) SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_START);          // Start
-            keys[4] |= (bool) SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_DPAD_RIGHT);     // Right
-            keys[5] |= (bool) SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_DPAD_LEFT);      // Left
-            keys[6] |= (bool) SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_DPAD_UP);        // Up
-            keys[7] |= (bool) SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_DPAD_DOWN);      // Down
-            keys[8] |= (bool) SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER);  // Button R
-            keys[9] |= (bool) SDL_GameControllerGetButton(game_controller, SDL_CONTROLLER_BUTTON_LEFTSHOULDER);   // Button L
-        }
-        if (keys[4] && keys[5]) keys[4] = keys[5] = false;  // Disallow opposing directions
-        if (keys[6] && keys[7]) keys[6] = keys[7] = false;
-        ioreg.keyinput.w = 0x3ff;
-        for (int i = 0; i < 10; i++) {
-            if (keys[i]) {
-                ioreg.keyinput.w &= ~(1 << i);
-            }
-        }
+        system_process_input();
 
         static bool paused = false;
         if (!paused) {
-            gba_emulate();
+            system_emulate();
             if (single_step) paused = true;
         }
 
@@ -623,10 +599,10 @@ int main(int argc, char *argv[]) {
         ImGui::Text("%s", fmt::format("fifo_b_w: {}", ioreg.fifo_b_w).c_str());
 
         if (ImGui::Button("Reset")) {
-            gba_reset(true);
+            system_reset(true);
         }
         if (ImGui::Button("Manual save")) {
-            write_save_file();
+            system_write_save_file();
         }
         ImGui::End();
 
@@ -640,7 +616,7 @@ int main(int argc, char *argv[]) {
     }
 
     if (!save_path.empty()) {
-        write_save_file();
+        system_write_save_file();
     }
 
     // Cleanup

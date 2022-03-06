@@ -16,6 +16,8 @@ extern uint8_t game_rom[0x2000000];
 extern uint32_t game_rom_size;
 extern uint32_t game_rom_mask;
 
+uint32_t memory_open_bus();
+
 uint8_t rom_read_byte(uint32_t address);
 uint16_t rom_read_halfword(uint32_t address);
 uint32_t rom_read_word(uint32_t address);

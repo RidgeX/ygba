@@ -122,6 +122,8 @@ typedef struct {
 
 extern io_registers ioreg;
 
+extern bool halted;
+
 // LCD I/O Registers
 #define REG_DISPCNT     0
 #define REG_DISPSTAT    4

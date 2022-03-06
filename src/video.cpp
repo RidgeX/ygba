@@ -54,6 +54,11 @@ static double fixed20p8_to_double(int32_t x) {
     return (x >> 8) + ((x & 0xff) / 256.0);
 }
 
+bool video_in_bitmap_mode() {
+    uint16_t mode = ioreg.dispcnt.w & 7;
+    return (mode >= 3 && mode <= 5);
+}
+
 static uint32_t rgb555(uint32_t pixel) {
     uint32_t red = pixel & 0x1f;
     uint32_t green = (pixel >> 5) & 0x1f;

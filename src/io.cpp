@@ -8,15 +8,35 @@
 #include <fmt/core.h>
 
 #include "audio.h"
+#include "cpu.h"
 #include "dma.h"
 #include "main.h"
+#include "memory.h"
 #include "timer.h"
 #include "video.h"
 
 //#define LOG_BAD_MEMORY_ACCESS
 
 io_registers ioreg;
-bool sound_powered = false;
+
+bool halted;
+bool sound_powered;
+
+static void check_keypad_interrupt() {
+    if (BIT(ioreg.keycnt.w, 14)) {
+        uint16_t held = ~ioreg.keyinput.w & 0x3ff;
+        uint16_t mask = ioreg.keycnt.w & 0x3ff;
+        if (BIT(ioreg.keycnt.w, 15)) {
+            if ((held & mask) == mask) {  // All keys held
+                ioreg.irq.w |= INT_BUTTON;
+            }
+        } else {
+            if (held & mask) {  // Any key held
+                ioreg.irq.w |= INT_BUTTON;
+            }
+        }
+    }
+}
 
 static void set_sound_powered(bool flag) {
     sound_powered = flag;
@@ -210,7 +230,7 @@ static uint8_t io_read_byte_discrete(uint32_t address) {
             break;
     }
 
-    return (uint8_t) (gba_open_bus() >> 8 * (address & 3));
+    return (uint8_t) (memory_open_bus() >> 8 * (address & 3));
 }
 
 static void io_write_byte_discrete(uint32_t address, uint8_t value) {
@@ -620,8 +640,8 @@ static void io_write_byte_discrete(uint32_t address, uint8_t value) {
 
 uint8_t io_read_byte(uint32_t address) {
     switch (address) {
-        case REG_KEYINPUT + 0: gba_check_keypad_interrupt(); return ioreg.keyinput.b.b0;
-        case REG_KEYINPUT + 1: gba_check_keypad_interrupt(); return ioreg.keyinput.b.b1;
+        case REG_KEYINPUT + 0: check_keypad_interrupt(); return ioreg.keyinput.b.b0;
+        case REG_KEYINPUT + 1: check_keypad_interrupt(); return ioreg.keyinput.b.b1;
         case REG_KEYCNT + 0: return ioreg.keycnt.b.b0;
         case REG_KEYCNT + 1: return ioreg.keycnt.b.b1;
 
@@ -643,11 +663,11 @@ void io_write_byte(uint32_t address, uint8_t value) {
 
         case REG_KEYCNT + 0:
             ioreg.keycnt.b.b0 = value;
-            gba_check_keypad_interrupt();
+            check_keypad_interrupt();
             break;
         case REG_KEYCNT + 1:
             ioreg.keycnt.b.b1 = value & 0xc3;
-            gba_check_keypad_interrupt();
+            check_keypad_interrupt();
             break;
 
         default:
@@ -658,7 +678,7 @@ void io_write_byte(uint32_t address, uint8_t value) {
 
 uint16_t io_read_halfword(uint32_t address) {
     switch (address) {
-        case REG_KEYINPUT: gba_check_keypad_interrupt(); return ioreg.keyinput.w;
+        case REG_KEYINPUT: check_keypad_interrupt(); return ioreg.keyinput.w;
         case REG_KEYCNT: return ioreg.keycnt.w;
 
         default:
@@ -677,7 +697,7 @@ void io_write_halfword(uint32_t address, uint16_t value) {
 
         case REG_KEYCNT:
             ioreg.keycnt.w = value & 0xc3ff;
-            gba_check_keypad_interrupt();
+            check_keypad_interrupt();
             break;
 
         default:
@@ -689,7 +709,7 @@ void io_write_halfword(uint32_t address, uint16_t value) {
 
 uint32_t io_read_word(uint32_t address) {
     switch (address) {
-        case REG_KEYINPUT: gba_check_keypad_interrupt(); return ioreg.keyinput.w | ioreg.keycnt.w << 16;
+        case REG_KEYINPUT: check_keypad_interrupt(); return ioreg.keyinput.w | ioreg.keycnt.w << 16;
 
         default:
             uint32_t result = io_read_byte_discrete(address);
@@ -707,7 +727,7 @@ void io_write_word(uint32_t address, uint32_t value) {
 
         case REG_KEYINPUT:
             ioreg.keycnt.w = (value >> 16) & 0xc3ff;
-            gba_check_keypad_interrupt();
+            check_keypad_interrupt();
             break;
 
         default:
