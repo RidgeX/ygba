@@ -403,15 +403,27 @@ static void gba_dma_transfer(int ch, uint32_t dst_ctrl, uint32_t src_ctrl, uint3
             }
         }
 
-        if (dst_ctrl == DMA_INC || dst_ctrl == DMA_RELOAD) {
-            dst_addr += size;
-        } else if (dst_ctrl == DMA_DEC) {
-            dst_addr -= size;
+        switch (dst_ctrl) {
+            case DMA_INC:
+            case DMA_RELOAD:
+                dst_addr += size;
+                break;
+            case DMA_DEC:
+                dst_addr -= size;
+                break;
+            case DMA_FIXED:
+                break;
         }
-        if (src_ctrl == DMA_INC) {
-            src_addr += size;
-        } else if (src_ctrl == DMA_DEC) {
-            src_addr -= size;
+        switch (src_ctrl) {
+            case DMA_INC:
+                src_addr += size;
+                break;
+            case DMA_DEC:
+                src_addr -= size;
+                break;
+            case DMA_FIXED:
+            case DMA_RELOAD:
+                break;
         }
     }
 }
@@ -463,7 +475,6 @@ void gba_dma_update(uint32_t current_timing) {
             }
         }
 
-        assert(src_ctrl != DMA_RELOAD);
         assert(!(cnt & DMA_DRQ));
 
         // EEPROM size autodetect
