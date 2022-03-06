@@ -5,8 +5,17 @@
 
 #include <stdint.h>
 
-#define SCREEN_WIDTH  240
-#define SCREEN_HEIGHT 160
+#define SCREEN_WIDTH    240
+#define SCREEN_HEIGHT   160
+
+#define NUM_SCANLINES   (SCREEN_HEIGHT + 68)
+
+#define CYCLES_HDRAW    1006
+#define CYCLES_HBLANK   226
+#define CYCLES_SCANLINE (CYCLES_HDRAW + CYCLES_HBLANK)
+#define CYCLES_VDRAW    (CYCLES_SCANLINE * SCREEN_HEIGHT)
+#define CYCLES_VBLANK   (CYCLES_SCANLINE * 68)
+#define CYCLES_FRAME    (CYCLES_VDRAW + CYCLES_VBLANK)
 
 extern uint32_t screen_texture;
 extern uint32_t screen_pixels[SCREEN_HEIGHT][SCREEN_WIDTH];

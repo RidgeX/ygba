@@ -262,17 +262,17 @@ static void gba_load(const std::string &rom_path) {
 }
 
 static void gba_ppu_update() {
-    ppu_cycles = (ppu_cycles + 1) % 280896;
-    if (ppu_cycles % 1232 == 0) {
+    ppu_cycles = (ppu_cycles + 1) % CYCLES_FRAME;
+    if (ppu_cycles % CYCLES_SCANLINE == 0) {
         ioreg.dispstat.w &= ~DSTAT_IN_HBL;
-        ioreg.vcount.w = (ioreg.vcount.w + 1) % 228;
-        if (ioreg.vcount.w == 227) {
+        ioreg.vcount.w = (ioreg.vcount.w + 1) % NUM_SCANLINES;
+        if (ioreg.vcount.w == NUM_SCANLINES - 1) {
             ioreg.dispstat.w &= ~DSTAT_IN_VBL;
-        } else if (ioreg.vcount.w == 161) {  // FIXME Implement proper IRQ delay
+        } else if (ioreg.vcount.w == SCREEN_HEIGHT + 1) {  // FIXME Implement proper IRQ delay
             if (ioreg.dispstat.w & DSTAT_VBL_IRQ) {
                 ioreg.irq.w |= INT_VBLANK;
             }
-        } else if (ioreg.vcount.w == 160) {
+        } else if (ioreg.vcount.w == SCREEN_HEIGHT) {
             if (!(ioreg.dispstat.w & DSTAT_IN_VBL)) {
                 ioreg.dispstat.w |= DSTAT_IN_VBL;
                 gba_dma_update(DMA_AT_VBLANK);
@@ -291,7 +291,7 @@ static void gba_ppu_update() {
         } else {
             ioreg.dispstat.w &= ~DSTAT_IN_VCT;
         }
-    } else if (ppu_cycles % 1232 == 1006) {
+    } else if (ppu_cycles % CYCLES_SCANLINE == CYCLES_HDRAW) {
         if (ioreg.vcount.w < SCREEN_HEIGHT) {
             video_draw_scanline();
             video_affine_update();
@@ -301,7 +301,7 @@ static void gba_ppu_update() {
             if (ioreg.dispstat.w & DSTAT_HBL_IRQ) {
                 ioreg.irq.w |= INT_HBLANK;
             }
-            if (ppu_cycles < 197120) {
+            if (ioreg.vcount.w < SCREEN_HEIGHT) {
                 gba_dma_update(DMA_AT_HBLANK);
             }
         }
@@ -457,8 +457,6 @@ void gba_dma_update(uint32_t current_timing) {
         if (src_addr >= 0x08000000 && src_addr < 0x0e000000) src_ctrl = DMA_INC;
         bool word_size = (cnt & DMA_32);
 
-        if (start_timing == DMA_AT_VBLANK) assert(ioreg.vcount.w == 160);
-        if (start_timing == DMA_AT_HBLANK) assert(ppu_cycles < 197120 && ppu_cycles % 1232 == 1006);
         if (start_timing == DMA_AT_REFRESH) {
             if (ch == 0) {
                 continue;
