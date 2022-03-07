@@ -43,12 +43,13 @@
       - [ ] Sinc interpolation
       - [ ] Lanczos interpolation
   - [ ] Sound bias register
-- [ ] Timings
+- [x] Timings
   - [ ] Scheduler optimisation
   - [ ] Memory region timings
   - [ ] Wait count register
   - [ ] Instruction timings
-  - [ ] Tick all components during DMA transfer
+  - [ ] Timers are updated during a DMA transfer
+  - [x] Higher priority DMAs can be initiated during a DMA transfer
   - [ ] DMAs delayed by 2 cycles
   - [ ] IRQs delayed by 7 cycles (e.g. Hamtaro - Ham-Ham Heartbreak, Mega Man & Bass)
   - [ ] Cartridge prefetch
