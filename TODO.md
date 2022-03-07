@@ -45,10 +45,10 @@
   - [ ] Sound bias register
 - [x] Timings
   - [ ] Scheduler optimisation
-  - [ ] Memory region timings
+  - [x] Memory region timings
   - [ ] Wait count register
   - [ ] Instruction timings
-  - [ ] Timers are updated during a DMA transfer
+  - [x] Timers are updated during a DMA transfer
   - [x] Higher priority DMAs can be initiated during a DMA transfer
   - [ ] DMAs delayed by 2 cycles
   - [ ] IRQs delayed by 7 cycles (e.g. Hamtaro - Ham-Ham Heartbreak, Mega Man & Bass)

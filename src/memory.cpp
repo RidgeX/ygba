@@ -38,6 +38,66 @@ uint32_t memory_open_bus() {
     }
 }
 
+static uint32_t cycles_byte_or_halfword(uint8_t region) {
+    switch (region) {
+        case 0:
+        case 3:
+        case 4:
+        case 5:
+        case 6:
+        case 7:
+            return 1;  // System ROM, CPU IWRAM, I/O, Palette RAM, Video RAM, Object RAM
+
+        case 8:
+        case 9:
+        case 0xa:
+        case 0xb:
+        case 0xc:
+        case 0xd:
+        case 0xe:
+        case 0xf:
+            return 2;  // Game ROM, Backup SRAM/Flash
+
+        case 2:
+            return 3;  // CPU EWRAM
+
+        default:
+            return 1;  // Unmapped
+    }
+}
+
+static uint32_t cycles_word(uint8_t region) {
+    switch (region) {
+        case 0:
+        case 3:
+        case 4:
+        case 7:
+            return 1;  // System ROM, CPU IWRAM, I/O, Object RAM
+
+        case 5:
+        case 6:
+            return 2;  // Palette RAM, Video RAM
+
+        case 8:
+        case 9:
+        case 0xa:
+        case 0xb:
+        case 0xc:
+        case 0xd:
+            return 4;  // Game ROM
+
+        case 2:
+            return 6;  // CPU EWRAM
+
+        case 0xe:
+        case 0xf:
+            return 8;  // Backup SRAM/Flash
+
+        default:
+            return 1;  // Unmapped
+    }
+}
+
 uint8_t rom_read_byte(uint32_t address) {
     if (address > game_rom_mask) return (uint8_t) ((uint16_t) (address >> 1) >> 8 * (address & 1));
     return game_rom[address & game_rom_mask];
@@ -54,8 +114,8 @@ uint32_t rom_read_word(uint32_t address) {
 }
 
 uint8_t memory_read_byte(uint32_t address, bool peek) {
-    UNUSED(peek);
     uint8_t region = address >> 24;
+    if (!peek) system_tick(cycles_byte_or_halfword(region));
     switch (region) {
         case 0:
             if (address >= 0x4000) break;
@@ -96,8 +156,8 @@ uint8_t memory_read_byte(uint32_t address, bool peek) {
 }
 
 void memory_write_byte(uint32_t address, uint8_t value, bool poke) {
-    UNUSED(poke);
     uint8_t region = address >> 24;
+    if (!poke) system_tick(cycles_byte_or_halfword(region));
     switch (region) {
         case 0:
             if (address >= 0x4000) break;
@@ -142,8 +202,8 @@ void memory_write_byte(uint32_t address, uint8_t value, bool poke) {
 }
 
 uint16_t memory_read_halfword(uint32_t address, bool peek) {
-    UNUSED(peek);
     uint8_t region = address >> 24;
+    if (!peek) system_tick(cycles_byte_or_halfword(region));
     switch (region) {
         case 0:
             if (address >= 0x4000) break;
@@ -190,8 +250,8 @@ uint16_t memory_read_halfword(uint32_t address, bool peek) {
 }
 
 void memory_write_halfword(uint32_t address, uint16_t value, bool poke) {
-    UNUSED(poke);
     uint8_t region = address >> 24;
+    if (!poke) system_tick(cycles_byte_or_halfword(region));
     switch (region) {
         case 0:
             if (address >= 0x4000) break;
@@ -244,8 +304,8 @@ void memory_write_halfword(uint32_t address, uint16_t value, bool poke) {
 }
 
 uint32_t memory_read_word(uint32_t address, bool peek) {
-    UNUSED(peek);
     uint8_t region = address >> 24;
+    if (!peek) system_tick(cycles_word(region));
     switch (region) {
         case 0:
             if (address >= 0x4000) break;
@@ -286,8 +346,8 @@ uint32_t memory_read_word(uint32_t address, bool peek) {
 }
 
 void memory_write_word(uint32_t address, uint32_t value, bool poke) {
-    UNUSED(poke);
     uint8_t region = address >> 24;
+    if (!poke) system_tick(cycles_word(region));
     switch (region) {
         case 0:
             if (address >= 0x4000) break;

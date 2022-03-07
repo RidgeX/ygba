@@ -282,7 +282,7 @@ void system_emulate_frame() {
             }
         }
 
-        system_tick(1);  // FIXME Implement timings
+        if (halted) system_idle();
         if (video_frame_drawn || (single_step && !halted)) break;
     }
 }
