@@ -18,6 +18,7 @@
 #define CYCLES_FRAME    (CYCLES_VDRAW + CYCLES_VBLANK)
 
 extern uint32_t video_cycles;
+extern bool video_frame_drawn;
 
 extern uint32_t screen_texture;
 extern uint32_t screen_pixels[SCREEN_HEIGHT][SCREEN_WIDTH];
@@ -45,4 +46,4 @@ extern uint32_t screen_pixels[SCREEN_HEIGHT][SCREEN_WIDTH];
 
 bool video_in_bitmap_mode();
 void video_bg_affine_reset(int i);
-void video_update();
+void video_update(uint32_t cycles);

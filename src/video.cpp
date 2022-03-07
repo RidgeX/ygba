@@ -14,6 +14,7 @@
 #include "system.h"
 
 uint32_t video_cycles;
+bool video_frame_drawn;
 
 uint32_t screen_texture;
 uint32_t screen_pixels[SCREEN_HEIGHT][SCREEN_WIDTH];
@@ -424,49 +425,56 @@ static void video_bg_affine_update() {
     }
 }
 
-void video_update() {
-    video_cycles = (video_cycles + 1) % CYCLES_FRAME;
-    if (video_cycles % CYCLES_SCANLINE == 0) {
-        ioreg.dispstat.w &= ~DSTAT_IN_HBL;
-        ioreg.vcount.w = (ioreg.vcount.w + 1) % NUM_SCANLINES;
-        if (ioreg.vcount.w == NUM_SCANLINES - 1) {
-            ioreg.dispstat.w &= ~DSTAT_IN_VBL;
-        } else if (ioreg.vcount.w == SCREEN_HEIGHT + 1) {  // FIXME Implement proper IRQ delay
-            if (ioreg.dispstat.w & DSTAT_VBL_IRQ) {
-                ioreg.irq.w |= INT_VBLANK;
-            }
-        } else if (ioreg.vcount.w == SCREEN_HEIGHT) {
-            if (!(ioreg.dispstat.w & DSTAT_IN_VBL)) {
-                ioreg.dispstat.w |= DSTAT_IN_VBL;
-                dma_update(DMA_AT_VBLANK);
-            }
-        } else if (ioreg.vcount.w == 0) {
-            video_bg_affine_reset(0);
-            video_bg_affine_reset(1);
-        }
-        if (ioreg.vcount.w == ioreg.dispstat.b.b1) {
-            if (!(ioreg.dispstat.w & DSTAT_IN_VCT)) {
-                ioreg.dispstat.w |= DSTAT_IN_VCT;
-                if (ioreg.dispstat.w & DSTAT_VCT_IRQ) {
-                    ioreg.irq.w |= INT_VCOUNT;
-                }
-            }
-        } else {
-            ioreg.dispstat.w &= ~DSTAT_IN_VCT;
-        }
-    } else if (video_cycles % CYCLES_SCANLINE == CYCLES_HDRAW) {
+void video_update(uint32_t cycles) {
+    uint32_t last_frame_cycles = video_cycles;
+    video_cycles = (video_cycles + cycles) % CYCLES_FRAME;
+    uint32_t frame_cycles = video_cycles;
+
+    uint32_t last_line_cycles = last_frame_cycles % CYCLES_SCANLINE;
+    uint32_t line_cycles = frame_cycles % CYCLES_SCANLINE;
+
+    if (line_cycles >= CYCLES_HDRAW && last_line_cycles < CYCLES_HDRAW) {
         if (ioreg.vcount.w < SCREEN_HEIGHT) {
             video_draw_scanline();
             video_bg_affine_update();
         }
-        if (!(ioreg.dispstat.w & DSTAT_IN_HBL)) {
-            ioreg.dispstat.w |= DSTAT_IN_HBL;
-            if (ioreg.dispstat.w & DSTAT_HBL_IRQ) {
-                ioreg.irq.w |= INT_HBLANK;
-            }
-            if (ioreg.vcount.w < SCREEN_HEIGHT) {
-                dma_update(DMA_AT_HBLANK);
-            }
+        ioreg.dispstat.w |= DSTAT_IN_HBL;  // Enter HBlank
+        if (ioreg.dispstat.w & DSTAT_HBL_IRQ) {
+            ioreg.irq.w |= INT_HBLANK;
         }
+        if (ioreg.vcount.w < SCREEN_HEIGHT) {
+            dma_update(DMA_AT_HBLANK);
+        }
+    }
+
+    if (line_cycles < last_line_cycles) {
+        ioreg.dispstat.w &= ~DSTAT_IN_HBL;  // Leave HBlank
+        ioreg.vcount.w = (ioreg.vcount.w + 1) % NUM_SCANLINES;
+        if (ioreg.vcount.w == 0) {
+            video_bg_affine_reset(0);
+            video_bg_affine_reset(1);
+        } else if (ioreg.vcount.w == SCREEN_HEIGHT) {
+            ioreg.dispstat.w |= DSTAT_IN_VBL;  // Enter VBlank
+            dma_update(DMA_AT_VBLANK);
+        } else if (ioreg.vcount.w == SCREEN_HEIGHT + 1) {
+            // FIXME Implement proper IRQ delay
+            if (ioreg.dispstat.w & DSTAT_VBL_IRQ) {
+                ioreg.irq.w |= INT_VBLANK;
+            }
+        } else if (ioreg.vcount.w == NUM_SCANLINES - 1) {
+            ioreg.dispstat.w &= ~DSTAT_IN_VBL;  // Leave VBlank
+        }
+        if (ioreg.vcount.w == ioreg.dispstat.b.b1) {
+            ioreg.dispstat.w |= DSTAT_IN_VCT;  // Enter VCount
+            if (ioreg.dispstat.w & DSTAT_VCT_IRQ) {
+                ioreg.irq.w |= INT_VCOUNT;
+            }
+        } else {
+            ioreg.dispstat.w &= ~DSTAT_IN_VCT;  // Leave VCount
+        }
+    }
+
+    if (frame_cycles < last_frame_cycles) {
+        video_frame_drawn = true;
     }
 }

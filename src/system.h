@@ -34,4 +34,9 @@ void system_read_bios_file();
 void system_write_save_file();
 void system_load_rom(const std::string &rom_path);
 void system_process_input();
-void system_emulate();
+void system_emulate_frame();
+void system_tick(uint32_t cycles);
+
+inline void system_idle() {
+    system_tick(1);
+}

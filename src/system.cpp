@@ -253,7 +253,9 @@ void system_process_input() {
     }
 }
 
-void system_emulate() {
+void system_emulate_frame() {
+    video_frame_drawn = false;
+
     while (true) {
         if (FLAG_T()) {
             if (branch_taken) thumb_fill_pipeline();
@@ -280,8 +282,12 @@ void system_emulate() {
             }
         }
 
-        timer_update(1);  // FIXME Implement timings
-        video_update();
-        if (video_cycles == 0 || (single_step && !halted)) break;
+        system_tick(1);  // FIXME Implement timings
+        if (video_frame_drawn || (single_step && !halted)) break;
     }
+}
+
+void system_tick(uint32_t cycles) {
+    timer_update(cycles);
+    video_update(cycles);
 }

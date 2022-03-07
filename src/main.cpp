@@ -209,7 +209,7 @@ int main(int argc, char *argv[]) {
 
         static bool paused = false;
         if (!paused) {
-            system_emulate();
+            system_emulate_frame();
             if (single_step) paused = true;
         }
 
