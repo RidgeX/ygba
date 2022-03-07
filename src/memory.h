@@ -22,9 +22,33 @@ uint8_t rom_read_byte(uint32_t address);
 uint16_t rom_read_halfword(uint32_t address);
 uint32_t rom_read_word(uint32_t address);
 
-uint8_t memory_read_byte(uint32_t address);
-void memory_write_byte(uint32_t address, uint8_t value);
-uint16_t memory_read_halfword(uint32_t address);
-void memory_write_halfword(uint32_t address, uint16_t value);
-uint32_t memory_read_word(uint32_t address);
-void memory_write_word(uint32_t address, uint32_t value);
+uint8_t memory_read_byte(uint32_t address, bool peek = false);
+void memory_write_byte(uint32_t address, uint8_t value, bool poke = false);
+uint16_t memory_read_halfword(uint32_t address, bool peek = false);
+void memory_write_halfword(uint32_t address, uint16_t value, bool poke = false);
+uint32_t memory_read_word(uint32_t address, bool peek = false);
+void memory_write_word(uint32_t address, uint32_t value, bool poke = false);
+
+inline uint8_t memory_peek_byte(uint32_t address) {
+    return memory_read_byte(address, true);
+}
+
+inline void memory_poke_byte(uint32_t address, uint8_t value) {
+    memory_write_byte(address, value, true);
+}
+
+inline uint16_t memory_peek_halfword(uint32_t address) {
+    return memory_read_halfword(address, true);
+}
+
+inline void memory_poke_halfword(uint32_t address, uint16_t value) {
+    memory_write_halfword(address, value, true);
+}
+
+inline uint32_t memory_peek_word(uint32_t address) {
+    return memory_read_word(address, true);
+}
+
+inline void memory_poke_word(uint32_t address, uint32_t value) {
+    memory_write_word(address, value, true);
+}

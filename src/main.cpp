@@ -276,13 +276,13 @@ int main(int argc, char *argv[]) {
                     ImGui::Text("%s", fmt::format("{:08X}", address).c_str());
                     std::string disasm_text;
                     if (FLAG_T()) {
-                        uint16_t op = memory_read_halfword(address);
+                        uint16_t op = memory_peek_halfword(address);
                         ImGui::TableNextColumn();
                         ImGui::Text("%s", fmt::format("{:04X}", op).c_str());
                         ImGui::TableNextColumn();
                         thumb_disasm(address, op, disasm_text);
                     } else {
-                        uint32_t op = memory_read_word(address);
+                        uint32_t op = memory_peek_word(address);
                         ImGui::TableNextColumn();
                         ImGui::Text("%s", fmt::format("{:08X}", op).c_str());
                         ImGui::TableNextColumn();
@@ -297,8 +297,8 @@ int main(int argc, char *argv[]) {
 
         // Memory
         static MemoryEditor mem_edit;
-        mem_edit.ReadFn = [](const uint8_t *data, std::size_t off) { UNUSED(data); return memory_read_byte(off); };
-        mem_edit.WriteFn = [](uint8_t *data, std::size_t off, uint8_t d) { UNUSED(data); memory_write_byte(off, d); };
+        mem_edit.ReadFn = [](const uint8_t *data, std::size_t off) { UNUSED(data); return memory_peek_byte(off); };
+        mem_edit.WriteFn = [](uint8_t *data, std::size_t off, uint8_t d) { UNUSED(data); memory_poke_byte(off, d); };
         if (show_memory_window) {
             ImGui::Begin("Memory", &show_memory_window);
             mem_edit.DrawContents(nullptr, 0x10000000);

@@ -292,7 +292,7 @@ void thumb_load_from_literal_pool_disasm(uint32_t address, uint16_t op, std::str
     print_register(s, Rd);
     s += ", ";
     uint32_t pc_rel_address = (address & ~3) + 4 + (imm << 2);
-    s += fmt::format("=0x{:08X}", memory_read_word(pc_rel_address));
+    s += fmt::format("=0x{:08X}", memory_peek_word(pc_rel_address));
     s += "  @ ";
     s += fmt::format("0x{:08X}", pc_rel_address);
 }
@@ -679,15 +679,15 @@ void thumb_branch_with_link_prefix(uint16_t op) {
 }
 
 void thumb_branch_with_link_suffix_disasm(uint32_t address, uint16_t op, std::string &s) {
-    uint16_t op_last = memory_read_halfword(address - 2);
-    uint32_t imm_last = BITS(op_last, 0, 10);
-    SIGN_EXTEND(imm_last, 10);
+    uint16_t last_op = memory_peek_halfword(address - 2);
+    uint32_t last_imm = BITS(last_op, 0, 10);
+    SIGN_EXTEND(last_imm, 10);
     uint32_t imm = BITS(op, 0, 10);
 
     s += "bl";
     s += " ";
-    if ((op_last & 0xf800) == 0xf000) {
-        print_address(s, address + 2 + (imm_last << 12) + (imm << 1));
+    if ((last_op & 0xf800) == 0xf000) {
+        print_address(s, address + 2 + (last_imm << 12) + (imm << 1));
     } else {
         s += "lr + ";
         print_immediate(s, imm << 1);

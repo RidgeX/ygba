@@ -53,7 +53,8 @@ uint32_t rom_read_word(uint32_t address) {
     return *(uint32_t *) &game_rom[address & (game_rom_mask & ~3)];
 }
 
-uint8_t memory_read_byte(uint32_t address) {
+uint8_t memory_read_byte(uint32_t address, bool peek) {
+    UNUSED(peek);
     uint8_t region = address >> 24;
     switch (region) {
         case 0:
@@ -94,7 +95,8 @@ uint8_t memory_read_byte(uint32_t address) {
     return (uint8_t) (memory_open_bus() >> 8 * (address & 3));
 }
 
-void memory_write_byte(uint32_t address, uint8_t value) {
+void memory_write_byte(uint32_t address, uint8_t value, bool poke) {
+    UNUSED(poke);
     uint8_t region = address >> 24;
     switch (region) {
         case 0:
@@ -139,7 +141,8 @@ void memory_write_byte(uint32_t address, uint8_t value) {
 #endif
 }
 
-uint16_t memory_read_halfword(uint32_t address) {
+uint16_t memory_read_halfword(uint32_t address, bool peek) {
+    UNUSED(peek);
     uint8_t region = address >> 24;
     switch (region) {
         case 0:
@@ -186,7 +189,8 @@ uint16_t memory_read_halfword(uint32_t address) {
     return (uint16_t) (memory_open_bus() >> 8 * (address & 2));
 }
 
-void memory_write_halfword(uint32_t address, uint16_t value) {
+void memory_write_halfword(uint32_t address, uint16_t value, bool poke) {
+    UNUSED(poke);
     uint8_t region = address >> 24;
     switch (region) {
         case 0:
@@ -239,7 +243,8 @@ void memory_write_halfword(uint32_t address, uint16_t value) {
 #endif
 }
 
-uint32_t memory_read_word(uint32_t address) {
+uint32_t memory_read_word(uint32_t address, bool peek) {
+    UNUSED(peek);
     uint8_t region = address >> 24;
     switch (region) {
         case 0:
@@ -280,7 +285,8 @@ uint32_t memory_read_word(uint32_t address) {
     return memory_open_bus();
 }
 
-void memory_write_word(uint32_t address, uint32_t value) {
+void memory_write_word(uint32_t address, uint32_t value, bool poke) {
+    UNUSED(poke);
     uint8_t region = address >> 24;
     switch (region) {
         case 0:
