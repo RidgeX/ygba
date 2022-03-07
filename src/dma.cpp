@@ -11,7 +11,7 @@
 #include "io.h"
 #include "memory.h"
 
-int dma_active_ch;
+int dma_channel;
 uint32_t dma_pc;
 
 const uint32_t src_addr_mask[4] = {0x07ffffff, 0x0fffffff, 0x0fffffff, 0x0fffffff};
@@ -25,21 +25,21 @@ static void dma_transfer(int ch, uint32_t dst_ctrl, uint32_t src_ctrl, uint32_t 
             uint32_t value;
             if (!bad_src_addr) {
                 value = memory_read_word(src_addr & ~3);
-                ioreg.dma_value.dw = value;
+                ioreg.dma[ch].value.dw = value;
             }
-            value = ioreg.dma_value.dw;
+            value = ioreg.dma[ch].value.dw;
             memory_write_word(dst_addr & ~3, value);
         } else {
             uint16_t value;
             if (!bad_src_addr) {
                 value = memory_read_halfword(src_addr & ~1);
-                ioreg.dma_value.w.w0 = value;
-                ioreg.dma_value.w.w1 = value;
+                ioreg.dma[ch].value.w.w0 = value;
+                ioreg.dma[ch].value.w.w1 = value;
             }
             if (dst_addr & 2) {
-                value = ioreg.dma_value.w.w1;
+                value = ioreg.dma[ch].value.w.w1;
             } else {
-                value = ioreg.dma_value.w.w0;
+                value = ioreg.dma[ch].value.w.w0;
             }
             memory_write_halfword(dst_addr & ~1, value);
         }
@@ -128,9 +128,9 @@ void dma_update(uint32_t current_timing) {
         }
 
         dma_pc = get_pc();
-        dma_active_ch = ch;
+        dma_channel = ch;
         dma_transfer(ch, dst_ctrl, src_ctrl, dst_addr, src_addr, word_size ? 4 : 2, count);
-        dma_active_ch = -1;
+        dma_channel = -1;
 
         if (cnt & DMA_IRQ) {
             ioreg.irq.w |= 1 << (8 + ch);

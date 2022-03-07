@@ -19,7 +19,7 @@
 #define DMA_IRQ        (1 << 30)
 #define DMA_ENABLE     (1 << 31)
 
-extern int dma_active_ch;
+extern int dma_channel;
 extern uint32_t dma_pc;
 
 void dma_reset(int ch);

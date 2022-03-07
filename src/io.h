@@ -84,8 +84,8 @@ typedef struct {
         uint32_t src_addr;
         uint32_t dst_addr;
         uint16_t count;
+        io_union32 value;
     } dma[4];
-    io_union32 dma_value;
 
     // Timer Registers
     struct {

@@ -29,8 +29,8 @@ uint32_t game_rom_size;
 uint32_t game_rom_mask;
 
 uint32_t memory_open_bus() {
-    if (dma_active_ch >= 0 || get_pc() - dma_pc == SIZEOF_INSTR) {
-        return ioreg.dma_value.dw;
+    if (dma_channel >= 0 || get_pc() - dma_pc == SIZEOF_INSTR) {
+        return ioreg.dma[dma_channel].value.dw;
     } else if (!FLAG_T()) {
         return arm_pipeline[1];
     } else {

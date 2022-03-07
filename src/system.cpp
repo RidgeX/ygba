@@ -50,7 +50,7 @@ void system_reset(bool keep_save_data) {
 
     video_cycles = 0;
     halted = false;
-    dma_active_ch = -1;
+    dma_channel = -1;
     dma_pc = 0;
 
     ioreg.dispcnt.w = 0x80;
