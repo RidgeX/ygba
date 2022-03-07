@@ -9,8 +9,6 @@
 
 #include <fmt/core.h>
 
-#include "dma.h"
-
 //#define LOG_BAD_MEMORY_ACCESS
 
 bool has_eeprom;
@@ -65,7 +63,6 @@ uint8_t backup_read_byte(uint32_t address) {
         }
         return backup_flash[flash_bank * 0x10000 + address];
     } else if (has_sram) {
-        if (dma_active_ch == 0) return 0;
         return backup_sram[address & 0x7fff];
     }
 #ifdef LOG_BAD_MEMORY_ACCESS

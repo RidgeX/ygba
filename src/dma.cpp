@@ -14,13 +14,12 @@
 int dma_active_ch;
 uint32_t dma_pc;
 
+const uint32_t src_addr_mask[4] = {0x07ffffff, 0x0fffffff, 0x0fffffff, 0x0fffffff};
+const uint32_t dst_addr_mask[4] = {0x07ffffff, 0x07ffffff, 0x07ffffff, 0x0fffffff};
+
 static void dma_transfer(int ch, uint32_t dst_ctrl, uint32_t src_ctrl, uint32_t &dst_addr, uint32_t &src_addr, uint32_t size, uint32_t count) {
     for (uint32_t i = 0; i < count; i++) {
-        bool bad_src_addr = !(src_addr >= 0x02000000 && src_addr < 0x10000000);
-        bad_src_addr |= (ch == 0 && src_addr >= 0x08000000 && src_addr < 0x0e000000);
-
-        bool bad_dst_addr = !(dst_addr >= 0x02000000 && dst_addr < 0x10000000);
-        bad_dst_addr |= (ch != 3 && dst_addr >= 0x08000000);
+        bool bad_src_addr = (src_addr < 0x02000000);
 
         if (size == 4) {
             uint32_t value;
@@ -29,9 +28,7 @@ static void dma_transfer(int ch, uint32_t dst_ctrl, uint32_t src_ctrl, uint32_t 
                 ioreg.dma_value.dw = value;
             }
             value = ioreg.dma_value.dw;
-            if (!bad_dst_addr) {
-                memory_write_word(dst_addr & ~3, value);
-            }
+            memory_write_word(dst_addr & ~3, value);
         } else {
             uint16_t value;
             if (!bad_src_addr) {
@@ -44,9 +41,7 @@ static void dma_transfer(int ch, uint32_t dst_ctrl, uint32_t src_ctrl, uint32_t 
             } else {
                 value = ioreg.dma_value.w.w0;
             }
-            if (!bad_dst_addr) {
-                memory_write_halfword(dst_addr & ~1, value);
-            }
+            memory_write_halfword(dst_addr & ~1, value);
         }
 
         switch (dst_ctrl) {
@@ -71,6 +66,8 @@ static void dma_transfer(int ch, uint32_t dst_ctrl, uint32_t src_ctrl, uint32_t 
             case DMA_RELOAD:
                 break;
         }
+        dst_addr &= dst_addr_mask[ch];
+        src_addr &= src_addr_mask[ch];
     }
 }
 
