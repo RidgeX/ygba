@@ -8,7 +8,8 @@
     - [x] 32 and 256 color palettes
   - [x] Bitmap modes
     - [x] Page flipping
-    - [x] Affine transformation (e.g. Advance Wars, Ecks vs. Sever)
+    - [x] Affine transformation (e.g. Advance Wars intro, Ecks vs. Sever)
+    - [x] Priorities (e.g. Iridion II intro)
   - [x] Tiled and affine backgrounds
     - [ ] Layer toggle delay
   - [x] Regular and affine sprites

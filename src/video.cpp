@@ -322,14 +322,18 @@ static void draw_tiled(int mode, int y) {
     for (int pri = 3; pri >= 0; pri--) {
         for (int bg = 3; bg >= 0; bg--) {
             bool bg_visible = BIT(ioreg.dispcnt.w, 8 + bg);
-            if (!bg_visible) continue;
             uint16_t priority = BITS(ioreg.bgcnt[bg].w, 0, 1);
-            if (priority != pri) continue;
-            draw_tiled_bg(mode, bg, y);
+
+            if (bg_visible && priority == pri) {
+                draw_tiled_bg(mode, bg, y);
+            }
         }
+
         bool obj_visible = (ioreg.dispcnt.w & DCNT_OBJ);
-        if (!obj_visible) continue;
-        draw_sprites(mode, pri, y);
+
+        if (obj_visible) {
+            draw_sprites(mode, pri, y);
+        }
     }
 }
 
@@ -355,25 +359,34 @@ static bool bitmap_access(int x, int y, int mode, uint16_t *pixel) {
 }
 
 static void draw_bitmap(int mode, int y) {
-    const int bg = 2;
-
-    double affine_x = ioreg.bg_affine[bg - 2].x;
-    double affine_y = ioreg.bg_affine[bg - 2].y;
-    double pa = fixed8p8_to_double(ioreg.bg_affine[bg - 2].pa.w);
-    double pc = fixed8p8_to_double(ioreg.bg_affine[bg - 2].pc.w);
-
-    for (int x = 0; x < SCREEN_WIDTH; x++) {
-        int i = std::floor(affine_x);
-        int j = std::floor(affine_y);
-        uint16_t pixel;
-        bool ok = bitmap_access(i, j, mode, &pixel);
-        if (ok) draw_pixel_culled(bg, x, y, pixel);
-        affine_x += pa;
-        affine_y += pc;
-    }
-
     for (int pri = 3; pri >= 0; pri--) {
-        draw_sprites(mode, pri, y);
+        const int bg = 2;
+
+        bool bg_visible = BIT(ioreg.dispcnt.w, 8 + bg);
+        uint16_t priority = BITS(ioreg.bgcnt[bg].w, 0, 1);
+
+        if (bg_visible && priority == pri) {
+            double affine_x = ioreg.bg_affine[bg - 2].x;
+            double affine_y = ioreg.bg_affine[bg - 2].y;
+            double pa = fixed8p8_to_double(ioreg.bg_affine[bg - 2].pa.w);
+            double pc = fixed8p8_to_double(ioreg.bg_affine[bg - 2].pc.w);
+
+            for (int x = 0; x < SCREEN_WIDTH; x++) {
+                int i = std::floor(affine_x);
+                int j = std::floor(affine_y);
+                uint16_t pixel;
+                bool ok = bitmap_access(i, j, mode, &pixel);
+                if (ok) draw_pixel_culled(bg, x, y, pixel);
+                affine_x += pa;
+                affine_y += pc;
+            }
+        }
+
+        bool obj_visible = (ioreg.dispcnt.w & DCNT_OBJ);
+
+        if (obj_visible) {
+            draw_sprites(mode, pri, y);
+        }
     }
 }
 
