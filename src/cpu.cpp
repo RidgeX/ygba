@@ -27,12 +27,12 @@ bool branch_taken;
 
 uint32_t arm_op;
 uint32_t arm_pipeline[2];
-int (*arm_lookup[4096])(uint32_t);
+void (*arm_lookup[4096])(uint32_t);
 void (*arm_lookup_disasm[4096])(uint32_t, uint32_t, std::string &);
 
 uint16_t thumb_op;
 uint16_t thumb_pipeline[2];
-int (*thumb_lookup[256])(uint16_t);
+void (*thumb_lookup[256])(uint16_t);
 void (*thumb_lookup_disasm[256])(uint32_t, uint16_t, std::string &);
 
 void arm_init_registers(bool skip_bios) {
@@ -236,7 +236,7 @@ void arm_step() {
     uint32_t cond = BITS(arm_op, 28, 31);
     if (condition_passed(cond)) {
         uint32_t index = BITS(arm_op, 20, 27) << 4 | BITS(arm_op, 4, 7);
-        int (*handler)(uint32_t) = arm_lookup[index];
+        void (*handler)(uint32_t) = arm_lookup[index];
         assert(handler != nullptr);
         (*handler)(arm_op);
     }
@@ -266,7 +266,7 @@ void thumb_fill_pipeline() {
 
 void thumb_step() {
     uint16_t index = BITS(thumb_op, 8, 15);
-    int (*handler)(uint16_t) = thumb_lookup[index];
+    void (*handler)(uint16_t) = thumb_lookup[index];
     assert(handler != nullptr);
     (*handler)(thumb_op);
 
