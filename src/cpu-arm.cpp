@@ -501,15 +501,13 @@ void arm_load_store_multiple(uint32_t op) {
         rlist |= 1 << REG_PC;
         count = 16;
     }
+    assert(Rn != REG_PC);
     uint32_t old_base = r[Rn];
     uint32_t new_base = old_base + (U ? 4 : -4) * count;
     uint32_t address = old_base;
     if (!U) address -= 4 * count;
     if (U == P) address += 4;
-    if (S) {
-        assert((cpsr & PSR_MODE) != PSR_MODE_USR && (cpsr & PSR_MODE) != PSR_MODE_SYS);
-        mode_change(cpsr & PSR_MODE, PSR_MODE_USR);  // Switch to user register bank
-    }
+    if (S) mode_change(cpsr & PSR_MODE, PSR_MODE_USR);  // Switch to user register bank
     for (uint32_t i = 0; i < 16; i++) {
         if (BIT(rlist, i)) {
             if (L) {
@@ -536,9 +534,8 @@ void arm_load_store_multiple(uint32_t op) {
             address += 4;
         }
     }
-    //assert(!W || !S);
+    if (W) r[Rn] = new_base;
     if (S) mode_change(PSR_MODE_USR, cpsr & PSR_MODE);  // Restore current register bank
-    if (W) r[Rn] = new_base;  // FIXME before or after mode change?
 }
 
 void arm_branch_disasm(uint32_t address, uint32_t op, std::string &s) {
