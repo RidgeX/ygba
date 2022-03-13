@@ -202,10 +202,10 @@ void arm_data_processing_register(uint32_t op) {
 
     uint32_t s = (shreg ? (uint8_t) r[Rs] : shamt);  // Use least significant byte of Rs
     uint32_t m = r[Rm];
-    if (Rm == REG_PC && shreg) m += SIZEOF_INSTR;  // PC ahead if shift by register
+    if (Rm == REG_PC && shreg) m += SIZEOF_INSTR;  // PC ahead when shift register specified
     m = arm_shifter_op(m, s, shop, shreg, true);
     uint32_t n = r[Rn];
-    if (Rn == REG_PC && shreg) n += SIZEOF_INSTR;  // PC ahead if shift by register
+    if (Rn == REG_PC && shreg) n += SIZEOF_INSTR;  // PC ahead when shift register specified
     uint64_t result = arm_alu_op(opc, n, m);
     if (S) {
         arm_shifter_flags(r[Rm], s, shop);
@@ -219,8 +219,8 @@ void arm_data_processing_register(uint32_t op) {
             if (S) write_cpsr(read_spsr());
         }
     } else {
-        if (Rd == REG_PC) {           // ARMv2 mode change (obsolete)
-            write_cpsr(read_spsr());  // Restores SPSR on ARMv4
+        if (Rd == REG_PC) {           // ARMv2 mode change (obsolete on ARMv4)
+            write_cpsr(read_spsr());  // Restore SPSR
         }
     }
 }
@@ -497,7 +497,7 @@ void arm_load_store_multiple(uint32_t op) {
     uint32_t rlist = BITS(op, 0, 15);
 
     uint32_t count = std::popcount(rlist);
-    if (rlist == 0) {  // Empty rlist
+    if (rlist == 0) {  // Empty rlist: PC loaded/stored and base incremented/decremented by 16 words
         rlist |= 1 << REG_PC;
         count = 16;
     }
@@ -508,12 +508,12 @@ void arm_load_store_multiple(uint32_t op) {
     if (U == P) address += 4;
     if (S) {
         assert((cpsr & PSR_MODE) != PSR_MODE_USR && (cpsr & PSR_MODE) != PSR_MODE_SYS);
-        mode_change(cpsr & PSR_MODE, PSR_MODE_USR);
+        mode_change(cpsr & PSR_MODE, PSR_MODE_USR);  // Switch to user register bank
     }
     for (uint32_t i = 0; i < 16; i++) {
         if (BIT(rlist, i)) {
             if (L) {
-                if (i == Rn) W = false;
+                if (i == Rn) W = false;  // No writeback if Rn in rlist
                 r[i] = memory_read_word(address);
                 if (i == REG_PC) {  // PC altered
                     r[i] &= ~1;
@@ -521,9 +521,9 @@ void arm_load_store_multiple(uint32_t op) {
                     if (S) write_cpsr(read_spsr());
                 }
             } else {
-                if (i == REG_PC) {
+                if (i == REG_PC) {  // PC ahead when stored to memory
                     memory_write_word(address, r[i] + SIZEOF_INSTR);
-                } else if (i == Rn) {
+                } else if (i == Rn) {  // Store unmodified base if Rn is first in rlist
                     if (std::countr_zero(rlist) == (int) Rn) {
                         memory_write_word(address, old_base);
                     } else {
@@ -537,7 +537,7 @@ void arm_load_store_multiple(uint32_t op) {
         }
     }
     //assert(!W || !S);
-    if (S) mode_change(PSR_MODE_USR, cpsr & PSR_MODE);
+    if (S) mode_change(PSR_MODE_USR, cpsr & PSR_MODE);  // Restore current register bank
     if (W) r[Rn] = new_base;  // FIXME before or after mode change?
 }
 
@@ -867,10 +867,10 @@ void arm_load_signed_halfword_or_signed_byte_register(uint32_t op) {
     if (P) n += (U ? m : -m);
     if (opc == 0xd) {
         r[Rd] = memory_read_byte(n);
-        if (r[Rd] & 0x80) r[Rd] |= ~0xff;
+        SIGN_EXTEND(r[Rd], 7);
     } else if (opc == 0xf) {
         r[Rd] = align_halfword(n, memory_read_halfword(n));
-        if ((n & 1) != 0) {
+        if (n & 1) {
             r[Rd] &= 0xff;
             SIGN_EXTEND(r[Rd], 7);
         } else {
@@ -937,10 +937,10 @@ void arm_load_signed_halfword_or_signed_byte_immediate(uint32_t op) {
     if (P) n += (U ? imm : -imm);
     if (opc == 0xd) {
         r[Rd] = memory_read_byte(n);
-        if (r[Rd] & 0x80) r[Rd] |= ~0xff;
+        SIGN_EXTEND(r[Rd], 7);
     } else if (opc == 0xf) {
         r[Rd] = align_halfword(n, memory_read_halfword(n));
-        if ((n & 1) != 0) {
+        if (n & 1) {
             r[Rd] &= 0xff;
             SIGN_EXTEND(r[Rd], 7);
         } else {
@@ -1177,7 +1177,7 @@ void arm_undefined_instruction(uint32_t op) {
 
     r14_und = r[REG_PC] - SIZEOF_INSTR;  // ARM: PC + 4, Thumb: PC + 2
     spsr_und = cpsr;
+    branch_taken = true;
     write_cpsr((cpsr & ~(PSR_T | PSR_MODE)) | PSR_I | PSR_MODE_UND);
     r[REG_PC] = VEC_UNDEF;
-    branch_taken = true;
 }
