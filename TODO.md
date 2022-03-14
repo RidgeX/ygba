@@ -91,19 +91,20 @@
   - [x] Pipeline
   - [x] Conditional execution
   - [x] Software and hardware interrupts
-  - [ ] ldrt/strt to User mode registers
+  - [ ] ldrt/strt user bank registers
   - [x] ARM edge cases
-    - [x] ldr/str with unaligned address
-    - [ ] ldm/stm with unaligned address
+    - [x] ldr/str aligns addresses and does rotated reads
+    - [x] ldm/stm aligns addresses and does not rotate reads, updated base retains misalignment
     - [x] CPSR bit 4 (M[4]) always reads as 1 (e.g. Banjo-Kazooie: Grunty's Revenge)
     - [ ] Invalid CPSR mode
-    - [x] Read SPSR in User/System mode (no SPSR)
-    - [ ] Change Thumb bit via msr
-    - [ ] ldm/stm {}^ in User/System mode
-    - [x] tstp/teqp/cmpp/cmnp (ARMv2 mode change)
-    - [x] ldm/stm empty register list
-    - [x] ldm/stm writeback and Rn in register list
-    - [x] bx to ARM unaligned address
+    - [x] Reading SPSR in modes where SPSR does not exist results in CPSR
+    - [ ] Changing Thumb bit via msr
+    - [x] ldm^/stm^ user bank registers with writeback loads base from non-user bank but stores updated base into user bank
+    - [x] tstp/teqp/cmpp/cmnp (ARMv2 mode change) restores SPSR only, mode is unchanged
+    - [x] ldm/stm with empty register list loads/stores PC and increments/decrements base Rn by 0x40
+    - [x] ldm with base Rn in register list ignores writeback
+    - [x] stm with base Rn first in register list stores unmodified base
+    - [x] bx aligns ARM addresses to word, Thumb addresses to halfword
     - [x] Undefined instructions
   - [x] Thumb edge cases
     - [x] Using the second half of a bl instruction pair on its own (e.g. Golden Sun)
