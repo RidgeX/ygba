@@ -61,6 +61,10 @@ void system_reset(bool keep_save_data) {
     last_bios_access = 0;
 
     if (skip_bios) {
+        ioreg.soundcnt_h.w = 0x880e;
+        ioreg.soundbias.w = 0x200;
+        ioreg.fifo_a_ticks = 11;
+        ioreg.fifo_b_ticks = 11;
         ioreg.rcnt.w = 0x8000;
         ioreg.postflg = 1;
         last_bios_access = 0xe4;
