@@ -48,11 +48,11 @@ void system_reset(bool keep_save_data) {
     arm_init_registers(skip_bios);
     branch_taken = true;
 
-    video_cycles = 0;
     halted = false;
     dma_active = -1;
     dma_pc = 0;
 
+    video_cycles = 0;
     ioreg.dispcnt.w = 0x80;
     ioreg.bg_affine[0].pa.w = 0x100;
     ioreg.bg_affine[0].pd.w = 0x100;
@@ -61,11 +61,20 @@ void system_reset(bool keep_save_data) {
     last_bios_access = 0;
 
     if (skip_bios) {
+        // Mario & Luigi: Superstar Saga
+        video_cycles = CYCLES_SCANLINE * 126 + 859;
+        ioreg.vcount.w = 126;
+
         ioreg.soundcnt_h.w = 0x880e;
         ioreg.soundbias.w = 0x200;
+
+        // Beyblade V-Force: Ultimate Blader Jam, Pac-Man World
         ioreg.fifo_a_ticks = 11;
         ioreg.fifo_b_ticks = 11;
+
+        // Sonic Advance
         ioreg.rcnt.w = 0x8000;
+
         ioreg.postflg = 1;
         last_bios_access = 0xe4;
     }
