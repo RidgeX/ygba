@@ -29,7 +29,7 @@ void timer_update(uint32_t cycles) {
             continue;
         }
 
-        uint32_t increment = 0;
+        int increment = 0;
         if (control & TM_CASCADE) {
             increment = (overflow ? 1 : 0);
         } else {
@@ -48,11 +48,16 @@ void timer_update(uint32_t cycles) {
             }
         }
 
-        uint16_t last_counter = counter;
-        counter += increment;
-        overflow = counter < last_counter;
+        overflow = false;
+        for (int n = 0; n < increment; n++) {
+            counter++;
+            if (counter == 0) {
+                counter = reload;
+                overflow = true;
+            }
+        }
+
         if (overflow) {
-            counter += reload;
             bool fifo_a_tick = BIT(ioreg.soundcnt_h.w, 10) == i;
             bool fifo_b_tick = BIT(ioreg.soundcnt_h.w, 14) == i;
             if (fifo_a_tick) {
