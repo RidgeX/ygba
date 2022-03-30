@@ -60,26 +60,38 @@ bool video_in_bitmap_mode() {
     return (mode >= 3 && mode <= 5);
 }
 
-static uint32_t rgb555(uint32_t pixel) {
-    uint32_t red = pixel & 0x1f;
-    uint32_t green = (pixel >> 5) & 0x1f;
-    uint32_t blue = (pixel >> 10) & 0x1f;
+static uint32_t rgb555_to_rgb888(uint16_t pixel) {
+    int red = BITS(pixel, 0, 4);
+    int green = BITS(pixel, 5, 9);
+    int blue = BITS(pixel, 10, 14);
+
     red = (red << 3) | (red >> 2);
     green = (green << 3) | (green >> 2);
     blue = (blue << 3) | (blue >> 2);
+
     return 0xff << 24 | blue << 16 | green << 8 | red;
 }
 
-static void draw_backdrop(int y, bool forced_blank) {
+static void draw_forced_blank(int y) {
+    assert(y >= 0 && y < SCREEN_HEIGHT);
+
+    for (int x = 0; x < SCREEN_WIDTH; x++) {
+        screen_pixels[y][x] = 0xffffffff;
+    }
+}
+
+static void draw_backdrop(int y) {
+    assert(y >= 0 && y < SCREEN_HEIGHT);
+
     uint16_t pixel = *(uint16_t *) &palette_ram[0];
-    uint32_t clear_color = rgb555(forced_blank ? 0x7fff : pixel);
+    uint32_t clear_color = rgb555_to_rgb888(pixel);
 
     for (int x = 0; x < SCREEN_WIDTH; x++) {
         screen_pixels[y][x] = clear_color;
     }
 }
 
-static void draw_pixel_culled(int bg, int x, int y, uint32_t pixel) {
+static void draw_pixel_if_visible(int bg, int x, int y, uint16_t pixel) {
     if (x < 0 || x >= SCREEN_WIDTH) return;
     assert(y >= 0 && y < SCREEN_HEIGHT);
 
@@ -92,17 +104,21 @@ static void draw_pixel_culled(int bg, int x, int y, uint32_t pixel) {
     bool inside_win1 = (enable_win1 && is_point_in_window(x, y, win1));
     bool inside_winobj = false;  // FIXME Implement object window
 
+    bool visible = true;
+
     if (inside_win0) {
-        if (!BIT(ioreg.winin.w, bg)) return;
+        if (!BIT(ioreg.winin.w, bg)) visible = false;
     } else if (inside_win1) {
-        if (!BIT(ioreg.winin.w, 8 + bg)) return;
+        if (!BIT(ioreg.winin.w, 8 + bg)) visible = false;
     } else if (inside_winobj) {
-        if (!BIT(ioreg.winout.w, 8 + bg)) return;
+        if (!BIT(ioreg.winout.w, 8 + bg)) visible = false;
     } else if (enable_winout) {
-        if (!BIT(ioreg.winout.w, bg)) return;
+        if (!BIT(ioreg.winout.w, bg)) visible = false;
     }
 
-    screen_pixels[y][x] = rgb555(pixel);
+    if (!visible) return;
+
+    screen_pixels[y][x] = rgb555_to_rgb888(pixel);
 }
 
 static bool tile_access(uint32_t tile_address, int x, int y, bool hflip, bool vflip, bool colors_256, uint32_t palette_offset, int palette_no, uint16_t *pixel) {
@@ -258,7 +274,7 @@ static void draw_sprites(int mode, int pri, int y) {
             int texture_y = sprite_cy + std::floor(pc * (i - bbox_cx) + pd * (j - bbox_cy));
             uint16_t pixel;
             bool ok = sprite_access(tile_no, texture_x, texture_y, sprite_width, sprite_height, hflip, vflip, colors_256, palette_no, mode, &pixel);
-            if (ok) draw_pixel_culled(4, sprite_x + i, y, pixel);
+            if (ok) draw_pixel_if_visible(4, sprite_x + i, y, pixel);
         }
     }
 }
@@ -312,7 +328,7 @@ static void draw_tiled_bg(int mode, int bg, int y) {
         } else {
             ok = bg_regular_access(i, j, bg_width, bg_height, tile_base, map_base, screen_size, colors_256, &pixel);
         }
-        if (ok) draw_pixel_culled(bg, x, y, pixel);
+        if (ok) draw_pixel_if_visible(bg, x, y, pixel);
         affine_x += pa;
         affine_y += pc;
     }
@@ -376,7 +392,7 @@ static void draw_bitmap(int mode, int y) {
                 int j = std::floor(affine_y);
                 uint16_t pixel;
                 bool ok = bitmap_access(i, j, mode, &pixel);
-                if (ok) draw_pixel_culled(bg, x, y, pixel);
+                if (ok) draw_pixel_if_visible(bg, x, y, pixel);
                 affine_x += pa;
                 affine_y += pc;
             }
@@ -401,8 +417,14 @@ static void video_draw_scanline() {
     win1.top = ioreg.winv[1].b.b1;
 
     bool forced_blank = (ioreg.dispcnt.w & DCNT_BLANK);
-    draw_backdrop(ioreg.vcount.w, forced_blank);
-    if (forced_blank) return;
+    int y = ioreg.vcount.w;
+
+    if (forced_blank) {
+        draw_forced_blank(y);
+        return;
+    }
+
+    draw_backdrop(y);
 
     int mode = BITS(ioreg.dispcnt.w, 0, 2);
     switch (mode) {
@@ -411,13 +433,13 @@ static void video_draw_scanline() {
         case 2:
             //case 6:
             //case 7:
-            draw_tiled(mode, ioreg.vcount.w);
+            draw_tiled(mode, y);
             break;
 
         case 3:
         case 4:
         case 5:
-            draw_bitmap(mode, ioreg.vcount.w);
+            draw_bitmap(mode, y);
             break;
 
         default:
