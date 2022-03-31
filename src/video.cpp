@@ -20,7 +20,9 @@ uint32_t screen_texture;
 uint32_t screen_pixels[SCREEN_HEIGHT][SCREEN_WIDTH];
 
 enum ScanlineFlags {
-    EnableBlend = 1
+    EnableBlend = 1,
+    SpriteBlend = 2,
+    SpriteMask = 4
 };
 
 struct ScanlineInfo {
@@ -32,6 +34,10 @@ struct ScanlineInfo {
 };
 
 ScanlineInfo scanline[SCREEN_WIDTH];
+
+bool active_compute_sprite_masks;
+bool active_sprite_blend;
+bool active_sprite_mask;
 
 struct WindowInfo {
     int left;
@@ -128,13 +134,18 @@ static void draw_backdrop(int y) {
         scanline[x].bottom = pixel;
         scanline[x].top_bg = 5;
         scanline[x].bottom_bg = 5;
-        scanline[x].flags = 0;
+        scanline[x].flags = ScanlineFlags::EnableBlend;
     }
 }
 
 static void draw_pixel_if_visible(int bg, int x, int y, uint16_t pixel) {
     if (x < 0 || x >= SCREEN_WIDTH) return;
     assert(y >= 0 && y < SCREEN_HEIGHT);
+
+    if (active_compute_sprite_masks) {
+        scanline[x].flags |= ScanlineFlags::SpriteMask;
+        return;
+    }
 
     bool enable_win0 = (ioreg.dispcnt.w & DCNT_WIN0);
     bool enable_win1 = (ioreg.dispcnt.w & DCNT_WIN1);
@@ -143,7 +154,7 @@ static void draw_pixel_if_visible(int bg, int x, int y, uint16_t pixel) {
 
     bool inside_win0 = (enable_win0 && is_point_in_window(x, y, win0));
     bool inside_win1 = (enable_win1 && is_point_in_window(x, y, win1));
-    bool inside_winobj = false;  // FIXME Implement object window
+    bool inside_winobj = (enable_winobj && (scanline[x].flags & ScanlineFlags::SpriteMask));
 
     bool enable_blend = true;
     bool visible = true;
@@ -162,13 +173,26 @@ static void draw_pixel_if_visible(int bg, int x, int y, uint16_t pixel) {
         visible = BIT(ioreg.winout.w, bg);
     }
 
-    scanline[x].flags = 0;
-    if (enable_blend) scanline[x].flags |= ScanlineFlags::EnableBlend;
+    if (!enable_blend) {
+        scanline[x].flags &= ~ScanlineFlags::EnableBlend;
+    }
+    if (active_sprite_blend) {
+        scanline[x].flags |= ScanlineFlags::SpriteBlend;
+    } else {
+        scanline[x].flags &= ~ScanlineFlags::SpriteBlend;
+    }
+    if (active_sprite_mask) {
+        visible = false;
+    }
 
     if (!visible) return;
 
-    scanline[x].bottom = scanline[x].top;
-    scanline[x].bottom_bg = scanline[x].top_bg;
+    bool occluding_sprites = (bg == 4 && scanline[x].top_bg == 4);
+    if (!occluding_sprites) {
+        scanline[x].bottom = scanline[x].top;
+        scanline[x].bottom_bg = scanline[x].top_bg;
+    }
+
     scanline[x].top = pixel;
     scanline[x].top_bg = bg;
 }
@@ -177,7 +201,7 @@ static void compose_scanline(int y) {
     assert(y >= 0 && y < SCREEN_HEIGHT);
 
     int blend_top_bgs = BITS(ioreg.bldcnt.w, 0, 5);
-    int blend_mode = BITS(ioreg.bldcnt.w, 6, 7);
+    int blend_mode_default = BITS(ioreg.bldcnt.w, 6, 7);
     int blend_bottom_bgs = BITS(ioreg.bldcnt.w, 8, 13);
     double weight_a = fixed1p4_to_double(BITS(ioreg.bldalpha.w, 0, 4));
     double weight_b = fixed1p4_to_double(BITS(ioreg.bldalpha.w, 8, 12));
@@ -195,12 +219,21 @@ static void compose_scanline(int y) {
         uint16_t bottom = scanline[x].bottom;
         uint8_t top_bg = scanline[x].top_bg;
         uint8_t bottom_bg = scanline[x].bottom_bg;
-        bool enable_blend = (scanline[x].flags & ScanlineFlags::EnableBlend);
+        bool enable_blend = scanline[x].flags & ScanlineFlags::EnableBlend;
+        bool sprite_blend = scanline[x].flags & ScanlineFlags::SpriteBlend;
 
         bool top_ok = BIT(blend_top_bgs, top_bg);
         bool bottom_ok = BIT(blend_bottom_bgs, bottom_bg);
 
+        int blend_mode = blend_mode_default;
         bool valid_blend = enable_blend && top_ok && (bottom_ok || blend_mode != 1);
+
+        if (sprite_blend) {
+            if ((top_ok && bottom_ok) || (!top_ok && blend_bottom_bgs != 0)) {
+                blend_mode = 1;
+                valid_blend = true;
+            }
+        }
 
         uint16_t pixel = top;
         if (valid_blend) {
@@ -319,10 +352,13 @@ static void draw_sprites(int mode, int pri, int y) {
 
         int sprite_y = BITS(attr0, 0, 7);
         int obj_mode = BITS(attr0, 8, 9);
-        //int gfx_mode = BITS(attr0, 10, 11);
+        int gfx_mode = BITS(attr0, 10, 11);
         //bool mosaic = BIT(attr0, 12);
         bool colors_256 = BIT(attr0, 13);
         int shape = BITS(attr0, 14, 15);
+
+        if (active_compute_sprite_masks && gfx_mode != 2) continue;
+        assert(gfx_mode != 3);
 
         int sprite_x = BITS(attr1, 0, 8);
         int affine_index = BITS(attr1, 9, 13);
@@ -367,6 +403,9 @@ static void draw_sprites(int mode, int pri, int y) {
             pb = pc = 0.0;
         }
 
+        active_sprite_blend = (gfx_mode == 1);
+        active_sprite_mask = (gfx_mode == 2);
+
         int j = y - sprite_y;
         for (int i = 0; i < bbox_width; i++) {
             int texture_x = sprite_cx + std::floor(pa * (i - bbox_cx) + pb * (j - bbox_cy));
@@ -375,7 +414,20 @@ static void draw_sprites(int mode, int pri, int y) {
             bool ok = sprite_access(tile_no, texture_x, texture_y, sprite_width, sprite_height, hflip, vflip, colors_256, palette_no, mode, &pixel);
             if (ok) draw_pixel_if_visible(4, sprite_x + i, y, pixel);
         }
+
+        active_sprite_blend = false;
+        active_sprite_mask = false;
     }
+}
+
+static void compute_sprite_masks(int mode, int y) {
+    active_compute_sprite_masks = true;
+
+    for (int pri = 3; pri >= 0; pri--) {
+        draw_sprites(mode, pri, y);
+    }
+
+    active_compute_sprite_masks = false;
 }
 
 const int bg_width_lookup[2][4] = {{256, 512, 256, 512}, {128, 256, 512, 1024}};
@@ -434,6 +486,8 @@ static void draw_tiled_bg(int mode, int bg, int y) {
 }
 
 static void draw_tiled(int mode, int y) {
+    compute_sprite_masks(mode, y);
+
     for (int pri = 3; pri >= 0; pri--) {
         for (int bg = 3; bg >= 0; bg--) {
             bool bg_visible = BIT(ioreg.dispcnt.w, 8 + bg);
@@ -474,6 +528,8 @@ static bool bitmap_access(int x, int y, int mode, uint16_t *pixel) {
 }
 
 static void draw_bitmap(int mode, int y) {
+    compute_sprite_masks(mode, y);
+
     for (int pri = 3; pri >= 0; pri--) {
         const int bg = 2;
 

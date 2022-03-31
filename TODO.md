@@ -19,11 +19,11 @@
     - [ ] Transparent sprites can update sprite priorities (e.g. Golden Sun carpet)
     - [ ] OAM update delay
   - [x] Graphic effects
-    - [ ] Blending
+    - [x] Blending
     - [ ] Mosaic
     - [x] Windowing
       - [x] Basic windows
-      - [ ] Object window
+      - [x] Object window
       - [ ] Bad values for window coordinates
   - [ ] Shaders
     - [ ] LCD color correction
