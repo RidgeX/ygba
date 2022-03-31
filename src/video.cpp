@@ -19,22 +19,30 @@ bool video_frame_drawn;
 uint32_t screen_texture;
 uint32_t screen_pixels[SCREEN_HEIGHT][SCREEN_WIDTH];
 
-uint16_t scanline_top[SCREEN_WIDTH];
-uint8_t scanline_top_bg[SCREEN_WIDTH];
-uint16_t scanline_bottom[SCREEN_WIDTH];
-uint8_t scanline_bottom_bg[SCREEN_WIDTH];
-bool scanline_enable_blend[SCREEN_WIDTH];
+enum ScanlineFlags {
+    EnableBlend = 1
+};
 
-struct Window {
+struct ScanlineInfo {
+    uint16_t top;
+    uint16_t bottom;
+    uint8_t top_bg;
+    uint8_t bottom_bg;
+    uint8_t flags;
+};
+
+ScanlineInfo scanline[SCREEN_WIDTH];
+
+struct WindowInfo {
     int left;
     int top;
     int right;
     int bottom;
 };
 
-Window win0, win1;
+WindowInfo win0, win1;
 
-static bool is_point_in_window(int x, int y, Window win) {
+static bool is_point_in_window(int x, int y, WindowInfo win) {
     bool x_ok = false;
     bool y_ok = false;
 
@@ -116,11 +124,11 @@ static void draw_backdrop(int y) {
     uint16_t pixel = *(uint16_t *) &palette_ram[0];
 
     for (int x = 0; x < SCREEN_WIDTH; x++) {
-        scanline_top[x] = pixel;
-        scanline_top_bg[x] = 5;
-        scanline_bottom[x] = pixel;
-        scanline_bottom_bg[x] = 5;
-        scanline_enable_blend[x] = false;
+        scanline[x].top = pixel;
+        scanline[x].bottom = pixel;
+        scanline[x].top_bg = 5;
+        scanline[x].bottom_bg = 5;
+        scanline[x].flags = 0;
     }
 }
 
@@ -154,13 +162,15 @@ static void draw_pixel_if_visible(int bg, int x, int y, uint16_t pixel) {
         visible = BIT(ioreg.winout.w, bg);
     }
 
-    scanline_enable_blend[x] = enable_blend;
+    scanline[x].flags = 0;
+    if (enable_blend) scanline[x].flags |= ScanlineFlags::EnableBlend;
+
     if (!visible) return;
 
-    scanline_bottom[x] = scanline_top[x];
-    scanline_bottom_bg[x] = scanline_top_bg[x];
-    scanline_top[x] = pixel;
-    scanline_top_bg[x] = bg;
+    scanline[x].bottom = scanline[x].top;
+    scanline[x].bottom_bg = scanline[x].top_bg;
+    scanline[x].top = pixel;
+    scanline[x].top_bg = bg;
 }
 
 static void compose_scanline(int y) {
@@ -181,11 +191,11 @@ static void compose_scanline(int y) {
     const uint16_t black = 0;
 
     for (int x = 0; x < SCREEN_WIDTH; x++) {
-        uint16_t top = scanline_top[x];
-        uint8_t top_bg = scanline_top_bg[x];
-        uint16_t bottom = scanline_bottom[x];
-        uint8_t bottom_bg = scanline_bottom_bg[x];
-        bool enable_blend = scanline_enable_blend[x];
+        uint16_t top = scanline[x].top;
+        uint16_t bottom = scanline[x].bottom;
+        uint8_t top_bg = scanline[x].top_bg;
+        uint8_t bottom_bg = scanline[x].bottom_bg;
+        bool enable_blend = (scanline[x].flags & ScanlineFlags::EnableBlend);
 
         bool top_ok = BIT(blend_top_bgs, top_bg);
         bool bottom_ok = BIT(blend_bottom_bgs, bottom_bg);
