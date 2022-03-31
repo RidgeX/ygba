@@ -19,6 +19,12 @@ bool video_frame_drawn;
 uint32_t screen_texture;
 uint32_t screen_pixels[SCREEN_HEIGHT][SCREEN_WIDTH];
 
+uint16_t scanline_top[SCREEN_WIDTH];
+uint8_t scanline_top_bg[SCREEN_WIDTH];
+uint16_t scanline_bottom[SCREEN_WIDTH];
+uint8_t scanline_bottom_bg[SCREEN_WIDTH];
+bool scanline_enable_blend[SCREEN_WIDTH];
+
 struct Window {
     int left;
     int top;
@@ -44,6 +50,10 @@ static bool is_point_in_window(int x, int y, Window win) {
     }
 
     return (x_ok && y_ok);
+}
+
+static double fixed1p4_to_double(int8_t x) {
+    return (x >> 4) + ((x & 0xf) / 16.0);
 }
 
 static double fixed8p8_to_double(int16_t x) {
@@ -72,6 +82,26 @@ static uint32_t rgb555_to_rgb888(uint16_t pixel) {
     return 0xff << 24 | blue << 16 | green << 8 | red;
 }
 
+static uint16_t rgb565_blend(uint16_t a, uint16_t b, double weight_a, double weight_b) {
+    int red_a = BITS(a, 0, 4);
+    int green_a = BITS(a, 5, 9) << 1 | BIT(a, 15);
+    int blue_a = BITS(a, 10, 14);
+
+    int red_b = BITS(b, 0, 4);
+    int green_b = BITS(b, 5, 9) << 1 | BIT(b, 15);
+    int blue_b = BITS(b, 10, 14);
+
+    int red = red_a * weight_a + red_b * weight_b;
+    int green = green_a * weight_a + green_b * weight_b;
+    int blue = blue_a * weight_a + blue_b * weight_b;
+
+    if (red > 31) red = 31;
+    if (green > 63) green = 63;
+    if (blue > 31) blue = 31;
+
+    return BIT(green, 0) << 15 | BITS(blue, 0, 4) << 10 | BITS(green, 1, 5) << 5 | BITS(red, 0, 4);
+}
+
 static void draw_forced_blank(int y) {
     assert(y >= 0 && y < SCREEN_HEIGHT);
 
@@ -84,10 +114,13 @@ static void draw_backdrop(int y) {
     assert(y >= 0 && y < SCREEN_HEIGHT);
 
     uint16_t pixel = *(uint16_t *) &palette_ram[0];
-    uint32_t clear_color = rgb555_to_rgb888(pixel);
 
     for (int x = 0; x < SCREEN_WIDTH; x++) {
-        screen_pixels[y][x] = clear_color;
+        scanline_top[x] = pixel;
+        scanline_top_bg[x] = 5;
+        scanline_bottom[x] = pixel;
+        scanline_bottom_bg[x] = 5;
+        scanline_enable_blend[x] = false;
     }
 }
 
@@ -104,21 +137,77 @@ static void draw_pixel_if_visible(int bg, int x, int y, uint16_t pixel) {
     bool inside_win1 = (enable_win1 && is_point_in_window(x, y, win1));
     bool inside_winobj = false;  // FIXME Implement object window
 
+    bool enable_blend = true;
     bool visible = true;
 
     if (inside_win0) {
-        if (!BIT(ioreg.winin.w, bg)) visible = false;
+        enable_blend = BIT(ioreg.winin.w, 5);
+        visible = BIT(ioreg.winin.w, bg);
     } else if (inside_win1) {
-        if (!BIT(ioreg.winin.w, 8 + bg)) visible = false;
+        enable_blend = BIT(ioreg.winin.w, 13);
+        visible = BIT(ioreg.winin.w, 8 + bg);
     } else if (inside_winobj) {
-        if (!BIT(ioreg.winout.w, 8 + bg)) visible = false;
+        enable_blend = BIT(ioreg.winout.w, 13);
+        visible = BIT(ioreg.winout.w, 8 + bg);
     } else if (enable_winout) {
-        if (!BIT(ioreg.winout.w, bg)) visible = false;
+        enable_blend = BIT(ioreg.winout.w, 5);
+        visible = BIT(ioreg.winout.w, bg);
     }
 
+    scanline_enable_blend[x] = enable_blend;
     if (!visible) return;
 
-    screen_pixels[y][x] = rgb555_to_rgb888(pixel);
+    scanline_bottom[x] = scanline_top[x];
+    scanline_bottom_bg[x] = scanline_top_bg[x];
+    scanline_top[x] = pixel;
+    scanline_top_bg[x] = bg;
+}
+
+static void compose_scanline(int y) {
+    assert(y >= 0 && y < SCREEN_HEIGHT);
+
+    int blend_top_bgs = BITS(ioreg.bldcnt.w, 0, 5);
+    int blend_mode = BITS(ioreg.bldcnt.w, 6, 7);
+    int blend_bottom_bgs = BITS(ioreg.bldcnt.w, 8, 13);
+    double weight_a = fixed1p4_to_double(BITS(ioreg.bldalpha.w, 0, 4));
+    double weight_b = fixed1p4_to_double(BITS(ioreg.bldalpha.w, 8, 12));
+    double weight_y = fixed1p4_to_double(BITS(ioreg.bldy.w, 0, 4));
+
+    if (weight_a > 1.0) weight_a = 1.0;
+    if (weight_b > 1.0) weight_b = 1.0;
+    if (weight_y > 1.0) weight_y = 1.0;
+
+    const uint16_t white = 0xffff;
+    const uint16_t black = 0;
+
+    for (int x = 0; x < SCREEN_WIDTH; x++) {
+        uint16_t top = scanline_top[x];
+        uint8_t top_bg = scanline_top_bg[x];
+        uint16_t bottom = scanline_bottom[x];
+        uint8_t bottom_bg = scanline_bottom_bg[x];
+        bool enable_blend = scanline_enable_blend[x];
+
+        bool top_ok = BIT(blend_top_bgs, top_bg);
+        bool bottom_ok = BIT(blend_bottom_bgs, bottom_bg);
+
+        bool valid_blend = enable_blend && top_ok && (bottom_ok || blend_mode != 1);
+
+        uint16_t pixel = top;
+        if (valid_blend) {
+            switch (blend_mode) {
+                case 1:
+                    pixel = rgb565_blend(top, bottom, weight_a, weight_b);
+                    break;
+                case 2:
+                    pixel = rgb565_blend(top, white, 1.0 - weight_y, weight_y);
+                    break;
+                case 3:
+                    pixel = rgb565_blend(top, black, 1.0 - weight_y, weight_y);
+                    break;
+            }
+        }
+        screen_pixels[y][x] = rgb555_to_rgb888(pixel);
+    }
 }
 
 static bool tile_access(uint32_t tile_address, int x, int y, bool hflip, bool vflip, bool colors_256, uint32_t palette_offset, int palette_no, uint16_t *pixel) {
@@ -446,6 +535,8 @@ static void video_draw_scanline() {
             assert(false);
             break;
     }
+
+    compose_scanline(y);
 }
 
 void video_bg_affine_reset(int i) {
