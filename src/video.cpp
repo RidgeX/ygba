@@ -21,7 +21,7 @@ uint32_t screen_pixels[SCREEN_HEIGHT][SCREEN_WIDTH];
 
 enum ScanlineFlags {
     EnableBlend = 1,
-    SpriteBlend = 2,
+    SpriteTransparency = 2,
     SpriteMask = 4
 };
 
@@ -36,7 +36,7 @@ struct ScanlineInfo {
 ScanlineInfo scanline[SCREEN_WIDTH];
 
 bool active_compute_sprite_masks;
-bool active_sprite_blend;
+bool active_sprite_transparency;
 bool active_sprite_mask;
 
 struct WindowInfo {
@@ -176,10 +176,10 @@ static void draw_pixel_if_visible(int bg, int x, int y, uint16_t pixel) {
     if (!enable_blend) {
         scanline[x].flags &= ~ScanlineFlags::EnableBlend;
     }
-    if (active_sprite_blend) {
-        scanline[x].flags |= ScanlineFlags::SpriteBlend;
+    if (active_sprite_transparency) {
+        scanline[x].flags |= ScanlineFlags::SpriteTransparency;
     } else {
-        scanline[x].flags &= ~ScanlineFlags::SpriteBlend;
+        scanline[x].flags &= ~ScanlineFlags::SpriteTransparency;
     }
     if (active_sprite_mask) {
         visible = false;
@@ -220,7 +220,7 @@ static void compose_scanline(int y) {
         uint8_t top_bg = scanline[x].top_bg;
         uint8_t bottom_bg = scanline[x].bottom_bg;
         bool enable_blend = scanline[x].flags & ScanlineFlags::EnableBlend;
-        bool sprite_blend = scanline[x].flags & ScanlineFlags::SpriteBlend;
+        bool sprite_transparency = scanline[x].flags & ScanlineFlags::SpriteTransparency;
 
         bool top_ok = BIT(blend_top_bgs, top_bg);
         bool bottom_ok = BIT(blend_bottom_bgs, bottom_bg);
@@ -228,8 +228,9 @@ static void compose_scanline(int y) {
         int blend_mode = blend_mode_default;
         bool valid_blend = enable_blend && top_ok && (bottom_ok || blend_mode != 1);
 
-        if (sprite_blend) {
-            if ((top_ok && bottom_ok) || (!top_ok && blend_bottom_bgs != 0)) {
+        if (sprite_transparency) {
+            bool force_alpha_blend = bottom_ok;
+            if (force_alpha_blend) {
                 blend_mode = 1;
                 valid_blend = true;
             }
@@ -403,7 +404,7 @@ static void draw_sprites(int mode, int pri, int y) {
             pb = pc = 0.0;
         }
 
-        active_sprite_blend = (gfx_mode == 1);
+        active_sprite_transparency = (gfx_mode == 1);
         active_sprite_mask = (gfx_mode == 2);
 
         int j = y - sprite_y;
@@ -415,7 +416,7 @@ static void draw_sprites(int mode, int pri, int y) {
             if (ok) draw_pixel_if_visible(4, sprite_x + i, y, pixel);
         }
 
-        active_sprite_blend = false;
+        active_sprite_transparency = false;
         active_sprite_mask = false;
     }
 }
