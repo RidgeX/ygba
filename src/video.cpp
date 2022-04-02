@@ -359,7 +359,7 @@ static void draw_sprites(int mode, int pri, int y) {
         int shape = BITS(attr0, 14, 15);
 
         if (active_compute_sprite_masks && gfx_mode != 2) continue;
-        assert(gfx_mode != 3);
+        if (gfx_mode == 3) gfx_mode = 0;
 
         int sprite_x = BITS(attr1, 0, 8);
         int affine_index = BITS(attr1, 9, 13);
