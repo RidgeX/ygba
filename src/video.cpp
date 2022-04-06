@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <cassert>
 #include <cmath>
+#include <cstring>
 
 #include "cpu.h"
 #include "dma.h"
@@ -179,6 +180,10 @@ static void draw_forced_blank(int y) {
     }
 }
 
+static void reset_scanline() {
+    std::memset(scanline, 0, sizeof(scanline));
+}
+
 static void draw_backdrop(int y) {
     assert(y >= 0 && y < SCREEN_HEIGHT);
 
@@ -189,7 +194,13 @@ static void draw_backdrop(int y) {
         scanline[x].bottom = pixel;
         scanline[x].top_bg = 5;
         scanline[x].bottom_bg = 5;
-        scanline[x].flags = ScanlineFlags::EnableBlend;
+
+        WindowRegion window_region = window_find_region(x, y);
+        bool enable_blend = window_enable_blend(window_region);
+
+        if (enable_blend) {
+            scanline[x].flags |= ScanlineFlags::EnableBlend;
+        }
     }
 }
 
@@ -202,23 +213,17 @@ static void draw_pixel_if_visible(int bg, int x, int y, uint16_t pixel) {
         return;
     }
 
-    WindowRegion window_region = window_find_region(x, y);
-    bool enable_blend = window_enable_blend(window_region);
-    bool visible = window_bg_visible(window_region, bg);
-
-    if (!enable_blend) {
-        scanline[x].flags &= ~ScanlineFlags::EnableBlend;
-    }
     if (active_sprite_transparency) {
         scanline[x].flags |= ScanlineFlags::SpriteTransparency;
     } else {
         scanline[x].flags &= ~ScanlineFlags::SpriteTransparency;
     }
-    if (active_sprite_mask) {
-        visible = false;
-    }
 
-    if (!visible) return;
+    if (active_sprite_mask) return;
+
+    WindowRegion window_region = window_find_region(x, y);
+    bool bg_visible = window_bg_visible(window_region, bg);
+    if (!bg_visible) return;
 
     bool occluding_sprites = (bg == 4 && scanline[x].top_bg == 4);
     if (!occluding_sprites) {
@@ -520,8 +525,6 @@ static void draw_tiled_bg(int mode, int bg, int y) {
 }
 
 static void draw_tiled(int mode, int y) {
-    compute_sprite_masks(mode, y);
-
     for (int pri = 3; pri >= 0; pri--) {
         for (int bg = 3; bg >= 0; bg--) {
             bool bg_visible = BIT(ioreg.dispcnt.w, 8 + bg);
@@ -562,8 +565,6 @@ static bool bitmap_access(int x, int y, int mode, uint16_t *pixel) {
 }
 
 static void draw_bitmap(int mode, int y) {
-    compute_sprite_masks(mode, y);
-
     for (int pri = 3; pri >= 0; pri--) {
         const int bg = 2;
 
@@ -606,6 +607,7 @@ static void video_draw_scanline() {
     win1.top = ioreg.winv[1].b.b1;
 
     bool forced_blank = (ioreg.dispcnt.w & DCNT_BLANK);
+    int mode = BITS(ioreg.dispcnt.w, 0, 2);
     int y = ioreg.vcount.w;
 
     if (forced_blank) {
@@ -613,9 +615,10 @@ static void video_draw_scanline() {
         return;
     }
 
+    reset_scanline();
+    compute_sprite_masks(mode, y);
     draw_backdrop(y);
 
-    int mode = BITS(ioreg.dispcnt.w, 0, 2);
     switch (mode) {
         case 0:
         case 1:
