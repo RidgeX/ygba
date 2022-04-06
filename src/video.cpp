@@ -39,6 +39,14 @@ bool active_compute_sprite_masks;
 bool active_sprite_transparency;
 bool active_sprite_mask;
 
+enum WindowRegion {
+    None = 0,
+    Win0 = 1,
+    Win1 = 2,
+    WinObj = 3,
+    WinOut = 4
+};
+
 struct WindowInfo {
     int left;
     int top;
@@ -48,22 +56,69 @@ struct WindowInfo {
 
 WindowInfo win0, win1;
 
-static bool is_point_in_window(int x, int y, WindowInfo win) {
+static bool is_point_in_window(WindowInfo window, int x, int y) {
     bool x_ok = false;
     bool y_ok = false;
 
-    if (win.left < win.right) {
-        x_ok = (x >= win.left && x < win.right);
-    } else if (win.left > win.right) {
-        x_ok = (x >= win.left || x < win.right);
+    if (window.left < window.right) {
+        x_ok = (x >= window.left && x < window.right);
+    } else if (window.left > window.right) {
+        x_ok = (x >= window.left || x < window.right);
     }
-    if (win.top < win.bottom) {
-        y_ok = (y >= win.top && y < win.bottom);
-    } else if (win.top > win.bottom) {
-        y_ok = (y >= win.top || y < win.bottom);
+    if (window.top < window.bottom) {
+        y_ok = (y >= window.top && y < window.bottom);
+    } else if (window.top > window.bottom) {
+        y_ok = (y >= window.top || y < window.bottom);
     }
 
     return (x_ok && y_ok);
+}
+
+static WindowRegion window_find_region(int x, int y) {
+    bool enable_win0 = (ioreg.dispcnt.w & DCNT_WIN0);
+    bool enable_win1 = (ioreg.dispcnt.w & DCNT_WIN1);
+    bool enable_winobj = (ioreg.dispcnt.w & DCNT_WINOBJ);
+    bool enable_winout = (enable_win0 || enable_win1 || enable_winobj);
+
+    bool inside_win0 = (enable_win0 && is_point_in_window(win0, x, y));
+    bool inside_win1 = (enable_win1 && is_point_in_window(win1, x, y));
+    bool inside_winobj = (enable_winobj && (scanline[x].flags & ScanlineFlags::SpriteMask));
+
+    if (inside_win0) {
+        return WindowRegion::Win0;
+    } else if (inside_win1) {
+        return WindowRegion::Win1;
+    } else if (inside_winobj) {
+        return WindowRegion::WinObj;
+    } else if (enable_winout) {
+        return WindowRegion::WinOut;
+    }
+
+    return WindowRegion::None;
+}
+
+static bool window_enable_blend(WindowRegion region) {
+    switch (region) {
+        case WindowRegion::None: break;
+        case WindowRegion::Win0: return BIT(ioreg.winin.w, 5);
+        case WindowRegion::Win1: return BIT(ioreg.winin.w, 13);
+        case WindowRegion::WinObj: return BIT(ioreg.winout.w, 13);
+        case WindowRegion::WinOut: return BIT(ioreg.winout.w, 5);
+    }
+
+    return true;
+}
+
+static bool window_bg_visible(WindowRegion region, int bg) {
+    switch (region) {
+        case WindowRegion::None: break;
+        case WindowRegion::Win0: return BIT(ioreg.winin.w, bg);
+        case WindowRegion::Win1: return BIT(ioreg.winin.w, 8 + bg);
+        case WindowRegion::WinObj: return BIT(ioreg.winout.w, 8 + bg);
+        case WindowRegion::WinOut: return BIT(ioreg.winout.w, bg);
+    }
+
+    return true;
 }
 
 static double fixed1p4_to_double(int8_t x) {
@@ -147,31 +202,9 @@ static void draw_pixel_if_visible(int bg, int x, int y, uint16_t pixel) {
         return;
     }
 
-    bool enable_win0 = (ioreg.dispcnt.w & DCNT_WIN0);
-    bool enable_win1 = (ioreg.dispcnt.w & DCNT_WIN1);
-    bool enable_winobj = (ioreg.dispcnt.w & DCNT_WINOBJ);
-    bool enable_winout = (enable_win0 || enable_win1 || enable_winobj);
-
-    bool inside_win0 = (enable_win0 && is_point_in_window(x, y, win0));
-    bool inside_win1 = (enable_win1 && is_point_in_window(x, y, win1));
-    bool inside_winobj = (enable_winobj && (scanline[x].flags & ScanlineFlags::SpriteMask));
-
-    bool enable_blend = true;
-    bool visible = true;
-
-    if (inside_win0) {
-        enable_blend = BIT(ioreg.winin.w, 5);
-        visible = BIT(ioreg.winin.w, bg);
-    } else if (inside_win1) {
-        enable_blend = BIT(ioreg.winin.w, 13);
-        visible = BIT(ioreg.winin.w, 8 + bg);
-    } else if (inside_winobj) {
-        enable_blend = BIT(ioreg.winout.w, 13);
-        visible = BIT(ioreg.winout.w, 8 + bg);
-    } else if (enable_winout) {
-        enable_blend = BIT(ioreg.winout.w, 5);
-        visible = BIT(ioreg.winout.w, bg);
-    }
+    WindowRegion window_region = window_find_region(x, y);
+    bool enable_blend = window_enable_blend(window_region);
+    bool visible = window_bg_visible(window_region, bg);
 
     if (!enable_blend) {
         scanline[x].flags &= ~ScanlineFlags::EnableBlend;
