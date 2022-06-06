@@ -154,7 +154,6 @@ static bool rom_contains_string(const std::string &s) {
 const std::map<std::tuple<std::string, std::string, uint8_t>, uint32_t> idle_loop_address_map{
     {{"ADVANCEWARS", "AWRE", 0}, 0x80387ec},   // Advance Wars (USA)
     {{"ADVANCEWARS", "AWRE", 1}, 0x8038818},   // Advance Wars (USA) (Rev 1)
-    {{"ADVANCEWARS2", "AW2E", 0}, 0x8036e0c},  // Advance Wars 2 - Black Hole Rising (USA, Australia)
     {{"DRILL DOZER", "V49E", 0}, 0x80006ba},   // Drill Dozer (USA)
     {{"FFTA_USVER.", "AFXE", 0}, 0x8000418},   // Final Fantasy Tactics Advance (USA, Australia)
     {{"KURURIN", "AKRP", 0}, 0x800041a},       // Kurukuru Kururin (Europe)
@@ -210,6 +209,8 @@ static void system_detect_cartridge_features() {
     if (key == std::make_tuple("MONKEYBALLJR", "ALUE", 0)) {  // Super Monkey Ball Jr. (USA)
         has_eeprom = true;
         has_flash = has_sram = false;
+    } else if (key == std::make_tuple("TOPGUN CZ", "A2YE", 0)) {  // Top Gun - Combat Zones (USA) (En,Fr,De,Es,It)
+        has_eeprom = has_flash = has_sram = false;
     }
 }
 
