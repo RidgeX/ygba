@@ -11,7 +11,8 @@
 #include "io.h"
 #include "memory.h"
 
-int dma_active;
+int dma_channel_active;
+int dma_channel_finished;
 uint32_t dma_pc;
 
 const uint32_t src_addr_mask[4] = {0x07ffffff, 0x0fffffff, 0x0fffffff, 0x0fffffff};
@@ -84,7 +85,7 @@ void dma_reset(int ch) {
 
 void dma_update(uint32_t current_timing) {
     for (int ch = 0; ch < 4; ch++) {
-        if (dma_active != -1 && ch >= dma_active) continue;
+        if (dma_channel_active != -1 && ch >= dma_channel_active) continue;
 
         uint32_t dad = ioreg.dma[ch].dad.dw;
         uint32_t cnt = ioreg.dma[ch].cnt.dw;
@@ -130,12 +131,13 @@ void dma_update(uint32_t current_timing) {
         }
 
         dma_pc = get_pc();
-        int last_dma_active = dma_active;
-        dma_active = ch;
+        int last_active = dma_channel_active;
+        dma_channel_active = ch;
 
         dma_transfer(ch, dst_ctrl, src_ctrl, dst_addr, src_addr, word_size ? 4 : 2, count);
 
-        dma_active = last_dma_active;
+        dma_channel_finished = dma_channel_active;
+        dma_channel_active = last_active;
 
         if (cnt & DMA_IRQ) {
             ioreg.irq.w |= 1 << (8 + ch);

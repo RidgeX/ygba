@@ -49,7 +49,8 @@ void system_reset(bool keep_save_data) {
     branch_taken = true;
 
     halted = false;
-    dma_active = -1;
+    dma_channel_active = -1;
+    dma_channel_finished = 0;
     dma_pc = 0;
 
     video_cycles = 0;
