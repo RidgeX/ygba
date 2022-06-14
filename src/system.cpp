@@ -43,6 +43,7 @@ void system_reset(bool keep_save_data) {
     if (!keep_save_data) backup_erase();
     backup_init();
     gpio_init();
+    io_init_keypad_interrupt();
 
     std::memset(r, 0, sizeof(uint32_t) * 16);
     arm_init_registers(skip_bios);

@@ -20,21 +20,48 @@
 io_registers ioreg;
 
 bool halted;
+uint16_t key_irq_held_last;
+uint16_t key_irq_mask_last;
+bool key_irq_raised_last;
 bool sound_powered;
+
+void io_init_keypad_interrupt() {
+    key_irq_held_last = 0x400;
+    key_irq_mask_last = 0x400;
+    key_irq_raised_last = false;
+}
 
 static void check_keypad_interrupt() {
     if (BIT(ioreg.keycnt.w, 14)) {
         uint16_t held = ~ioreg.keyinput.w & 0x3ff;
         uint16_t mask = ioreg.keycnt.w & 0x3ff;
+
+        bool held_same = (held == key_irq_held_last);
+        bool mask_same = (mask == key_irq_mask_last);
+        bool mask_no_keys_added = ((key_irq_mask_last & mask) == mask);
+        bool raised_last = key_irq_raised_last;
+
+        // With the same set of keys held, the trigger condition is not retested if:
+        // - KEYCNT remains the same
+        // - KEYCNT is modified to only remove keys and the previous test was true
+        if (held_same && (mask_same || (mask_no_keys_added && raised_last))) return;
+
+        bool raised = false;
         if (BIT(ioreg.keycnt.w, 15)) {
-            if ((held & mask) == mask) {  // All keys held
-                ioreg.irq.w |= INT_BUTTON;
+            if ((held & mask) == mask) {
+                ioreg.irq.w |= INT_BUTTON;  // All keys in mask held
+                raised = true;
             }
         } else {
-            if (held & mask) {  // Any key held
-                ioreg.irq.w |= INT_BUTTON;
+            if (held & mask) {
+                ioreg.irq.w |= INT_BUTTON;  // Any key in mask held
+                raised = true;
             }
         }
+
+        key_irq_held_last = held;
+        key_irq_mask_last = mask;
+        key_irq_raised_last = raised;
     }
 }
 

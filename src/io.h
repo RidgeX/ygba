@@ -263,6 +263,7 @@ extern bool halted;
 #define REG_POSTFLG     0x300
 #define REG_HALTCNT     0x301
 
+void io_init_keypad_interrupt();
 uint8_t io_read_byte(uint32_t address);
 void io_write_byte(uint32_t address, uint8_t value);
 uint16_t io_read_halfword(uint32_t address);
