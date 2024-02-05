@@ -11,8 +11,8 @@
 
 using fmt::file;
 
-output_redirect::output_redirect(FILE* f) : file_(f) {
-  flush();
+output_redirect::output_redirect(FILE* f, bool flush) : file_(f) {
+  if (flush) this->flush();
   int fd = FMT_POSIX(fileno(f));
   // Create a file object referring to the original file.
   original_ = file::dup(fd);
@@ -23,7 +23,7 @@ output_redirect::output_redirect(FILE* f) : file_(f) {
   write_end.dup2(fd);
 }
 
-output_redirect::~output_redirect() FMT_NOEXCEPT {
+output_redirect::~output_redirect() noexcept {
   try {
     restore();
   } catch (const std::exception& e) {

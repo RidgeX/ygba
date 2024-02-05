@@ -1,18 +1,15 @@
 add_subdirectory(gtest)
 
+include(CheckSymbolExists)
+
 set(TEST_MAIN_SRC test-main.cc gtest-extra.cc gtest-extra.h util.cc)
 add_library(test-main STATIC ${TEST_MAIN_SRC})
 target_include_directories(test-main PUBLIC
   $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>)
-target_link_libraries(test-main gtest)
-
-include(CheckCXXCompilerFlag)
+target_link_libraries(test-main gtest fmt)
 
 function(add_fmt_executable name)
   add_executable(${name} ${ARGN})
-  if (MINGW)
-    target_link_libraries(${name} -static-libgcc -static-libstdc++)
-  endif ()
   # (Wstringop-overflow) - [meta-bug] bogus/missing -Wstringop-overflow warnings
   #   https://gcc.gnu.org/bugzilla/show_bug.cgi?id=88443
   # Bogus -Wstringop-overflow warning
@@ -21,6 +18,8 @@ function(add_fmt_executable name)
   #   https://gcc.gnu.org/bugzilla/show_bug.cgi?id=95353
   if (CMAKE_CXX_COMPILER_ID MATCHES "GNU" AND
       NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 7.0)
+    target_compile_options(${name} PRIVATE -Wno-stringop-overflow)
+    # The linker flag is needed for LTO.
     target_link_libraries(${name} -Wno-stringop-overflow)
   endif ()
 endfunction()
@@ -38,7 +37,7 @@ function(add_fmt_test name)
       set(PEDANTIC_COMPILE_FLAGS ${PEDANTIC_COMPILE_FLAGS} -Wno-weak-vtables)
     endif ()
   elseif (ADD_FMT_TEST_MODULE)
-    set(libs gtest test-module)
+    set(libs test-main test-module)
     set_source_files_properties(${name}.cc PROPERTIES OBJECT_DEPENDS test-module)
   else ()
     set(libs test-main fmt)
@@ -55,6 +54,10 @@ function(add_fmt_test name)
   endif ()
   add_test(NAME ${name} COMMAND ${name})
 endfunction()
+
+if (FMT_MODULE)
+  return ()
+endif ()
 
 add_fmt_test(args-test)
 add_fmt_test(assert-test)
@@ -78,7 +81,22 @@ if (MSVC)
 endif()
 add_fmt_test(printf-test)
 add_fmt_test(ranges-test ranges-odr-test.cc)
+
 add_fmt_test(scan-test)
+check_symbol_exists(strptime "time.h" HAVE_STRPTIME)
+if (HAVE_STRPTIME)
+  target_compile_definitions(scan-test PRIVATE FMT_HAVE_STRPTIME)
+endif ()
+
+add_fmt_test(std-test)
+try_compile(compile_result_unused
+            ${CMAKE_CURRENT_BINARY_DIR}
+            SOURCES ${CMAKE_CURRENT_LIST_DIR}/detect-stdfs.cc
+            OUTPUT_VARIABLE RAWOUTPUT)
+string(REGEX REPLACE ".*libfound \"([^\"]*)\".*" "\\1" STDLIBFS "${RAWOUTPUT}")
+if (STDLIBFS)
+  target_link_libraries(std-test ${STDLIBFS})
+endif ()
 add_fmt_test(unicode-test HEADER_ONLY)
 if (MSVC)
   target_compile_options(unicode-test PRIVATE /utf-8)
@@ -88,13 +106,13 @@ add_fmt_test(enforce-checks-test)
 target_compile_definitions(enforce-checks-test PRIVATE
                            -DFMT_ENFORCE_COMPILE_STRING)
 
-if (FMT_CAN_MODULE)
+if (FMT_MODULE)
   # The tests need {fmt} to be compiled as traditional library
   # because of visibility of implementation details.
   # If module support is present the module tests require a
   # test-only module to be built from {fmt}
   add_library(test-module OBJECT ${CMAKE_SOURCE_DIR}/src/fmt.cc)
-  target_compile_features(test-module PUBLIC ${FMT_REQUIRED_FEATURES})
+  target_compile_features(test-module PUBLIC cxx_std_11)
   target_include_directories(test-module PUBLIC
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>)
   enable_module(test-module)
@@ -128,9 +146,6 @@ if (NOT MSVC_STATIC_RUNTIME)
   if (FMT_PEDANTIC)
     target_compile_options(posix-mock-test PRIVATE ${PEDANTIC_COMPILE_FLAGS})
   endif ()
-  if (HAVE_STRTOD_L)
-    target_compile_definitions(posix-mock-test PRIVATE FMT_LOCALE)
-  endif ()
   add_test(NAME posix-mock-test COMMAND posix-mock-test)
   add_fmt_test(os-test)
 endif ()
@@ -148,9 +163,7 @@ if (FMT_PEDANTIC)
     target_include_directories(
       noexception-test PRIVATE ${PROJECT_SOURCE_DIR}/include)
     target_compile_options(noexception-test PRIVATE -fno-exceptions)
-    if (FMT_PEDANTIC)
-      target_compile_options(noexception-test PRIVATE ${PEDANTIC_COMPILE_FLAGS})
-    endif ()
+    target_compile_options(noexception-test PRIVATE ${PEDANTIC_COMPILE_FLAGS})
   endif ()
 
   # Test that the library compiles without locale.
@@ -162,7 +175,12 @@ if (FMT_PEDANTIC)
 endif ()
 
 # These tests are disabled on Windows because they take too long.
-if (FMT_PEDANTIC AND NOT WIN32)
+# They are disabled on GCC < 4.9 because it can not parse UDLs without
+# a space after `operator""` but that is an incorrect syntax for any more
+# modern compiler.
+if (FMT_PEDANTIC AND NOT WIN32 AND NOT (
+    CMAKE_CXX_COMPILER_ID MATCHES "GNU" AND
+    CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.9))
   # Test if incorrect API usages produce compilation error.
   add_test(compile-error-test ${CMAKE_CTEST_COMMAND}
     --build-and-test
@@ -174,8 +192,8 @@ if (FMT_PEDANTIC AND NOT WIN32)
     "-DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
     "-DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}"
     "-DCMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD}"
-    "-DFMT_DIR=${CMAKE_SOURCE_DIR}"
-    "-DSUPPORTS_USER_DEFINED_LITERALS=${SUPPORTS_USER_DEFINED_LITERALS}")
+    "-DCXX_STANDARD_FLAG=${CXX_STANDARD_FLAG}"
+    "-DFMT_DIR=${CMAKE_SOURCE_DIR}")
 
   # Test if the targets are found from the build directory.
   add_test(find-package-test ${CMAKE_CTEST_COMMAND}
