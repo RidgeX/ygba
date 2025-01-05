@@ -50,11 +50,18 @@ int main(int argc, char *argv[]) {
 
     // Decide GL+GLSL versions
 #if defined(IMGUI_IMPL_OPENGL_ES2)
-    // GL ES 2.0 + GLSL 100
+    // GL ES 2.0 + GLSL 100 (WebGL 1.0)
     const char *glsl_version = "#version 100";
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, 0);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+#elif defined(IMGUI_IMPL_OPENGL_ES3)
+    // GL ES 3.0 + GLSL 300 es (WebGL 2.0)
+    const char *glsl_version = "#version 300 es";
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, 0);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
 #elif defined(__APPLE__)
     // GL 3.2 Core + GLSL 150
@@ -88,6 +95,10 @@ int main(int argc, char *argv[]) {
         std::exit(EXIT_FAILURE);
     }
     SDL_GLContext gl_context = SDL_GL_CreateContext(window);
+    if (gl_context == nullptr) {
+        SDL_Log("Failed to create context: %s", SDL_GetError());
+        std::exit(EXIT_FAILURE);
+    }
     SDL_GL_MakeCurrent(window, gl_context);
     SDL_GL_SetSwapInterval(1);  // Enable vsync
 
@@ -228,7 +239,7 @@ int main(int argc, char *argv[]) {
         ImGui::Begin("Screen");
         ImGui::SliderInt("Scale", &screen_scale, 1, 5);
         ImVec2 screen_size = ImVec2((float) SCREEN_WIDTH * screen_scale, (float) SCREEN_HEIGHT * screen_scale);
-        ImGui::Image((void *) (intptr_t) screen_texture, screen_size);
+        ImGui::Image((ImTextureID) (intptr_t) screen_texture, screen_size);
         ImGui::End();
 
         // Debugger
@@ -301,8 +312,16 @@ int main(int argc, char *argv[]) {
 
         // Memory
         static MemoryEditor mem_edit;
-        mem_edit.ReadFn = [](const uint8_t *data, std::size_t off) { UNUSED(data); return memory_peek_byte(off); };
-        mem_edit.WriteFn = [](uint8_t *data, std::size_t off, uint8_t d) { UNUSED(data); memory_poke_byte(off, d); };
+        mem_edit.ReadFn = [](const uint8_t *mem, std::size_t off, void *user_data) {
+            UNUSED(mem);
+            UNUSED(user_data);
+            return memory_peek_byte(off);
+        };
+        mem_edit.WriteFn = [](uint8_t *mem, std::size_t off, uint8_t d, void *user_data) {
+            UNUSED(mem);
+            UNUSED(user_data);
+            memory_poke_byte(off, d);
+        };
         if (show_memory_window) {
             ImGui::Begin("Memory", &show_memory_window);
             mem_edit.DrawContents(nullptr, 0x10000000);

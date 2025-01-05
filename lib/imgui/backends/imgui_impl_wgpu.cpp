@@ -4,7 +4,8 @@
 
 // Implemented features:
 //  [X] Renderer: User texture binding. Use 'WGPUTextureView' as ImTextureID. Read the FAQ about ImTextureID!
-//  [X] Renderer: Large meshes support (64k+ vertices) with 16-bit indices.
+//  [X] Renderer: Large meshes support (64k+ vertices) even with 16-bit indices (ImGuiBackendFlags_RendererHasVtxOffset).
+//  [X] Renderer: Expose selected render state for draw callbacks to use. Access in '(ImGui_ImplXXXX_RenderState*)GetPlatformIO().Renderer_RenderState'.
 
 // You can use unmodified imgui_impl_* files in your project. See examples/ folder for examples of using this.
 // Prefer including the entire imgui/ repository into your project (either as a copy or as a submodule), and only build the backends you need.
@@ -16,6 +17,14 @@
 
 // CHANGELOG
 // (minor and older changes stripped away, please see git history for details)
+//  2024-10-14: Update Dawn support for change of string usages. (#8082, #8083)
+//  2024-10-07: Expose selected render state in ImGui_ImplWGPU_RenderState, which you can access in 'void* platform_io.Renderer_RenderState' during draw callbacks.
+//  2024-10-07: Changed default texture sampler to Clamp instead of Repeat/Wrap.
+//  2024-09-16: Added support for optional IMGUI_IMPL_WEBGPU_BACKEND_DAWN / IMGUI_IMPL_WEBGPU_BACKEND_WGPU define to handle ever-changing native implementations. (#7977)
+//  2024-01-22: Added configurable PipelineMultisampleState struct. (#7240)
+//  2024-01-22: (Breaking) ImGui_ImplWGPU_Init() now takes a ImGui_ImplWGPU_InitInfo structure instead of variety of parameters, allowing for easier further changes.
+//  2024-01-22: Fixed pipeline layout leak. (#7245)
+//  2024-01-17: Explicitly fill all of WGPUDepthStencilState since standard removed defaults.
 //  2023-07-13: Use WGPUShaderModuleWGSLDescriptor's code instead of source. use WGPUMipmapFilterMode_Linear instead of WGPUFilterMode_Linear. (#6602)
 //  2023-04-11: Align buffer sizes. Use WGSL shaders instead of precompiled SPIR-V.
 //  2023-04-11: Reorganized backend to pull data from a single structure to facilitate usage with multiple-contexts (all g_XXXX access changed to bd->XXXX).
@@ -30,6 +39,18 @@
 //  2021-05-16: Update to latest WebGPU specs (compatible with Emscripten 2.0.20 and Chrome Canary 92).
 //  2021-02-18: Change blending equation to preserve alpha in output buffer.
 //  2021-01-28: Initial version.
+
+// When targeting native platforms (i.e. NOT emscripten), one of IMGUI_IMPL_WEBGPU_BACKEND_DAWN
+// or IMGUI_IMPL_WEBGPU_BACKEND_WGPU must be provided. See imgui_impl_wgpu.h for more details.
+#ifndef __EMSCRIPTEN__
+    #if defined(IMGUI_IMPL_WEBGPU_BACKEND_DAWN) == defined(IMGUI_IMPL_WEBGPU_BACKEND_WGPU)
+    #error exactly one of IMGUI_IMPL_WEBGPU_BACKEND_DAWN or IMGUI_IMPL_WEBGPU_BACKEND_WGPU must be defined!
+    #endif
+#else
+    #if defined(IMGUI_IMPL_WEBGPU_BACKEND_DAWN) || defined(IMGUI_IMPL_WEBGPU_BACKEND_WGPU)
+    #error neither IMGUI_IMPL_WEBGPU_BACKEND_DAWN nor IMGUI_IMPL_WEBGPU_BACKEND_WGPU may be defined if targeting emscripten!
+    #endif
+#endif
 
 #include "imgui.h"
 #ifndef IMGUI_DISABLE
@@ -72,16 +93,17 @@ struct Uniforms
 
 struct ImGui_ImplWGPU_Data
 {
-    WGPUDevice          wgpuDevice = nullptr;
-    WGPUQueue           defaultQueue = nullptr;
-    WGPUTextureFormat   renderTargetFormat = WGPUTextureFormat_Undefined;
-    WGPUTextureFormat   depthStencilFormat = WGPUTextureFormat_Undefined;
-    WGPURenderPipeline  pipelineState = nullptr;
+    ImGui_ImplWGPU_InitInfo initInfo;
+    WGPUDevice              wgpuDevice = nullptr;
+    WGPUQueue               defaultQueue = nullptr;
+    WGPUTextureFormat       renderTargetFormat = WGPUTextureFormat_Undefined;
+    WGPUTextureFormat       depthStencilFormat = WGPUTextureFormat_Undefined;
+    WGPURenderPipeline      pipelineState = nullptr;
 
-    RenderResources     renderResources;
-    FrameResources*     pFrameResources = nullptr;
-    unsigned int        numFramesInFlight = 0;
-    unsigned int        frameIndex = UINT_MAX;
+    RenderResources         renderResources;
+    FrameResources*         pFrameResources = nullptr;
+    unsigned int            numFramesInFlight = 0;
+    unsigned int            frameIndex = UINT_MAX;
 };
 
 // Backend data stored in io.BackendRendererUserData to allow support for multiple Dear ImGui contexts
@@ -179,6 +201,12 @@ static void SafeRelease(WGPUBuffer& res)
         wgpuBufferRelease(res);
     res = nullptr;
 }
+static void SafeRelease(WGPUPipelineLayout& res)
+{
+    if (res)
+        wgpuPipelineLayoutRelease(res);
+    res = nullptr;
+}
 static void SafeRelease(WGPURenderPipeline& res)
 {
     if (res)
@@ -233,16 +261,26 @@ static WGPUProgrammableStageDescriptor ImGui_ImplWGPU_CreateShaderModule(const c
 {
     ImGui_ImplWGPU_Data* bd = ImGui_ImplWGPU_GetBackendData();
 
-    WGPUShaderModuleWGSLDescriptor wgsl_desc = {};
+#ifdef IMGUI_IMPL_WEBGPU_BACKEND_DAWN
+	WGPUShaderSourceWGSL wgsl_desc = {};
+    wgsl_desc.chain.sType = WGPUSType_ShaderSourceWGSL;
+	wgsl_desc.code = { wgsl_source, WGPU_STRLEN };
+#else
+	WGPUShaderModuleWGSLDescriptor wgsl_desc = {};
     wgsl_desc.chain.sType = WGPUSType_ShaderModuleWGSLDescriptor;
-    wgsl_desc.code = wgsl_source;
+	wgsl_desc.code = wgsl_source;
+#endif
 
     WGPUShaderModuleDescriptor desc = {};
     desc.nextInChain = reinterpret_cast<WGPUChainedStruct*>(&wgsl_desc);
 
     WGPUProgrammableStageDescriptor stage_desc = {};
     stage_desc.module = wgpuDeviceCreateShaderModule(bd->wgpuDevice, &desc);
+#ifdef IMGUI_IMPL_WEBGPU_BACKEND_DAWN
+    stage_desc.entryPoint = { "main", WGPU_STRLEN };
+#else
     stage_desc.entryPoint = "main";
+#endif
     return stage_desc;
 }
 
@@ -355,6 +393,9 @@ void ImGui_ImplWGPU_RenderDrawData(ImDrawData* draw_data, WGPURenderPassEncoder 
         {
             nullptr,
             "Dear ImGui Vertex buffer",
+#ifdef IMGUI_IMPL_WEBGPU_BACKEND_DAWN
+            WGPU_STRLEN,
+#endif
             WGPUBufferUsage_CopyDst | WGPUBufferUsage_Vertex,
             MEMALIGN(fr->VertexBufferSize * sizeof(ImDrawVert), 4),
             false
@@ -379,6 +420,9 @@ void ImGui_ImplWGPU_RenderDrawData(ImDrawData* draw_data, WGPURenderPassEncoder 
         {
             nullptr,
             "Dear ImGui Index buffer",
+#ifdef IMGUI_IMPL_WEBGPU_BACKEND_DAWN
+            WGPU_STRLEN,
+#endif
             WGPUBufferUsage_CopyDst | WGPUBufferUsage_Index,
             MEMALIGN(fr->IndexBufferSize * sizeof(ImDrawIdx), 4),
             false
@@ -395,11 +439,11 @@ void ImGui_ImplWGPU_RenderDrawData(ImDrawData* draw_data, WGPURenderPassEncoder 
     ImDrawIdx* idx_dst = (ImDrawIdx*)fr->IndexBufferHost;
     for (int n = 0; n < draw_data->CmdListsCount; n++)
     {
-        const ImDrawList* cmd_list = draw_data->CmdLists[n];
-        memcpy(vtx_dst, cmd_list->VtxBuffer.Data, cmd_list->VtxBuffer.Size * sizeof(ImDrawVert));
-        memcpy(idx_dst, cmd_list->IdxBuffer.Data, cmd_list->IdxBuffer.Size * sizeof(ImDrawIdx));
-        vtx_dst += cmd_list->VtxBuffer.Size;
-        idx_dst += cmd_list->IdxBuffer.Size;
+        const ImDrawList* draw_list = draw_data->CmdLists[n];
+        memcpy(vtx_dst, draw_list->VtxBuffer.Data, draw_list->VtxBuffer.Size * sizeof(ImDrawVert));
+        memcpy(idx_dst, draw_list->IdxBuffer.Data, draw_list->IdxBuffer.Size * sizeof(ImDrawIdx));
+        vtx_dst += draw_list->VtxBuffer.Size;
+        idx_dst += draw_list->IdxBuffer.Size;
     }
     int64_t vb_write_size = MEMALIGN((char*)vtx_dst - (char*)fr->VertexBufferHost, 4);
     int64_t ib_write_size = MEMALIGN((char*)idx_dst - (char*)fr->IndexBufferHost, 4);
@@ -409,6 +453,13 @@ void ImGui_ImplWGPU_RenderDrawData(ImDrawData* draw_data, WGPURenderPassEncoder 
     // Setup desired render state
     ImGui_ImplWGPU_SetupRenderState(draw_data, pass_encoder, fr);
 
+    // Setup render state structure (for callbacks and custom texture bindings)
+    ImGuiPlatformIO& platform_io = ImGui::GetPlatformIO();
+    ImGui_ImplWGPU_RenderState render_state;
+    render_state.Device = bd->wgpuDevice;
+    render_state.RenderPassEncoder = pass_encoder;
+    platform_io.Renderer_RenderState = &render_state;
+
     // Render command lists
     // (Because we merged all buffers into a single one, we maintain our own offset into them)
     int global_vtx_offset = 0;
@@ -417,10 +468,10 @@ void ImGui_ImplWGPU_RenderDrawData(ImDrawData* draw_data, WGPURenderPassEncoder 
     ImVec2 clip_off = draw_data->DisplayPos;
     for (int n = 0; n < draw_data->CmdListsCount; n++)
     {
-        const ImDrawList* cmd_list = draw_data->CmdLists[n];
-        for (int cmd_i = 0; cmd_i < cmd_list->CmdBuffer.Size; cmd_i++)
+        const ImDrawList* draw_list = draw_data->CmdLists[n];
+        for (int cmd_i = 0; cmd_i < draw_list->CmdBuffer.Size; cmd_i++)
         {
-            const ImDrawCmd* pcmd = &cmd_list->CmdBuffer[cmd_i];
+            const ImDrawCmd* pcmd = &draw_list->CmdBuffer[cmd_i];
             if (pcmd->UserCallback != nullptr)
             {
                 // User callback, registered via ImDrawList::AddCallback()
@@ -428,7 +479,7 @@ void ImGui_ImplWGPU_RenderDrawData(ImDrawData* draw_data, WGPURenderPassEncoder 
                 if (pcmd->UserCallback == ImDrawCallback_ResetRenderState)
                     ImGui_ImplWGPU_SetupRenderState(draw_data, pass_encoder, fr);
                 else
-                    pcmd->UserCallback(cmd_list, pcmd);
+                    pcmd->UserCallback(draw_list, pcmd);
             }
             else
             {
@@ -464,9 +515,10 @@ void ImGui_ImplWGPU_RenderDrawData(ImDrawData* draw_data, WGPURenderPassEncoder 
                 wgpuRenderPassEncoderDrawIndexed(pass_encoder, pcmd->ElemCount, 1, pcmd->IdxOffset + global_idx_offset, pcmd->VtxOffset + global_vtx_offset, 0);
             }
         }
-        global_idx_offset += cmd_list->IdxBuffer.Size;
-        global_vtx_offset += cmd_list->VtxBuffer.Size;
+        global_idx_offset += draw_list->IdxBuffer.Size;
+        global_vtx_offset += draw_list->VtxBuffer.Size;
     }
+    platform_io.Renderer_RenderState = nullptr;
 }
 
 static void ImGui_ImplWGPU_CreateFontsTexture()
@@ -481,7 +533,11 @@ static void ImGui_ImplWGPU_CreateFontsTexture()
     // Upload texture to graphics system
     {
         WGPUTextureDescriptor tex_desc = {};
+#ifdef IMGUI_IMPL_WEBGPU_BACKEND_DAWN
+        tex_desc.label = { "Dear ImGui Font Texture", WGPU_STRLEN };
+#else
         tex_desc.label = "Dear ImGui Font Texture";
+#endif
         tex_desc.dimension = WGPUTextureDimension_2D;
         tex_desc.size.width = width;
         tex_desc.size.height = height;
@@ -525,9 +581,9 @@ static void ImGui_ImplWGPU_CreateFontsTexture()
         sampler_desc.minFilter = WGPUFilterMode_Linear;
         sampler_desc.magFilter = WGPUFilterMode_Linear;
         sampler_desc.mipmapFilter = WGPUMipmapFilterMode_Linear;
-        sampler_desc.addressModeU = WGPUAddressMode_Repeat;
-        sampler_desc.addressModeV = WGPUAddressMode_Repeat;
-        sampler_desc.addressModeW = WGPUAddressMode_Repeat;
+        sampler_desc.addressModeU = WGPUAddressMode_ClampToEdge;
+        sampler_desc.addressModeV = WGPUAddressMode_ClampToEdge;
+        sampler_desc.addressModeW = WGPUAddressMode_ClampToEdge;
         sampler_desc.maxAnisotropy = 1;
         bd->renderResources.Sampler = wgpuDeviceCreateSampler(bd->wgpuDevice, &sampler_desc);
     }
@@ -544,6 +600,9 @@ static void ImGui_ImplWGPU_CreateUniformBuffer()
     {
         nullptr,
         "Dear ImGui Uniform buffer",
+#ifdef IMGUI_IMPL_WEBGPU_BACKEND_DAWN
+        WGPU_STRLEN,
+#endif
         WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform,
         MEMALIGN(sizeof(Uniforms), 16),
         false
@@ -565,9 +624,7 @@ bool ImGui_ImplWGPU_CreateDeviceObjects()
     graphics_pipeline_desc.primitive.stripIndexFormat = WGPUIndexFormat_Undefined;
     graphics_pipeline_desc.primitive.frontFace = WGPUFrontFace_CW;
     graphics_pipeline_desc.primitive.cullMode = WGPUCullMode_None;
-    graphics_pipeline_desc.multisample.count = 1;
-    graphics_pipeline_desc.multisample.mask = UINT_MAX;
-    graphics_pipeline_desc.multisample.alphaToCoverageEnabled = false;
+    graphics_pipeline_desc.multisample = bd->initInfo.PipelineMultisampleState;
 
     // Bind group layouts
     WGPUBindGroupLayoutEntry common_bg_layout_entries[2] = {};
@@ -651,10 +708,20 @@ bool ImGui_ImplWGPU_CreateDeviceObjects()
     // Create depth-stencil State
     WGPUDepthStencilState depth_stencil_state = {};
     depth_stencil_state.format = bd->depthStencilFormat;
+#ifdef IMGUI_IMPL_WEBGPU_BACKEND_DAWN
+    depth_stencil_state.depthWriteEnabled = WGPUOptionalBool_False;
+#else
     depth_stencil_state.depthWriteEnabled = false;
+#endif
     depth_stencil_state.depthCompare = WGPUCompareFunction_Always;
     depth_stencil_state.stencilFront.compare = WGPUCompareFunction_Always;
+    depth_stencil_state.stencilFront.failOp = WGPUStencilOperation_Keep;
+    depth_stencil_state.stencilFront.depthFailOp = WGPUStencilOperation_Keep;
+    depth_stencil_state.stencilFront.passOp = WGPUStencilOperation_Keep;
     depth_stencil_state.stencilBack.compare = WGPUCompareFunction_Always;
+    depth_stencil_state.stencilBack.failOp = WGPUStencilOperation_Keep;
+    depth_stencil_state.stencilBack.depthFailOp = WGPUStencilOperation_Keep;
+    depth_stencil_state.stencilBack.passOp = WGPUStencilOperation_Keep;
 
     // Configure disabled depth-stencil state
     graphics_pipeline_desc.depthStencil = (bd->depthStencilFormat == WGPUTextureFormat_Undefined) ? nullptr :  &depth_stencil_state;
@@ -684,6 +751,7 @@ bool ImGui_ImplWGPU_CreateDeviceObjects()
 
     SafeRelease(vertex_shader_desc.module);
     SafeRelease(pixel_shader_desc.module);
+    SafeRelease(graphics_pipeline_desc.layout);
     SafeRelease(bg_layouts[0]);
 
     return true;
@@ -705,22 +773,32 @@ void ImGui_ImplWGPU_InvalidateDeviceObjects()
         SafeRelease(bd->pFrameResources[i]);
 }
 
-bool ImGui_ImplWGPU_Init(WGPUDevice device, int num_frames_in_flight, WGPUTextureFormat rt_format, WGPUTextureFormat depth_format)
+bool ImGui_ImplWGPU_Init(ImGui_ImplWGPU_InitInfo* init_info)
 {
     ImGuiIO& io = ImGui::GetIO();
+    IMGUI_CHECKVERSION();
     IM_ASSERT(io.BackendRendererUserData == nullptr && "Already initialized a renderer backend!");
 
     // Setup backend capabilities flags
     ImGui_ImplWGPU_Data* bd = IM_NEW(ImGui_ImplWGPU_Data)();
     io.BackendRendererUserData = (void*)bd;
+#if defined(__EMSCRIPTEN__)
+    io.BackendRendererName = "imgui_impl_webgpu_emscripten";
+#elif defined(IMGUI_IMPL_WEBGPU_BACKEND_DAWN)
+    io.BackendRendererName = "imgui_impl_webgpu_dawn";
+#elif defined(IMGUI_IMPL_WEBGPU_BACKEND_WGPU)
+    io.BackendRendererName = "imgui_impl_webgpu_wgpu";
+#else
     io.BackendRendererName = "imgui_impl_webgpu";
+#endif
     io.BackendFlags |= ImGuiBackendFlags_RendererHasVtxOffset;  // We can honor the ImDrawCmd::VtxOffset field, allowing for large meshes.
 
-    bd->wgpuDevice = device;
+    bd->initInfo = *init_info;
+    bd->wgpuDevice = init_info->Device;
     bd->defaultQueue = wgpuDeviceGetQueue(bd->wgpuDevice);
-    bd->renderTargetFormat = rt_format;
-    bd->depthStencilFormat = depth_format;
-    bd->numFramesInFlight = num_frames_in_flight;
+    bd->renderTargetFormat = init_info->RenderTargetFormat;
+    bd->depthStencilFormat = init_info->DepthStencilFormat;
+    bd->numFramesInFlight = init_info->NumFramesInFlight;
     bd->frameIndex = UINT_MAX;
 
     bd->renderResources.FontTexture = nullptr;
@@ -733,8 +811,8 @@ bool ImGui_ImplWGPU_Init(WGPUDevice device, int num_frames_in_flight, WGPUTextur
     bd->renderResources.ImageBindGroupLayout = nullptr;
 
     // Create buffers with a default size (they will later be grown as needed)
-    bd->pFrameResources = new FrameResources[num_frames_in_flight];
-    for (int i = 0; i < num_frames_in_flight; i++)
+    bd->pFrameResources = new FrameResources[bd->numFramesInFlight];
+    for (unsigned int i = 0; i < bd->numFramesInFlight; i++)
     {
         FrameResources* fr = &bd->pFrameResources[i];
         fr->IndexBuffer = nullptr;
